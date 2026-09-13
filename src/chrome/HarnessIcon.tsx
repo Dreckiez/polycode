@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import antigravity from "../assets/providers/antigravity.svg";
 import claude from "../assets/providers/claude.svg";
 import codex from "../assets/providers/codex.svg";
 import cursor from "../assets/providers/cursor.svg";
@@ -10,6 +11,7 @@ import pi from "../assets/providers/pi.svg";
 import type { HarnessId } from "../lib/session";
 
 export const HARNESS_ICONS: Record<HarnessId, string> = {
+  antigravity,
   claude,
   codex,
   cursor,
@@ -22,6 +24,7 @@ export const HARNESS_ICONS: Record<HarnessId, string> = {
 
 /** White marks that must follow `currentColor` so they stay visible in light mode. */
 export const MONOCHROME_HARNESSES = new Set<HarnessId>([
+  "antigravity",
   "cursor",
   "grok",
   "opencode",
@@ -57,6 +60,17 @@ export function HarnessIcon({
   harness: HarnessId;
   className?: string;
 }) {
+  if (harness === "antigravity") {
+    return (
+      <MonoIcon className={className}>
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M14.5 0C14.5 8.008 8.008 14.5 0 14.5C8.008 14.5 14.5 20.992 14.5 29C14.5 20.992 20.992 14.5 29 14.5C20.992 14.5 14.5 8.008 14.5 0Z"
+        />
+      </MonoIcon>
+    );
+  }
   if (harness === "cursor") {
     return (
       <MonoIcon className={className}>

@@ -170,9 +170,58 @@ export const MODELS: AgentModel[] = [
     name: "GLM 5.2 Fast",
     nativeId: "zai/glm-5.2-fast",
   },
+  {
+    id: "antigravity:gemini-3.8-flash-high",
+    harness: "antigravity",
+    name: "Gemini 3.8 Flash (High)",
+    nativeId: "gemini-3.8-flash-high",
+  },
+  {
+    id: "antigravity:gemini-3.8-flash-medium",
+    harness: "antigravity",
+    name: "Gemini 3.8 Flash (Medium)",
+    nativeId: "gemini-3.8-flash-medium",
+  },
+  {
+    id: "antigravity:gemini-3.8-flash-low",
+    harness: "antigravity",
+    name: "Gemini 3.8 Flash (Low)",
+    nativeId: "gemini-3.8-flash-low",
+  },
+  {
+    id: "antigravity:gemini-3.7-flash-high",
+    harness: "antigravity",
+    name: "Gemini 3.7 Flash (High)",
+    nativeId: "gemini-3.7-flash-high",
+  },
+  {
+    id: "antigravity:gemini-3.1-pro-high",
+    harness: "antigravity",
+    name: "Gemini 3.1 Pro (High)",
+    nativeId: "gemini-3.1-pro-high",
+  },
+  {
+    id: "antigravity:claude-sonnet-4-6",
+    harness: "antigravity",
+    name: "Claude Sonnet 4.6 (Thinking)",
+    nativeId: "claude-sonnet-4-6",
+  },
+  {
+    id: "antigravity:claude-opus-4-6-thinking",
+    harness: "antigravity",
+    name: "Claude Opus 4.6 (Thinking)",
+    nativeId: "claude-opus-4-6-thinking",
+  },
+  {
+    id: "antigravity:gpt-oss-120b-medium",
+    harness: "antigravity",
+    name: "GPT-OSS 120B (Medium)",
+    nativeId: "gpt-oss-120b-medium",
+  },
 ];
 
 export const DEFAULT_MODEL_ID: Record<HarnessId, string> = {
+  antigravity: "antigravity:gemini-3.8-flash-high",
   claude: "claude:sonnet-5",
   codex: "",
   cursor: "cursor:composer-2.5",
@@ -200,6 +249,7 @@ export type LastModelChoice = {
 };
 
 const HARNESS_ORDER: HarnessId[] = [
+  "antigravity",
   "claude",
   "codex",
   "cursor",

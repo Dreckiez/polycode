@@ -1,6 +1,7 @@
 import type { HarnessId } from "../session";
 import { HARNESSES } from "../session";
 import {
+  resolveAntigravityBinary,
   resolveClaudeBinary,
   resolveCodexBinary,
   resolveCursorBinary,
@@ -19,6 +20,7 @@ export type HarnessAvailability = Record<HarnessId, boolean>;
  * authenticated, so the hint must not blame a login.
  */
 const CLI: Record<HarnessId, { name: string; install?: string }> = {
+  antigravity: { name: "Antigravity CLI" },
   claude: { name: "Claude Code CLI" },
   codex: { name: "Codex CLI" },
   cursor: { name: "Cursor CLI" },
@@ -33,6 +35,7 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
 };
 
 let availability: HarnessAvailability = {
+  antigravity: false,
   claude: false,
   codex: false,
   cursor: false,
@@ -95,6 +98,14 @@ export function probeHarnessAvailability(
   inflight = Promise.all(
     HARNESSES.map(async (id) => {
       if (!isLiveHarness(id)) return [id, false] as const;
+      if (id === "antigravity") {
+        try {
+          await resolveAntigravityBinary();
+          return [id, true] as const;
+        } catch {
+          return [id, false] as const;
+        }
+      }
       if (id === "cursor") {
         try {
           await resolveCursorBinary();

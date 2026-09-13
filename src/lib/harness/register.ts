@@ -1,3 +1,4 @@
+import { ensureAntigravityRegistered } from "./antigravityAdapter";
 import { ensureClaudeRegistered } from "./claudeAdapter";
 import { ensureCodexRegistered } from "./codexAdapter";
 import { ensureCursorRegistered } from "./cursorAdapter";
@@ -9,6 +10,7 @@ import { ensurePiRegistered } from "./piAdapter";
 
 /** Register all known live harness adapters. Idempotent. */
 export function registerBuiltinHarnesses(): void {
+  ensureAntigravityRegistered();
   ensureClaudeRegistered();
   ensureCursorRegistered();
   ensureCodexRegistered();

@@ -10,9 +10,18 @@ import {
 } from "./models";
 
 export type HarnessId =
-  "claude" | "codex" | "cursor" | "grok" | "opencode" | "pi" | "omp" | "fx";
+  | "antigravity"
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "grok"
+  | "opencode"
+  | "pi"
+  | "omp"
+  | "fx";
 
 export const HARNESSES: HarnessId[] = [
+  "antigravity",
   "claude",
   "codex",
   "cursor",
@@ -272,6 +281,7 @@ export type PendingHarnessSwitch = {
 };
 
 export const HARNESS_LABEL: Record<HarnessId, string> = {
+  antigravity: "antigravity",
   claude: "claude",
   codex: "codex",
   cursor: "cursor",
@@ -283,6 +293,7 @@ export const HARNESS_LABEL: Record<HarnessId, string> = {
 };
 
 export const HARNESS_TITLE: Record<HarnessId, string> = {
+  antigravity: "Antigravity",
   claude: "Claude Code",
   codex: "Codex",
   cursor: "Cursor",

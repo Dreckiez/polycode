@@ -306,6 +306,18 @@ pub fn harness_resolve_grok() -> Result<CursorBinary, String> {
         })
 }
 
+/// Resolve the Antigravity CLI (`agy`).
+#[tauri::command(async)]
+pub fn harness_resolve_antigravity() -> Result<CursorBinary, String> {
+    resolve_antigravity()
+        .map(|path| CursorBinary {
+            path: path.to_string_lossy().into_owned(),
+        })
+        .ok_or_else(|| {
+            "Antigravity CLI (agy) not found. Install it and run `agy`, then retry.".into()
+        })
+}
+
 /// Bind an ephemeral loopback port for `opencode serve`.
 #[tauri::command]
 pub fn harness_free_port() -> Result<u16, String> {
@@ -656,6 +668,7 @@ fn is_resolved_harness_binary(command: &str) -> bool {
         resolve_omp(),
         resolve_fx(),
         resolve_grok(),
+        resolve_antigravity(),
     ]
     .into_iter()
     .flatten()
@@ -1410,6 +1423,34 @@ fn resolve_grok() -> Option<PathBuf> {
     }
 
     first_binary_matching(candidates, is_grok_agent)
+}
+
+fn resolve_antigravity() -> Option<PathBuf> {
+    let home = dirs_home().map(PathBuf::from);
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Some(home) = &home {
+        candidates.push(home.join("AppData/Local/agy/bin/agy"));
+        candidates.push(home.join(".local/bin/agy"));
+        candidates.push(home.join(".gemini/antigravity-cli/bin/agy"));
+        candidates.push(home.join(".cargo/bin/agy"));
+        candidates.push(home.join(".npm-global/bin/agy"));
+        candidates.push(home.join("AppData/Local/agy/bin/antigravity"));
+        candidates.push(home.join(".local/bin/antigravity"));
+    }
+    #[cfg(target_os = "macos")]
+    candidates.push(PathBuf::from("/opt/homebrew/bin/agy"));
+    candidates.push(PathBuf::from("/usr/local/bin/agy"));
+    candidates.push(PathBuf::from("/usr/bin/agy"));
+    candidates.push(PathBuf::from("/snap/bin/agy"));
+    if let Some(from_shell) = which_via_login_shell("agy") {
+        candidates.push(from_shell);
+    }
+    if let Some(from_shell) = which_via_login_shell("antigravity") {
+        candidates.push(from_shell);
+    }
+
+    first_binary(candidates)
 }
 
 fn is_pi_coding_agent(path: &Path) -> bool {
