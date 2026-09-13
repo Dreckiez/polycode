@@ -120,7 +120,6 @@ export function pendingInputNotifications(
 ): Map<string, PendingInputNotification> {
   const pending = new Map<string, PendingInputNotification>();
   for (const session of sessions) {
-    if (session.inboxAsk) continue;
     for (const block of session.blocks) {
       if (block.approval && !block.approval.decided) {
         pending.set(
@@ -221,7 +220,6 @@ export async function notifySession(
   event: NotificationEvent,
   sessionVisible: boolean,
 ): Promise<boolean> {
-  if (session.inboxAsk) return false;
   const decision = shouldNotify({
     enabled: loadNotificationsEnabled(),
     permission,

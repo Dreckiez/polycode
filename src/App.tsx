@@ -241,7 +241,6 @@ import {
   type Attachment,
   type Block,
   type HarnessId,
-  type LinkedWorkItem,
   type PlanBuildTarget,
   type RuntimeMode,
   type PlanStatus,
@@ -259,7 +258,6 @@ import { dropContextWindow } from "./lib/contextUsage";
 import {
   deleteSession,
   getSession,
-  listLinkedSessions,
   listSessionsByProject,
   persistFingerprint,
   replaceInFlightSessions,
@@ -329,23 +327,11 @@ import {
   turnUserRequest,
 } from "./lib/secondOpinion";
 import { PaneTree } from "./surfaces/PaneTree";
-import { SessionPane } from "./surfaces/SessionPane";
-import { SessionSurface } from "./surfaces/SessionSurface";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
 import { SearchView } from "./surfaces/SearchView";
-import { SettingsView, type SettingsAnchor } from "./surfaces/SettingsView";
-import type { ConnectableInboxSource } from "./lib/inboxFilters";
-import { InboxView } from "./surfaces/InboxView";
-import type { InboxSessionPortal } from "./surfaces/InboxDiscussionPanel";
-import { inboxAskKey, inboxAskPrompt } from "./lib/inboxAsk";
+import { SettingsView } from "./surfaces/SettingsView";
 import { NotesView } from "./surfaces/NotesView";
-import { inboxComposerCard, type InboxItem } from "./lib/githubTasks";
-import {
-  linkedWorkItemFromInboxItem,
-  resolveLinkedWorkItem,
-} from "./lib/sessionWorkItem";
-import { linearIssueDetails, peekLinearIssueDetails } from "./lib/linear";
-import { gitlabWorkItemDetails, peekGitlabWorkItemDetails } from "./lib/gitlab";
+import { resolveLinkedWorkItem } from "./lib/sessionWorkItem";
 import {
   loadLiveAgentsEnabled,
   loadNotesEnabled,
@@ -638,11 +624,7 @@ export default function App({
   const [searchFocusToken, setSearchFocusToken] = useState(0);
   const [searchViewOpen, setSearchViewOpen] = useState(false);
   const [searchViewFocusToken, setSearchViewFocusToken] = useState(0);
-  const [inboxViewOpen, setInboxViewOpen] = useState(false);
-  const [inboxTarget, setInboxTarget] = useState<LinkedWorkItem | null>(null);
-  const [inboxAskPortal, setInboxAskPortal] =
-    useState<InboxSessionPortal | null>(null);
-  const openingInboxSessions = useRef(new Map<string, Promise<string>>());
+
   const [notesViewOpen, setNotesViewOpen] = useState(false);
   const notesEnabled = useSyncExternalStore(
     subscribeNotesEnabled,
@@ -659,9 +641,6 @@ export default function App({
   const [whatsNewVersion, setWhatsNewVersion] = useState<string | null>(null);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSectionId>(loadSettingsSection);
-  const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | null>(
-    null,
-  );
   const [editorNavigation, setEditorNavigation] =
     useState<EditorNavigationTarget | null>(null);
   const editorNavigationToken = useRef(0);
@@ -675,9 +654,6 @@ export default function App({
     () => new Map(),
   );
   const [history, setHistory] = useState<SessionSummary[]>(() => bootHistory);
-  const [storedLinkedSessions, setStoredLinkedSessions] = useState<
-    SessionSummary[]
-  >(() => bootHistory.filter((session) => session.linkedWorkItem));
   /**
    * Projects whose rows are already in `history`. This has to be state, not a
    * ref: `sidebarCwd` is derived during render, so the frame that first shows
@@ -711,8 +687,7 @@ export default function App({
   projectCwdRef.current = projectCwd;
   const searchViewOpenRef = useRef(searchViewOpen);
   searchViewOpenRef.current = searchViewOpen;
-  const inboxViewOpenRef = useRef(inboxViewOpen);
-  inboxViewOpenRef.current = inboxViewOpen;
+
   const notesViewOpenRef = useRef(notesViewOpen);
   notesViewOpenRef.current = notesViewOpen;
   const settingsOpenRef = useRef(settingsOpen);
@@ -1020,9 +995,7 @@ export default function App({
   }
   const approvalSessionIds = approvalSessionIdsRef.current;
 
-  const activeSessionId = inboxViewOpen
-    ? inboxAskPortal?.sessionId
-    : active?.id;
+  const activeSessionId = active?.id;
   const activeSessionIdRef = useRef(activeSessionId);
   activeSessionIdRef.current = activeSessionId;
 
@@ -1170,20 +1143,7 @@ export default function App({
     void refreshHistory(sidebarCwd);
   }, [sidebarCwd, refreshHistory]);
 
-  useEffect(() => {
-    if (!inboxViewOpen) return;
-    let cancelled = false;
-    void listLinkedSessions()
-      .then((rows) => {
-        if (!cancelled) setStoredLinkedSessions(rows);
-      })
-      .catch(() => {
-        // Already-loaded and live sessions still provide a useful fallback.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [inboxViewOpen]);
+
 
   useEffect(() => {
     prefetchProjectFiles(sidebarCwd);
@@ -1352,11 +1312,7 @@ export default function App({
   // then parks it and resumes on the next prompt.
   useEffect(() => {
     const visibleIds = openSessionIds(tabs);
-    // Inbox owns these panes independently of project tabs. Keep their drafts
-    // and attachments mounted when the panel closes or switches items.
-    for (const session of sessions) {
-      if (session.inboxAsk) visibleIds.add(session.id);
-    }
+
     const keepUnseen = liveAgentsEnabled;
     const idleDetached = sessions.filter(
       (session) =>
@@ -1475,7 +1431,6 @@ export default function App({
 
   const onNew = useCallback(() => {
     setSearchViewOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(false);
     const cwd = active?.cwd ?? sessionDefaults?.cwd ?? projectCwd;
     const session = newDefaultSession(cwd, sessionDefaults?.runtimeMode);
@@ -1493,65 +1448,10 @@ export default function App({
     projectCwd,
   ]);
 
-  const onStartInboxItem = useCallback(
-    async (item: InboxItem, body?: string) => {
-      const start = (description?: string) => {
-        setInboxViewOpen(false);
-        setNotesViewOpen(false);
-        setSidebarTab("sessions");
-        const cwd =
-          item.projectPath || active?.cwd || sessionDefaults?.cwd || projectCwd;
-        const ref =
-          item.provider === "linear"
-            ? item.identifier?.trim() || `#${item.number}`
-            : `#${item.number}`;
-        const linkedWorkItem = linkedWorkItemFromInboxItem(item);
-        const session = {
-          ...newDefaultSession(cwd, sessionDefaults?.runtimeMode),
-          title: `${ref} ${item.title}`,
-          inboxCard: inboxComposerCard(item, description),
-          ...(linkedWorkItem ? { linkedWorkItem } : {}),
-        };
-        const tab = newTab(session.id);
-        setSessions((prev) => [...prev, session]);
-        appendTab(tab, cwd);
-        setActiveTabId(tab.id);
-        setComposerFocused(true);
-      };
-
-      if (item.provider !== "linear") {
-        start();
-        return;
-      }
-      if (!item.id) {
-        throw new Error("Missing Linear issue");
-      }
-      if (body !== undefined) {
-        start(body);
-        return;
-      }
-      const cached = peekLinearIssueDetails(item.id);
-      if (cached) {
-        start(cached.body);
-        return;
-      }
-      const details = await linearIssueDetails(item.id);
-      start(details.body);
-    },
-    [
-      active?.cwd,
-      appendTab,
-      sessionDefaults?.cwd,
-      sessionDefaults?.runtimeMode,
-      projectCwd,
-    ],
-  );
-
   const onAddNoteToChat = useCallback(
     (card: NoteComposerCard) => {
       if (!card.id) return;
       setSearchViewOpen(false);
-      setInboxViewOpen(false);
       setNotesViewOpen(false);
       setSidebarTab("sessions");
       const cwd =
@@ -1591,16 +1491,6 @@ export default function App({
     window.addEventListener(ADD_NOTE_TO_CHAT_EVENT, onAdd);
     return () => window.removeEventListener(ADD_NOTE_TO_CHAT_EVENT, onAdd);
   }, [onAddNoteToChat]);
-
-  const onInboxCardDismiss = useCallback((sessionId: string) => {
-    setSessions((prev) =>
-      prev.map((session) =>
-        session.id === sessionId && session.inboxCard
-          ? { ...session, inboxCard: undefined }
-          : session,
-      ),
-    );
-  }, []);
 
   const onNoteCardDismiss = useCallback((sessionId: string) => {
     setSessions((prev) =>
@@ -2472,10 +2362,6 @@ export default function App({
   const onFocusPane = useCallback(
     (paneId: string) => {
       setProjectTerminalFocused(false);
-      if (inboxAskPortal?.sessionId === paneId) {
-        setComposerFocused(true);
-        return;
-      }
       setTabs((prev) =>
         prev.map((t) =>
           t.id === activeTabId
@@ -2487,7 +2373,7 @@ export default function App({
         sessionsRef.current.some((session) => session.id === paneId),
       );
     },
-    [activeTabId, inboxAskPortal],
+    [activeTabId],
   );
 
   const onOpenDiff = useCallback(
@@ -2722,119 +2608,11 @@ export default function App({
     [refreshHistory, sidebarCwd],
   );
 
-  const onAskInboxItem = useCallback(
-    (item: InboxItem): Promise<string> => {
-      const key = inboxAskKey(item);
-      const pending = openingInboxSessions.current.get(key);
-      if (pending) return pending;
-      const opening = (async () => {
-        let session = sessionsRef.current.find(
-          (entry) => entry.inboxAsk?.key === key,
-        );
-        if (!session) {
-          const candidate = item.projectPath || sidebarCwd;
-          const cwd =
-            candidate && candidate !== "~"
-              ? candidate
-              : await invoke<string>("default_cwd");
-          const description =
-            item.provider === "linear" && item.id
-              ? (
-                  peekLinearIssueDetails(item.id) ??
-                  (await linearIssueDetails(item.id))
-                ).body
-              : item.provider === "gitlab" &&
-                  (item.kind === "issue" || item.kind === "pr")
-                ? (
-                    peekGitlabWorkItemDetails(
-                      item.projectPath,
-                      item.kind,
-                      item.number,
-                    ) ??
-                    (await gitlabWorkItemDetails(
-                      item.projectPath,
-                      item.kind,
-                      item.number,
-                    ))
-                  ).body
-                : undefined;
-          session = {
-            ...newDefaultSession(cwd),
-            title: `Ask · ${item.title}`,
-            inboxAsk: {
-              key,
-              title: item.title,
-              url: item.url,
-              provider: item.provider,
-              description,
-            },
-          };
-          sessionsRef.current = [...sessionsRef.current, session];
-          setSessions(sessionsRef.current);
-        }
-        return session.id;
-      })();
-      openingInboxSessions.current.set(key, opening);
-      void opening.then(
-        () => openingInboxSessions.current.delete(key),
-        () => openingInboxSessions.current.delete(key),
-      );
-      return opening;
-    },
-    [sidebarCwd],
-  );
-
-  const onRestartInboxAsk = useCallback(
-    async (item: InboxItem): Promise<string> => {
-      const id = await onAskInboxItem(item);
-      const current = sessionsRef.current.find((session) => session.id === id)!;
-      removingSessionIds.current.add(id);
-      try {
-        await stopSessionForRemoval(id);
-        await Promise.all(
-          sessionChildHarnesses(current).map((harness) =>
-            forgetHarnessSession(harness, id),
-          ),
-        );
-        const fresh = {
-          ...newSession(
-            current.harness,
-            current.cwd,
-            current.model,
-            current.runtimeMode,
-            current.modelSettings,
-          ),
-          title: current.title,
-          inboxAsk: current.inboxAsk,
-        };
-        const next = sessionsRef.current.map((session) =>
-          session.id === id ? fresh : session,
-        );
-        sessionsRef.current = next;
-        setSessions(next);
-        setInboxAskPortal((portal) =>
-          portal?.sessionId === id
-            ? { ...portal, sessionId: fresh.id }
-            : portal,
-        );
-        return fresh.id;
-      } finally {
-        removingSessionIds.current.delete(id);
-      }
-    },
-    [onAskInboxItem, stopSessionForRemoval],
-  );
-
-  useEffect(() => {
-    if (!inboxAskPortal || !inboxViewOpen) return;
-    setComposerFocused(true);
-  }, [inboxAskPortal, inboxViewOpen]);
-
   const onSelectHistorySession = useCallback(
     async (sessionId: string) => {
       if (focusOpenSession(sessionId)) return;
       const session = await ensureOpenSession(sessionId);
-      if (!session || session.inboxAsk) return;
+      if (!session) return;
       if (replaceBlankPaneWithSession(session)) return;
       const tab = newTab(session.id);
       appendTab(tab, session.cwd);
@@ -2855,7 +2633,6 @@ export default function App({
       if (!session)
         throw new Error("This conversation is no longer available.");
       setSearchViewOpen(false);
-      setInboxViewOpen(false);
       setNotesViewOpen(false);
       setSettingsOpen(false);
       setFilePickerOpen(false);
@@ -2886,7 +2663,7 @@ export default function App({
   const sessionReminders = useSessionReminders(
     openReminderSession,
     ensureReminderSessionsSaved,
-    sessions.filter((session) => !session.inboxAsk).map((session) => session.id),
+    sessions.map((session) => session.id),
   );
 
   const onPlaceSessionOnPane = useCallback(
@@ -3174,7 +2951,6 @@ export default function App({
           projectTerminalFocused: projectTerminalFocusedRef.current,
           surfaceOpen: Boolean(
             searchViewOpenRef.current ||
-            inboxViewOpenRef.current ||
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
@@ -3372,7 +3148,6 @@ export default function App({
   const onSelectProject = useCallback(
     (path: string) => {
       setSearchViewOpen(false);
-      setInboxViewOpen(false);
       setNotesViewOpen(false);
       const normalized = normalizeProjectPath(path);
       if (!looksLikeProject(normalized)) return;
@@ -3855,7 +3630,6 @@ export default function App({
               s.id === sessionId
                 ? {
                     ...s,
-                    inboxCard: rawCommand ? s.inboxCard : undefined,
                     noteCard: rawCommand ? s.noteCard : undefined,
                     handoffCard: rawCommand ? s.handoffCard : undefined,
                     queuedMessages: [
@@ -3897,7 +3671,6 @@ export default function App({
             if (s.id !== sessionId) return s;
             let next: Session = {
               ...s,
-              inboxCard: rawCommand ? s.inboxCard : undefined,
               noteCard: rawCommand ? s.noteCard : undefined,
               handoffCard: rawCommand ? s.handoffCard : undefined,
             };
@@ -3921,10 +3694,7 @@ export default function App({
               cwd: workCwd,
               model: current.model,
               modelSettings: current.modelSettings,
-              text: inboxAskPrompt(
-                rawCommand ? undefined : current.inboxAsk,
-                prompt,
-              ),
+              text: prompt,
               attachments: prepared,
             });
           } catch (error: unknown) {
@@ -3952,7 +3722,6 @@ export default function App({
       );
       const titleSeed =
         isFirstTurn &&
-        !current.inboxCard &&
         !current.noteCard &&
         placeholderTitle
           ? titleFromPrompt(submittedText, current.harness, attachments)
@@ -3985,7 +3754,6 @@ export default function App({
           const titled = isFirstTurn ? titleSeed : selected.title;
           let next: Session = {
             ...selected,
-            inboxCard: rawCommand ? s.inboxCard : undefined,
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
           };
@@ -4162,9 +3930,7 @@ export default function App({
           return event;
         };
 
-        if (!current.inboxAsk) {
-          await beginSessionTurn(sessionId, workCwd).catch(() => undefined);
-        }
+        await beginSessionTurn(sessionId, workCwd).catch(() => undefined);
         if (turnGen.current.get(sessionId) !== gen) return;
         let buildSucceeded = false;
         try {
@@ -4190,8 +3956,7 @@ export default function App({
             modelSettings: current.modelSettings,
             runtimeMode: current.runtimeMode,
             intent,
-            text: inboxAskPrompt(
-              rawCommand ? undefined : current.inboxAsk,
+            text:
               wrap && !rawCommand
                 ? wrapHandoffPrompt(
                     wrap.text,
@@ -4200,7 +3965,6 @@ export default function App({
                     earlier,
                   )
                 : turnPrompt,
-            ),
             attachments: prepared,
             onEvent: (event) => {
               if (turnGen.current.get(sessionId) !== gen) return;
@@ -4845,7 +4609,6 @@ export default function App({
   const onSelectLiveAgent = useCallback(
     (sessionId: string) => {
       setSearchViewOpen(false);
-      setInboxViewOpen(false);
       setNotesViewOpen(false);
       onOpenApprovalSession(sessionId);
     },
@@ -4883,42 +4646,10 @@ export default function App({
       }),
     [history, projectBranches, sessions, sidebarCwd],
   );
-  const inboxRelatedSessions = useMemo(() => {
-    const byId = new Map<string, SessionSummary>();
-    for (const session of storedLinkedSessions) byId.set(session.id, session);
-    for (const session of history) {
-      if (session.linkedWorkItem) byId.set(session.id, session);
-    }
-    for (const session of sessions) {
-      if (session.inboxAsk || !session.linkedWorkItem) continue;
-      const current = byId.get(session.id);
-      const summary = summaryFromSession(session);
-      byId.set(
-        session.id,
-        current
-          ? {
-              ...current,
-              harness: summary.harness,
-              model: summary.model,
-              runtimeMode: summary.runtimeMode,
-              title: summary.title,
-              cwd: summary.cwd,
-              linkedWorkItem: summary.linkedWorkItem,
-            }
-          : summary,
-      );
-    }
-    return [...byId.values()].sort(
-      (a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id),
-    );
-  }, [history, sessions, storedLinkedSessions]);
   const openProjectSessions = useMemo(
     () =>
       sessions
-        .filter(
-          (session) =>
-            !session.inboxAsk && sameProjectPath(session.cwd, sidebarCwd),
-        )
+        .filter((session) => sameProjectPath(session.cwd, sidebarCwd))
         .map((session) =>
           summaryFromSession(session, {
             ...(projectBranches?.current
@@ -4950,14 +4681,12 @@ export default function App({
 
   const onGoToFile = useCallback(() => {
     setSearchViewOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(false);
     setFilePickerOpen(true);
   }, []);
 
   const onFindInProject = useCallback(() => {
     setSearchViewOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(false);
     setSidebarTab("files");
     setFilesSearchOpen(true);
@@ -4967,7 +4696,6 @@ export default function App({
   const onOpenSearch = useCallback(() => {
     setFilePickerOpen(false);
     setSettingsOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(false);
     setSearchViewOpen(true);
     setSearchViewFocusToken((token) => token + 1);
@@ -4977,45 +4705,11 @@ export default function App({
     setSearchViewOpen(false);
   }, []);
 
-  const onOpenInbox = useCallback(() => {
-    setFilePickerOpen(false);
-    setSettingsOpen(false);
-    setSearchViewOpen(false);
-    setNotesViewOpen(false);
-    setInboxTarget(null);
-    setInboxViewOpen(true);
-  }, []);
-
-  const onOpenLinkedWorkItem = useCallback((item: LinkedWorkItem) => {
-    setFilePickerOpen(false);
-    setSettingsOpen(false);
-    setSearchViewOpen(false);
-    setNotesViewOpen(false);
-    setInboxTarget(item);
-    setInboxViewOpen(true);
-  }, []);
-
-  const onLeaveInbox = useCallback(() => {
-    setInboxViewOpen(false);
-    setInboxTarget(null);
-  }, []);
-
-  const onOpenInboxSession = useCallback(
-    (sessionId: string) => {
-      setInboxViewOpen(false);
-      setInboxTarget(null);
-      setSidebarTab("sessions");
-      void onSelectHistorySession(sessionId);
-    },
-    [onSelectHistorySession],
-  );
-
   const onOpenNotes = useCallback(() => {
     if (!loadNotesEnabled()) return;
     setFilePickerOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(true);
   }, []);
 
@@ -5024,27 +4718,20 @@ export default function App({
   }, []);
 
   const openSettings = useCallback(
-    (section?: SettingsSectionId, anchor?: SettingsAnchor) => {
+    (section?: SettingsSectionId) => {
       setFilePickerOpen(false);
       setSearchViewOpen(false);
-      setInboxViewOpen(false);
       setNotesViewOpen(false);
       if (section) {
         setSettingsSection(section);
         saveSettingsSection(section);
       }
-      setSettingsAnchor(anchor ?? null);
       setSettingsOpen(true);
     },
     [],
   );
 
   const onOpenSettings = useCallback(() => openSettings(), [openSettings]);
-
-  const onOpenInboxIntegrations = useCallback(
-    (source: ConnectableInboxSource) => openSettings("inbox", source),
-    [openSettings],
-  );
 
   const onCloseSettings = useCallback(() => {
     setSettingsOpen(false);
@@ -5072,28 +4759,19 @@ export default function App({
       setSearchViewOpen(false);
       return;
     }
-    if (inboxViewOpen) {
-      setInboxViewOpen(false);
-      return;
-    }
     if (notesViewOpen) {
       setNotesViewOpen(false);
       return;
     }
     onVisitBack();
-  }, [onVisitBack, searchViewOpen, settingsOpen, inboxViewOpen, notesViewOpen]);
+  }, [onVisitBack, searchViewOpen, settingsOpen, notesViewOpen]);
 
   const onRailForward = useCallback(() => {
     setSearchViewOpen(false);
     setSettingsOpen(false);
-    setInboxViewOpen(false);
     setNotesViewOpen(false);
     onVisitForward();
   }, [onVisitForward]);
-
-  useEffect(() => {
-    if (sidebarTab === "inbox") setSidebarTab("sessions");
-  }, [sidebarTab]);
 
   useEffect(() => {
     if (!dockVisible) setProjectTerminalFocused(false);
@@ -5175,7 +4853,6 @@ export default function App({
     onGoToFile,
     onFindInProject,
     onOpenSearch,
-    onOpenInbox,
     onOpenNotes,
     pickProject,
     onNewTerminal,
@@ -5202,7 +4879,6 @@ export default function App({
     onGoToFile,
     onFindInProject,
     onOpenSearch,
-    onOpenInbox,
     onOpenNotes,
     pickProject,
     onNewTerminal,
@@ -5268,7 +4944,6 @@ export default function App({
           );
           const surfaceOpen =
             searchViewOpenRef.current ||
-            inboxViewOpenRef.current ||
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
@@ -5342,7 +5017,6 @@ export default function App({
       }
       if (
         !searchViewOpenRef.current &&
-        !inboxViewOpenRef.current &&
         !notesViewOpenRef.current &&
         handleEditorFindKey(e)
       ) {
@@ -5436,7 +5110,6 @@ export default function App({
       }),
       listen("go_to_file", () => actions.current.onGoToFile()),
       listen("open_search", () => actions.current.onOpenSearch()),
-      listen("open_inbox", () => actions.current.onOpenInbox()),
       listen("open_notes", () => actions.current.onOpenNotes()),
       listen("open_settings", () => actions.current.openSettings()),
       listen("check_for_updates", () => {
@@ -5527,7 +5200,6 @@ export default function App({
     onQueuedMessageEditingChange,
     onSteerQueuedMessage,
     onResumeQueue,
-    onInboxCardDismiss,
     onNoteCardDismiss,
     onHandoffCardDismiss,
     onApproval,
@@ -5585,7 +5257,6 @@ export default function App({
           tabVisitNav.canBack ||
           searchViewOpen ||
           settingsOpen ||
-          inboxViewOpen ||
           notesViewOpen
         }
         canGoForward={tabVisitNav.canForward}
@@ -5614,12 +5285,9 @@ export default function App({
         openSessions={openProjectSessions}
         onNewTerminal={onNewTerminal}
         onSearch={onOpenSearch}
-        onOpenInbox={onOpenInbox}
-        onOpenInboxItem={onOpenLinkedWorkItem}
         onOpenNotes={notesEnabled ? onOpenNotes : undefined}
         onGoToFile={onGoToFile}
         searchActive={searchViewOpen}
-        inboxActive={inboxViewOpen}
         notesActive={notesViewOpen}
         notesEnabled={notesEnabled}
         projectRailOpen={projectRailOpen}
@@ -5638,17 +5306,16 @@ export default function App({
       <div className="body-glass flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           className={
-            searchViewOpen || settingsOpen || inboxViewOpen || notesViewOpen
+            searchViewOpen || settingsOpen || notesViewOpen
               ? "hidden"
               : "flex min-h-0 min-w-0 flex-1 flex-col"
           }
           aria-hidden={
-            searchViewOpen || settingsOpen || inboxViewOpen || notesViewOpen
+            searchViewOpen || settingsOpen || notesViewOpen
           }
           inert={
             searchViewOpen ||
             settingsOpen ||
-            inboxViewOpen ||
             notesViewOpen ||
             undefined
           }
@@ -5668,7 +5335,6 @@ export default function App({
               onPickProject={pickProject}
               onFindInProject={onFindInProject}
               onSearch={onOpenSearch}
-              onOpenInbox={onOpenInbox}
               onOpenNotes={notesEnabled ? onOpenNotes : undefined}
               onZoomIn={() => {
                 const next = saveUiScale(zoomInUiScale(loadUiScale()));
@@ -5698,7 +5364,6 @@ export default function App({
               !!currentProjectDock && currentProjectDock.pane.files.length > 0
             }
             onOpenSettings={onOpenSettings}
-            onOpenInbox={onOpenInbox}
             onOpenNotes={notesEnabled ? onOpenNotes : undefined}
             onClose={onCloseTitleTab}
             onCloseMany={onCloseTabs}
@@ -5765,7 +5430,7 @@ export default function App({
                       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
                         <PaneTree
                           {...sessionPaneProps}
-                          visible={tab.id === activeTabId && !inboxViewOpen}
+                          visible={tab.id === activeTabId}
                           layout={tab.layout}
                           sessions={sessions}
                           editorPanes={[
@@ -5776,7 +5441,6 @@ export default function App({
                           fileErrorCounts={fileErrorCounts}
                           focusedId={
                             tab.id === activeTabId &&
-                            !inboxViewOpen &&
                             !tab.diffFocused &&
                             !projectTerminalFocused
                               ? tab.focusedId
@@ -5816,7 +5480,7 @@ export default function App({
             cwd={sidebarCwd}
             recents={recents}
             history={projectHistory}
-            sessions={sessions.filter((session) => !session.inboxAsk)}
+            sessions={sessions}
             focusToken={searchViewFocusToken}
             besideRail={projectRailOpen}
             onClose={onLeaveSearch}
@@ -5824,46 +5488,6 @@ export default function App({
             onOpenFile={onOpenFile}
             onOpenSession={onSelectHistorySession}
             onOpenProject={onSelectProject}
-          />
-        ) : null}
-        <div className="hidden" aria-hidden>
-          {sessions
-            .filter((session) => session.inboxAsk)
-            .map((session) => {
-              const visible =
-                inboxViewOpen && inboxAskPortal?.sessionId === session.id;
-              return (
-                <SessionSurface
-                  key={session.id}
-                  host={visible ? inboxAskPortal.host : undefined}
-                >
-                  <SessionPane
-                    {...sessionPaneProps}
-                    session={session}
-                    visible={visible}
-                    focused={visible}
-                    inSplit={false}
-                    composerFocused={composerFocused}
-                  />
-                </SessionSurface>
-              );
-            })}
-        </div>
-        {inboxViewOpen ? (
-          <InboxView
-            cwd={sidebarCwd}
-            recents={recents}
-            besideRail={projectRailOpen}
-            onClose={onLeaveInbox}
-            onToggleSidebar={onToggleSidebar}
-            onStart={onStartInboxItem}
-            onAsk={onAskInboxItem}
-            onAskRestart={onRestartInboxAsk}
-            onAskMount={setInboxAskPortal}
-            sessions={inboxRelatedSessions}
-            onOpenSession={onOpenInboxSession}
-            target={inboxTarget}
-            onOpenIntegrations={onOpenInboxIntegrations}
           />
         ) : null}
         {notesViewOpen ? (
@@ -5877,7 +5501,6 @@ export default function App({
         {settingsOpen ? (
           <SettingsView
             section={settingsSection}
-            anchor={settingsAnchor}
             cwd={sidebarCwd}
             sessions={sidebarHistory}
             besideRail
@@ -5893,7 +5516,6 @@ export default function App({
           />
         ) : null}
         {searchViewOpen ||
-        inboxViewOpen ||
         notesViewOpen ||
         settingsOpen ? null : (
           <UsageFooter

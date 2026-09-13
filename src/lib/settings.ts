@@ -7,7 +7,6 @@ export type SettingsSectionId =
   | "appearance"
   | "keybindings"
   | "providers"
-  | "inbox"
   | "skills"
   | "archive";
 
@@ -37,11 +36,6 @@ export const SETTINGS_SECTIONS: {
     label: "Providers",
     description:
       "Agent CLIs MonoCode can drive, and the model new sessions start with.",
-  },
-  {
-    id: "inbox",
-    label: "Inbox",
-    description: "Connect and manage the services that appear in your Inbox.",
   },
   {
     id: "skills",

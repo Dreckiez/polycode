@@ -1,12 +1,13 @@
+import { invoke } from "@tauri-apps/api/core";
 import { gitPrStatus } from "./fs";
-import {
-  githubRepo,
-  inboxIdentityKey,
-  type InboxItem,
-  type GithubTaskKind,
-} from "./githubTasks";
 import type { LinkedWorkItem } from "./session";
 import type { GeneratedWorkItemHint } from "./sessionTitle";
+
+export type GithubTaskKind = "issue" | "pr";
+
+export async function githubRepo(cwd: string): Promise<string> {
+  return invoke<string>("git_github_repo", { cwd });
+}
 
 const GITHUB_URL_RE =
   /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/(pull|issues)\/(\d+)\b/i;
@@ -94,52 +95,4 @@ export async function resolveLinkedWorkItem(
   } catch {
     return null;
   }
-}
-
-export function linkedWorkItemFromInboxItem(
-  item: InboxItem,
-): LinkedWorkItem | null {
-  if (
-    item.provider !== "github" ||
-    (item.kind !== "issue" && item.kind !== "pr") ||
-    !validNumber(item.number) ||
-    !validRepo(item.repo)
-  ) {
-    return null;
-  }
-  return {
-    kind: item.kind,
-    repo: item.repo,
-    number: item.number,
-    url: item.url || githubUrl(item.repo, item.kind, item.number),
-  };
-}
-
-export function inboxItemMatchesLinkedWorkItem(
-  item: InboxItem,
-  linked: LinkedWorkItem,
-): boolean {
-  return (
-    item.provider === "github" &&
-    item.kind === linked.kind &&
-    item.number === linked.number &&
-    item.repo.trim().toLowerCase() === linked.repo.trim().toLowerCase()
-  );
-}
-
-/** Same key used by Inbox selection, without synthesizing a full Inbox item. */
-export function linkedWorkItemInboxKey(linked: LinkedWorkItem): string {
-  return `github:${inboxIdentityKey(linked)}`;
-}
-
-/** Find local sessions whose persisted GitHub identity matches an Inbox row. */
-export function relatedSessionsForInboxItem<
-  T extends { linkedWorkItem?: LinkedWorkItem },
->(item: InboxItem, sessions: readonly T[]): T[] {
-  if (item.provider !== "github") return [];
-  return sessions.filter(
-    (session) =>
-      session.linkedWorkItem != null &&
-      inboxItemMatchesLinkedWorkItem(item, session.linkedWorkItem),
-  );
 }

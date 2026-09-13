@@ -46,11 +46,10 @@ export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
 /** Fired on `window` whenever the transcript layout flips (detail: TranscriptLayout). */
 export const TRANSCRIPT_LAYOUT_CHANGE_EVENT = "monocode:transcriptlayoutchange";
 
-export type SidebarTabId = "files" | "sessions" | "changes" | "inbox";
+export type SidebarTabId = "files" | "sessions" | "changes";
 
 const DEFAULT_SIDEBAR_TAB_ORDER: SidebarTabId[] = [
   "sessions",
-  "inbox",
   "files",
   "changes",
 ];
@@ -424,8 +423,7 @@ function isSidebarTabId(value: unknown): value is SidebarTabId {
   return (
     value === "files" ||
     value === "sessions" ||
-    value === "changes" ||
-    value === "inbox"
+    value === "changes"
   );
 }
 

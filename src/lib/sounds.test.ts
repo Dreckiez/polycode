@@ -13,7 +13,6 @@ vi.mock("cuelume", () => ({
 import {
   announceUpdateAvailable,
   loadSoundsEnabled,
-  noteInboxUnseen,
   playCue,
   resetSoundCues,
   saveSoundsEnabled,
@@ -80,8 +79,6 @@ describe("sounds", () => {
     playCue("turnFinished");
     expect(setVolume).toHaveBeenCalledWith(SOUNDS_VOLUME);
     expect(play).toHaveBeenCalledWith("success");
-    playCue("inboxUnseen");
-    expect(play).toHaveBeenCalledWith("bloom");
     playCue("updateAvailable");
     expect(play).toHaveBeenCalledWith("arrival");
     playCue("switch");
@@ -95,23 +92,6 @@ describe("sounds", () => {
     play.mockClear();
     playCue("turnFinished");
     expect(play).not.toHaveBeenCalled();
-  });
-
-  it("does not ding for the first inbox snapshot", () => {
-    noteInboxUnseen(true);
-    expect(play).not.toHaveBeenCalled();
-  });
-
-  it("dings once when the inbox dot appears, then again after it clears", () => {
-    noteInboxUnseen(false);
-    noteInboxUnseen(true);
-    expect(play).toHaveBeenCalledTimes(1);
-    expect(play).toHaveBeenCalledWith("bloom");
-    noteInboxUnseen(true);
-    expect(play).toHaveBeenCalledTimes(1);
-    noteInboxUnseen(false);
-    noteInboxUnseen(true);
-    expect(play).toHaveBeenCalledTimes(2);
   });
 
   it("dings once per update version", () => {

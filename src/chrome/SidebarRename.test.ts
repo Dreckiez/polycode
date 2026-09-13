@@ -7,7 +7,6 @@ import { formatReminderTime } from "../lib/sessionReminders";
 import { Sidebar } from "./Sidebar";
 
 // Keep native services out of these menu/input interaction tests.
-vi.mock("../hooks/useInboxUnseen", () => ({ useInboxUnseen: () => false }));
 vi.mock("../hooks/useProjectDiffStats", () => ({
   useProjectDiffStats: () => null,
 }));

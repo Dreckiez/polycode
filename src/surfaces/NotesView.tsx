@@ -18,7 +18,7 @@ import { WindowControls } from "../chrome/WindowControls";
 import { useDragResize } from "../hooks/useDragResize";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
-import { formatRelativeTime } from "../lib/githubTasks";
+import { formatRelativeTime } from "../lib/formatTime";
 import {
   createNote,
   deleteNote,

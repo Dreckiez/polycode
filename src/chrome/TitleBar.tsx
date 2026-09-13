@@ -1,7 +1,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Inbox,
   PanelLeft,
   Plus,
   Search,
@@ -74,7 +73,6 @@ type Props = {
   onShowTerminal?: () => void;
   projectTerminalActive?: boolean;
   onOpenSettings?: () => void;
-  onOpenInbox?: () => void;
   onOpenNotes?: () => void;
   onClose: (id: string) => void;
   onCloseMany: (ids: string[], fallbackId: string) => void;
@@ -550,7 +548,6 @@ function TitleBarComponent({
   onShowTerminal,
   projectTerminalActive = false,
   onOpenSettings,
-  onOpenInbox,
   onOpenNotes,
   onClose,
   onCloseMany,
@@ -711,11 +708,6 @@ function TitleBarComponent({
   const trailingControls = (
     <div className="flex h-full shrink-0 items-stretch">
       <div className="flex items-center gap-0.5 px-2">
-        {projectless && railClosed && onOpenInbox ? (
-          <IconButton label="Inbox" onClick={onOpenInbox}>
-            <Inbox className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
         {projectless && railClosed && onOpenNotes ? (
           <IconButton label="Notes" onClick={onOpenNotes}>
             <StickyNote className="size-3.5" strokeWidth={1.75} />

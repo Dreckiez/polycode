@@ -10,7 +10,6 @@ import {
   Folder,
   GitBranch,
   GitPullRequest,
-  Inbox,
   ListFilter,
   Pin,
   Plus,
@@ -97,7 +96,7 @@ import {
   saveSessionSidebarFilters,
   type SessionSidebarFilters,
 } from "../lib/sessionFilters";
-import type { HarnessId, LinkedWorkItem } from "../lib/session";
+import type { HarnessId } from "../lib/session";
 import type { LiveAgent } from "../lib/liveAgents";
 import type { SessionSummary } from "../lib/sessionStore";
 import type { SettingsSectionId } from "../lib/settings";
@@ -115,7 +114,6 @@ import {
 } from "../lib/tabGroups";
 import { useDragResize } from "../hooks/useDragResize";
 import { useGitFileStatuses } from "../hooks/useGitFileStatuses";
-import { useInboxUnseen } from "../hooks/useInboxUnseen";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useProjectDiffStats } from "../hooks/useProjectDiffStats";
 import { useSortable } from "../hooks/useSortable";
@@ -161,7 +159,6 @@ type SidebarTab = SidebarTabId;
 
 const TAB_LABELS: Record<SidebarTab, string> = {
   sessions: "Sessions",
-  inbox: "Inbox",
   files: "Explorer",
   changes: "Changes",
 };
@@ -244,12 +241,9 @@ type Props = {
   onNew?: () => string | void;
   onNewTerminal?: () => void;
   onSearch?: () => void;
-  onOpenInbox?: () => void;
-  onOpenInboxItem?: (item: LinkedWorkItem) => void;
   onOpenNotes?: () => void;
   onGoToFile?: () => void;
   searchActive?: boolean;
-  inboxActive?: boolean;
   notesActive?: boolean;
   notesEnabled?: boolean;
   onToggleProjectRail?: () => void;
@@ -321,12 +315,9 @@ function SidebarComponent({
   onRemoveProject,
   onNew,
   onSearch,
-  onOpenInbox,
-  onOpenInboxItem,
   onOpenNotes,
   onGoToFile,
   searchActive = false,
-  inboxActive = false,
   notesActive = false,
   notesEnabled = true,
   onToggleProjectRail,
@@ -342,7 +333,6 @@ function SidebarComponent({
   onDismissUpdate,
 }: Props) {
   const gitRoot = gitCwd || cwd;
-  const inboxUnseen = useInboxUnseen(recents, cwd);
   const resize = useDragResize({
     min: MIN_WIDTH,
     max: () => Math.min(MAX_WIDTH, Math.floor(window.innerWidth * 0.5)),
@@ -527,7 +517,7 @@ function SidebarComponent({
     },
     { axis: "y" },
   );
-  const visibleTabs = tabOrder.filter((itemId) => itemId !== "inbox");
+  const visibleTabs = tabOrder;
   const canDragTabs = visibleTabs.length > 1;
   const showProjectRail = Boolean(onSelectProject && onOpenProject);
   // Settings live in the rail slot, so they keep it visible even when the
@@ -540,7 +530,6 @@ function SidebarComponent({
   const sidebarVisible =
     open &&
     !searchActive &&
-    !inboxActive &&
     !notesActive &&
     !settingsOpen &&
     inProject;
@@ -1013,7 +1002,6 @@ function SidebarComponent({
         compact={compact}
         now={now}
         onSelect={onSessionCardSelect}
-        onOpenWorkItem={onOpenInboxItem}
         onPrefetch={onPrefetchSession}
         onPlaceOnPane={onPlaceSessionOnPane}
         onListDrop={reminderIds.has(session.id) ? undefined : onSessionListDrop}
@@ -1207,12 +1195,9 @@ function SidebarComponent({
               onOpenProject={onOpenProject}
               onNew={onNew}
               onSearch={onSearch}
-              onOpenInbox={onOpenInbox}
               onOpenNotes={notesEnabled ? onOpenNotes : undefined}
               searchActive={searchActive}
-              inboxActive={inboxActive}
               notesActive={notesActive}
-              inboxUnseen={inboxUnseen}
             />
           ) : null}
           <div
@@ -1667,7 +1652,6 @@ function SidebarComponent({
         <ProjectRail
           cwd={cwd}
           recents={recents}
-          inboxUnseen={inboxUnseen}
           busyPaths={busyProjectPaths}
           liveAgents={liveAgents}
           activeSessionId={activeSessionId}
@@ -1678,8 +1662,6 @@ function SidebarComponent({
           onGoForward={onGoForward}
           onSearch={onSearch}
           searchActive={searchActive}
-          onOpenInbox={onOpenInbox}
-          inboxActive={inboxActive}
           notesEnabled={notesEnabled}
           onOpenNotes={onOpenNotes}
           notesActive={notesActive}
@@ -1712,12 +1694,9 @@ function SidebarProjectPicker({
   onOpenProject,
   onNew,
   onSearch,
-  onOpenInbox,
   onOpenNotes,
   searchActive = false,
-  inboxActive = false,
   notesActive = false,
-  inboxUnseen = false,
 }: {
   cwd: string;
   recents: RecentProject[];
@@ -1726,12 +1705,9 @@ function SidebarProjectPicker({
   onOpenProject?: () => void;
   onNew?: () => void;
   onSearch?: () => void;
-  onOpenInbox?: () => void;
   onOpenNotes?: () => void;
   searchActive?: boolean;
-  inboxActive?: boolean;
   notesActive?: boolean;
-  inboxUnseen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1982,23 +1958,6 @@ function SidebarProjectPicker({
             onClick={onSearch}
           >
             <Search className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
-        {onOpenInbox ? (
-          <IconButton
-            label={inboxUnseen ? "Inbox, new items" : "Inbox"}
-            active={inboxActive}
-            onClick={onOpenInbox}
-          >
-            <span className="relative">
-              <Inbox className="size-3.5" strokeWidth={1.75} />
-              {inboxUnseen ? (
-                <span
-                  aria-hidden
-                  className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-accent"
-                />
-              ) : null}
-            </span>
           </IconButton>
         ) : null}
         {onOpenNotes ? (
@@ -2320,7 +2279,6 @@ function SessionCard({
   compact = false,
   now,
   onSelect,
-  onOpenWorkItem,
   onPrefetch,
   onPlaceOnPane,
   onListDrop,
@@ -2340,7 +2298,6 @@ function SessionCard({
   compact?: boolean;
   now: number;
   onSelect: (sessionId: string, event: { shiftKey: boolean }) => void;
-  onOpenWorkItem?: (item: LinkedWorkItem) => void;
   onPrefetch?: (sessionId: string) => void;
   onPlaceOnPane?: (sessionId: string, targetId: string, edge: PaneEdge) => void;
   onListDrop?: (draggedId: string, target: SessionListDropTarget) => void;
@@ -2396,18 +2353,13 @@ function SessionCard({
       type="button"
       data-no-drag
       data-tauri-drag-region="false"
-      title={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number} in Inbox (${MOD}-click for GitHub)`}
+      title={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number} on GitHub`}
       aria-label={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number}`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (event.metaKey || event.ctrlKey) {
-          void openUrl(linkedWorkItem.url).catch(() => undefined);
-          return;
-        }
-        if (onOpenWorkItem) onOpenWorkItem(linkedWorkItem);
-        else void openUrl(linkedWorkItem.url).catch(() => undefined);
+        void openUrl(linkedWorkItem.url).catch(() => undefined);
       }}
       onAuxClick={(event) => {
         if (event.button !== 1) return;

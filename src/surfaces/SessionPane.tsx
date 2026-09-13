@@ -10,7 +10,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Composer } from "../chrome/Composer";
-import { DiscussionEmpty } from "../chrome/DiscussionEmpty";
 import { SessionReview } from "../chrome/SessionReview";
 import { PromptOutline } from "../chrome/PromptOutline";
 import {
@@ -98,7 +97,6 @@ type Props = {
   onQueuedMessageEditingChange: (sessionId: string, messageId?: string) => void;
   onSteerQueuedMessage: (sessionId: string, messageId: string) => void;
   onResumeQueue: (sessionId: string) => void;
-  onInboxCardDismiss?: (sessionId: string) => void;
   onNoteCardDismiss?: (sessionId: string) => void;
   onHandoffCardDismiss?: (sessionId: string) => void;
   onApproval: (
@@ -165,7 +163,6 @@ export const SessionPane = memo(function SessionPane({
   onQueuedMessageEditingChange,
   onSteerQueuedMessage,
   onResumeQueue,
-  onInboxCardDismiss,
   onNoteCardDismiss,
   onHandoffCardDismiss,
   onApproval,
@@ -296,7 +293,7 @@ export const SessionPane = memo(function SessionPane({
   const workCwd = sessionWorkCwd(session);
   const isEmpty = session.blocks.length === 0;
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
-  const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
+  const dockComposer = !isEmpty || inSplit;
   const draftRef = useRef<string | undefined>(undefined);
   const composer = (
     <Composer
@@ -313,29 +310,17 @@ export const SessionPane = memo(function SessionPane({
       sessionId={session.id}
       compactSupported={canCompactHarnessContext(session.harness)}
       recents={recents}
-      hideProjectPicker={
-        !!session.inboxAsk ||
-        (hideProjectPicker ? !showDeckProjectPicker : false)
-      }
-      hideBranchPicker={!!session.inboxAsk}
-      hideTopBar={!!session.inboxAsk}
+      hideProjectPicker={hideProjectPicker ? !showDeckProjectPicker : false}
       context={session.context}
       quoteRequest={quoteRequest}
-      initialDraft={
-        draftRef.current ??
-        (session.inboxCard || session.noteCard || session.handoffCard
-          ? undefined
-          : session.composerSeed)
-      }
+      initialDraft={draftRef.current}
       onDraftChange={(text) => {
         draftRef.current = text;
       }}
-      inboxCard={session.inboxCard}
       noteCard={session.noteCard}
       handoffCard={session.handoffCard}
       question={session.pendingQuestion}
       onQuoteRequestConsumed={acknowledgeQuote}
-      onInboxCardDismiss={() => onInboxCardDismiss?.(session.id)}
       onNoteCardDismiss={() => onNoteCardDismiss?.(session.id)}
       onHandoffCardDismiss={() => onHandoffCardDismiss?.(session.id)}
       onQuestionReply={replyQuestion}
@@ -444,19 +429,13 @@ export const SessionPane = memo(function SessionPane({
       ) : null}
       <div ref={transcriptScope} className="@container relative min-h-0 flex-1">
         {isEmpty ? (
-          session.inboxAsk ? (
-            <div className="scrollbar-none h-full min-h-0 overflow-y-auto">
-              <DiscussionEmpty message="Explore this item with your agent." />
-            </div>
-          ) : (
-            <EmptySession
-              cwd={session.cwd}
-              hasChatBackground={Boolean(
-                projectBackground || globalBackgroundPath,
-              )}
-              composer={dockComposer ? undefined : composer}
-            />
-          )
+          <EmptySession
+            cwd={session.cwd}
+            hasChatBackground={Boolean(
+              projectBackground || globalBackgroundPath,
+            )}
+            composer={dockComposer ? undefined : composer}
+          />
         ) : (
           <>
             <AgentTranscript
@@ -476,13 +455,13 @@ export const SessionPane = memo(function SessionPane({
               onOpenPlan={openPlan}
               onBuildPlan={buildPlan}
               onSecondOpinion={
-                !session.inboxAsk && onSecondOpinion
+                onSecondOpinion
                   ? (harness, turn, model) =>
                       onSecondOpinion(session.id, harness, turn, model)
                   : undefined
               }
               onHandoff={
-                !session.inboxAsk && onHandoff
+                onHandoff
                   ? (harness, turn, model) =>
                       onHandoff(session.id, harness, turn, model)
                   : undefined
@@ -491,16 +470,14 @@ export const SessionPane = memo(function SessionPane({
               onJumpToBottomReady={onJumpToBottomReady}
               onRevealReady={onRevealReady}
               latestTurnAccessory={
-                session.inboxAsk ? undefined : (
-                  <SessionReview
-                    sessionId={session.id}
-                    cwd={workCwd}
-                    enabled={visible}
-                    busy={!!session.busy}
-                    undoLocked={reviewUndoLocked}
-                    onOpenDiff={onOpenDiff}
-                  />
-                )
+                <SessionReview
+                  sessionId={session.id}
+                  cwd={workCwd}
+                  enabled={visible}
+                  busy={!!session.busy}
+                  undoLocked={reviewUndoLocked}
+                  onOpenDiff={onOpenDiff}
+                />
               }
             />
             <PromptOutline

@@ -54,10 +54,6 @@ import {
   type MentionToken,
 } from "../lib/fileMentions";
 import type { ProjectFile } from "../lib/fs";
-import {
-  composeInboxMessage,
-  type InboxComposerCard,
-} from "../lib/githubTasks";
 import type { HandoffComposerCard } from "../lib/handoff";
 import { looksLikeProject, type RecentProject } from "../lib/recents";
 import type {
@@ -78,7 +74,6 @@ import {
   createBlankSkill,
   rankSkills,
   hasNativeCommands,
-  isNativeCommandPrompt,
   replaceSlashToken,
   skillTextParts,
   slashTokenAt,
@@ -93,7 +88,6 @@ import { BranchPicker } from "./BranchPicker";
 import { CwdPicker } from "./CwdPicker";
 import { FileMentionPicker } from "./FileMentionPicker";
 import { FileTypeIcon } from "./FileTypeIcon";
-import { InboxMiniCard } from "./InboxMiniCard";
 import { NoteMiniCard } from "./NoteMiniCard";
 import { HandoffMiniCard } from "./HandoffMiniCard";
 import { ModelPicker } from "./ModelPicker";
@@ -155,7 +149,6 @@ type Props = {
   compactSupported?: boolean;
   quoteRequest?: QuoteRequest;
   initialDraft?: string;
-  inboxCard?: InboxComposerCard;
   noteCard?: NoteComposerCard;
   handoffCard?: HandoffComposerCard;
   question?: UserQuestionPrompt;
@@ -171,7 +164,6 @@ type Props = {
   onModelSettingsChange?: (settings: Record<string, string>) => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   onQuoteRequestConsumed?: (id: number) => void;
-  onInboxCardDismiss?: () => void;
   onNoteCardDismiss?: () => void;
   onHandoffCardDismiss?: () => void;
   onQuestionReply?: (requestId: number, reply: UserQuestionReply) => void;
@@ -412,7 +404,6 @@ export function Composer({
   compactSupported = false,
   quoteRequest,
   initialDraft,
-  inboxCard,
   noteCard,
   handoffCard,
   question,
@@ -427,7 +418,6 @@ export function Composer({
   onModelSettingsChange,
   onRuntimeModeChange,
   onQuoteRequestConsumed,
-  onInboxCardDismiss,
   onNoteCardDismiss,
   onHandoffCardDismiss,
   onQuestionReply,
@@ -457,7 +447,6 @@ export function Composer({
   const [hasValue, setHasValue] = useState(
     () =>
       (initialDraft ?? "").trim().length > 0 ||
-      !!inboxCard ||
       !!noteCard ||
       !!handoffCard,
   );
@@ -501,7 +490,6 @@ export function Composer({
   const navigationEmpty =
     draft.length === 0 &&
     attachments.length === 0 &&
-    !inboxCard &&
     !noteCard &&
     !handoffCard;
   const skillPickerOpen = creatingSkill || slash !== null;
@@ -564,17 +552,16 @@ export function Composer({
       setHasValue(
         text.trim().length > 0 ||
           files.length > 0 ||
-          !!inboxCard ||
           !!noteCard ||
           !!handoffCard,
       );
     },
-    [inboxCard, noteCard, handoffCard],
+    [noteCard, handoffCard],
   );
 
   useEffect(() => {
     syncHasValue(ref.current?.value ?? "", attachmentsRef.current);
-  }, [inboxCard, noteCard, handoffCard, syncHasValue]);
+  }, [noteCard, handoffCard, syncHasValue]);
 
   const addAttachments = useCallback(
     (incoming: Attachment[]) => {
@@ -697,9 +684,7 @@ export function Composer({
     resizeComposer(el);
   }, [initialDraft]);
 
-  // Drafts changed while hidden could not be measured. Inbox panes are portaled
-  // into place by a parent effect that runs after this one, so the first pass
-  // can still find no layout box; retry once the move has landed.
+  // Drafts changed while hidden could not be measured; retry once the move has landed.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !enabled) return;
@@ -992,9 +977,7 @@ export function Composer({
         ? folderCommand.text
         : value,
     );
-    const text = isNativeCommandPrompt(command.text, harness)
-      ? command.text
-      : composeInboxMessage(inboxCard, command.text);
+    const text = command.text;
     const files = attachments;
     if (!text && files.length === 0 && !noteCard && !handoffCard) return;
     onSubmit(text, files, {
@@ -1329,10 +1312,6 @@ export function Composer({
             </div>
           ) : null}
 
-          {inboxCard ? (
-            <InboxMiniCard card={inboxCard} onDismiss={onInboxCardDismiss} />
-          ) : null}
-
           {noteCard ? (
             <NoteMiniCard card={noteCard} onDismiss={onNoteCardDismiss} />
           ) : null}
@@ -1365,15 +1344,13 @@ export function Composer({
               spellCheck={false}
               defaultValue={initialDraft}
               placeholder={
-                inboxCard
-                  ? "Add a note, or send to start…"
-                  : noteCard
-                    ? "Add a message, or send…"
-                    : handoffCard
-                      ? "Add context, or send to continue…"
-                      : shell
-                        ? "Ask, build, / for commands, @ for references... "
-                        : "Ask, build, / for commands, @ for references... "
+                noteCard
+                  ? "Add a message, or send…"
+                  : handoffCard
+                    ? "Add context, or send to continue…"
+                    : shell
+                      ? "Ask, build, / for commands, @ for references... "
+                      : "Ask, build, / for commands, @ for references... "
               }
               className={`composer-field scrollbar-none relative max-h-40 w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent px-3 text-sm leading-5.5 outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap font-sans ${
                 shell ? "py-4" : "py-3"

@@ -2,7 +2,6 @@ import {
   Archive,
   ArrowLeft,
   Bot,
-  Inbox,
   Keyboard,
   Palette,
   SlidersHorizontal,
@@ -17,7 +16,6 @@ const SECTION_ICONS: Record<SettingsSectionId, IconComponent> = {
   appearance: Palette,
   keybindings: Keyboard,
   providers: Bot,
-  inbox: Inbox,
   skills: Sparkles,
   archive: Archive,
 };

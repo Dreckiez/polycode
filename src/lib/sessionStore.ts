@@ -75,7 +75,6 @@ type SessionUpsertPayload = {
 /** Only real chats belong in project history — blank tabs stay ephemeral. */
 export function shouldPersistSession(session: Session): boolean {
   return (
-    !session.inboxAsk &&
     session.cwd !== "~" &&
     session.blocks.some((block) => block.role === "user")
   );

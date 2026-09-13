@@ -1,6 +1,5 @@
 import { markTurnInterrupted, type ResumedWorkspace } from "./inFlight";
 import {
-  closeLeaf,
   isTerminalTab,
   leafIds,
   newTab,
@@ -21,7 +20,6 @@ import {
 import { normalizeProjectPath } from "./recents";
 import { pathKey } from "./paths";
 import { reconcileProjectReturn, type ProjectReturnMemory } from "./projectReturn";
-import type { InboxAskContext } from "./inboxAsk";
 import {
   HARNESSES,
   RUNTIME_MODES,
@@ -32,7 +30,6 @@ import {
 } from "./session";
 
 export type WorkspaceSessionStub = {
-  inboxAsk?: InboxAskContext;
   id: string;
   cwd: string;
   harness: HarnessId;
@@ -62,7 +59,7 @@ export function collectWorkspaceSnapshot(
   memory: ProjectReturnMemory,
   projectTerminals: ProjectTerminalDock[] = [],
 ): WorkspaceSnapshot {
-  const snapshot = withoutInboxSessions({
+  const snapshot: WorkspaceSnapshot = {
     tabs: tabs.map(sanitizeTab).filter((tab): tab is WorkspaceTab => tab != null),
     sessions: sessions.map(sessionStub).filter((stub): stub is WorkspaceSessionStub => stub != null),
     activeTabId,
@@ -70,7 +67,7 @@ export function collectWorkspaceSnapshot(
     projectTerminals: projectTerminals
       .map(sanitizeProjectTerminal)
       .filter((dock): dock is ProjectTerminalDock => dock != null),
-  });
+  };
   return withProjectReturnTargets(snapshot, memory);
 }
 
@@ -111,28 +108,6 @@ function parseProjectReturnTargets(raw: unknown): ProjectReturnMemory {
   return memory;
 }
 
-/** Also removes tabs saved by the earlier, persistent Inbox implementation. */
-function withoutInboxSessions(snapshot: WorkspaceSnapshot): WorkspaceSnapshot {
-  const inboxIds = snapshot.sessions.filter(session => session.inboxAsk).map(session => session.id);
-  if (inboxIds.length === 0) return snapshot;
-  let tabs = snapshot.tabs;
-  for (const id of inboxIds) {
-    tabs = tabs.flatMap(tab => {
-      if (!leafIds(tab.layout).includes(id)) return [tab];
-      const next = closeLeaf(tab, id);
-      return next ? [next] : [];
-    });
-  }
-  return {
-    ...snapshot,
-    tabs,
-    sessions: snapshot.sessions.filter(session => !session.inboxAsk),
-    activeTabId: tabs.some(tab => tab.id === snapshot.activeTabId)
-      ? snapshot.activeTabId
-      : tabs[0]?.id ?? "",
-  };
-}
-
 export function parseWorkspaceSnapshot(raw: unknown): WorkspaceSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as {
@@ -167,7 +142,7 @@ export function parseWorkspaceSnapshot(raw: unknown): WorkspaceSnapshot | null {
         .map(sanitizeProjectTerminal)
         .filter((dock): dock is ProjectTerminalDock => dock != null)
     : [];
-  const snapshot = withoutInboxSessions({ tabs, sessions, activeTabId, projectCwd, projectTerminals });
+  const snapshot: WorkspaceSnapshot = { tabs, sessions, activeTabId, projectCwd, projectTerminals };
   return snapshot.tabs.length > 0
     ? withProjectReturnTargets(
         snapshot,
@@ -208,7 +183,7 @@ export function hydrateWorkspaceSnapshot(
     const record = loaded.get(id);
     const stub = stubs.get(id);
     const base = record ?? (stub ? sessionFromStub(stub) : null);
-    if (!base || base.inboxAsk) return null;
+    if (!base) return null;
     const next = interruptedIds.has(id) ? markTurnInterrupted(base) : { ...base, busy: false };
     sessions.set(id, next);
     return next;
@@ -238,7 +213,7 @@ export function hydrateWorkspaceSnapshot(
 
   for (const id of interruptedIds) {
     const session = take(id);
-    if (!session || session.inboxAsk) continue;
+    if (!session) continue;
     if (tabs.some((tab) => leafIds(tab.layout).includes(id))) continue;
     tabs.push(newTab(id));
   }
@@ -277,7 +252,6 @@ function sessionStub(session: Session): WorkspaceSessionStub | null {
     modelSettings: { ...session.modelSettings },
     runtimeMode: session.runtimeMode,
     title: session.title,
-    ...(session.inboxAsk ? { inboxAsk: session.inboxAsk } : {}),
     ...(session.providerSessionId
       ? { providerSessionId: session.providerSessionId }
       : {}),
@@ -298,7 +272,6 @@ function sessionFromStub(stub: WorkspaceSessionStub): Session {
     ...session,
     id: stub.id,
     title: stub.title,
-    ...(stub.inboxAsk ? { inboxAsk: stub.inboxAsk } : {}),
     ...(stub.providerSessionId
       ? { providerSessionId: stub.providerSessionId }
       : {}),
@@ -333,8 +306,6 @@ function sanitizeStub(raw: unknown): WorkspaceSessionStub | null {
     modelSettings,
     runtimeMode,
     title: typeof value.title === "string" ? value.title : "",
-    ...(value.inboxAsk && typeof value.inboxAsk === "object"
-      ? { inboxAsk: value.inboxAsk as InboxAskContext } : {}),
     ...(typeof value.providerSessionId === "string" && value.providerSessionId
       ? { providerSessionId: value.providerSessionId }
       : {}),

@@ -188,25 +188,11 @@ input,
 .agent-transcript,
 .markdown-preview,
 .whats-new-md,
-.inbox-pr-diff,
 .unified-diff,
-.inbox-comment-md,
 .monocode-terminal,
 .monocode-terminal .xterm,
 .monocode-terminal .xterm-viewport {
   user-select: text;
-}
-
-.inbox-comment-md.agent-markdown p:first-child,
-.inbox-comment-md.agent-markdown li:first-child,
-.inbox-comment-md.agent-markdown blockquote:first-child {
-  margin-top: 0;
-}
-
-.inbox-comment-md.agent-markdown p:last-child,
-.inbox-comment-md.agent-markdown li:last-child,
-.inbox-comment-md.agent-markdown blockquote:last-child {
-  margin-bottom: 0;
 }
 
 .agent-markdown [data-streamdown="blockquote"] {
@@ -230,15 +216,7 @@ input,
   padding-inline-start: 1.5rem;
 }
 
-.inbox-comment-md.agent-markdown blockquote {
-  margin: 0.4em 0;
-  padding: 0.15em 0;
-  padding-inline-start: 0.75em;
-  border: 0;
-  border-inline-start: 2px solid
-    color-mix(in srgb, var(--color-content) 16%, transparent);
-  color: color-mix(in srgb, var(--color-content) 55%, transparent);
-}
+
 
 .workspace-surface[aria-hidden="true"] {
   visibility: hidden;
@@ -712,14 +690,6 @@ header[data-tauri-drag-region] button {
   margin-inline: auto;
 }
 
-.agent-markdown .inbox-media {
-  vertical-align: middle;
-}
-
-.agent-markdown .inbox-media img,
-.agent-markdown .inbox-media video {
-  vertical-align: middle;
-}
 
 @keyframes approval-toast-in {
   from {

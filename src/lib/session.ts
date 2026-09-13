@@ -1,8 +1,6 @@
 import type { ContextUsage } from "./contextUsage";
 import type { UserQuestionPrompt } from "./userQuestion";
 import type { HandoffComposerCard } from "./handoff";
-import type { InboxComposerCard } from "./githubTasks";
-import type { InboxAskContext } from "./inboxAsk";
 import type { NoteCardMeta, NoteComposerCard } from "./notes";
 import {
   defaultSessionChoice,
@@ -220,8 +218,6 @@ export const RUNTIME_MODE_HINT: Record<RuntimeMode, string> = {
 };
 
 export type Session = {
-  /** Temporary Inbox conversation: shares the runtime, never saved as a session. */
-  inboxAsk?: InboxAskContext;
   id: string;
   harness: HarnessId;
   model: string;
@@ -255,10 +251,6 @@ export type Session = {
   branch?: string;
   /** Extra git worktree from the old session-branch feature. Unused. */
   worktreeCwd?: string;
-  /** One-shot composer text when opening a session from Inbox. */
-  composerSeed?: string;
-  /** Inbox issue/PR chip shown above the composer. In-memory, one-shot. */
-  inboxCard?: InboxComposerCard;
   /** GitHub issue or pull request shown on the persisted session card. */
   linkedWorkItem?: LinkedWorkItem;
   /** Note chip shown above the composer. In-memory, one-shot. */

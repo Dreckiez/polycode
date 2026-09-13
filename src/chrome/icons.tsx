@@ -50,7 +50,6 @@ import GitPullRequestClosedIcon from "@hugeicons/core-free-icons/GitPullRequestC
 import GitPullRequestDraftIcon from "@hugeicons/core-free-icons/GitPullRequestDraftIcon";
 import GitPullRequestIcon from "@hugeicons/core-free-icons/GitPullRequestIcon";
 import ImageAdd01Icon from "@hugeicons/core-free-icons/ImageAdd01Icon";
-import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import KeyboardIcon from "@hugeicons/core-free-icons/KeyboardIcon";
 import LayoutAlignRightIcon from "@hugeicons/core-free-icons/LayoutAlignRightIcon";
 import LayoutBottomIcon from "@hugeicons/core-free-icons/LayoutBottomIcon";
@@ -190,7 +189,6 @@ export const GitPullRequestDraft = wrap(
 );
 export const GripVertical = wrap(DragDropVerticalIcon, "GripVertical");
 export const ImagePlus = wrap(ImageAdd01Icon, "ImagePlus");
-export const Inbox = wrap(InboxIcon, "Inbox");
 export const Keyboard = wrap(KeyboardIcon, "Keyboard");
 export const ListBullet = wrap(LeftToRightListBulletIcon, "ListBullet");
 export const ListEnd = wrap(ListEndIcon, "ListEnd");

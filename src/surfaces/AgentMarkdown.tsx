@@ -40,10 +40,8 @@ import { useColorScheme } from "../hooks/useColorScheme";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { copyText } from "../lib/clipboard";
 import { revealPath } from "../lib/fs";
-import { INBOX_MEDIA_PREFIXES, isInboxMediaUrl } from "../lib/inboxMedia";
 import { isNoteImagePath } from "../lib/noteImages";
 import { IS_MAC, IS_WIN } from "../lib/platform";
-import { InboxMedia } from "./InboxMedia";
 
 const MERMAID_BASE_CONFIG = {
   startOnLoad: false,
@@ -76,21 +74,6 @@ const MARKDOWN_REHYPE_PLUGINS: PluggableList = [
   ],
 ];
 
-const INBOX_MEDIA_REHYPE_PLUGINS: PluggableList = [
-  defaultRehypePlugins.raw,
-  defaultRehypePlugins.sanitize,
-  [
-    harden,
-    {
-      defaultOrigin: "https://inbox.invalid",
-      allowedImagePrefixes: INBOX_MEDIA_PREFIXES,
-      allowedLinkPrefixes: ["*"],
-      allowDataImages: true,
-      imageBlockPolicy: "remove" as const,
-    },
-  ],
-];
-
 type FileLinkMenu = {
   x: number;
   y: number;
@@ -107,8 +90,6 @@ const FileOpenContext = createContext<{
     navigation?: EditorNavigation,
   ) => void;
 }>({});
-
-const RemoteMediaContext = createContext(false);
 
 const REVEAL_LABEL = IS_MAC
   ? "Reveal in Finder"
@@ -207,13 +188,8 @@ function MarkdownLink({
   dir,
   ...props
 }: MarkdownLinkProps) {
-  const allowRemoteMedia = useContext(RemoteMediaContext);
   const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
   const file = href ? resolveWorkspaceFileReference(href, cwd) : undefined;
-  const label = textContent(children);
-  if (allowRemoteMedia && href && isInboxMediaUrl(href)) {
-    return <InboxMedia src={href} alt={label} />;
-  }
 
   return (
     <a
@@ -427,7 +403,6 @@ function MarkdownImage({
   node: _node,
   ...props
 }: MarkdownImageProps) {
-  const allowRemoteMedia = useContext(RemoteMediaContext);
   const url = typeof src === "string" ? src.trim() : "";
   if (url.startsWith("data:image/")) {
     return <img {...props} src={url} alt={alt ?? ""} />;
@@ -435,8 +410,7 @@ function MarkdownImage({
   if (isNoteImagePath(url)) {
     return <NoteAssetImage {...props} asset={url} alt={alt} />;
   }
-  if (!allowRemoteMedia || !url || !isInboxMediaUrl(url)) return null;
-  return <InboxMedia src={url} alt={alt} />;
+  return null;
 }
 
 const MARKDOWN_COMPONENTS = {
@@ -451,14 +425,12 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
   cwd,
   onOpenFile,
-  allowRemoteMedia,
 }: {
   text: string;
   streaming?: boolean;
   className?: string;
   cwd?: string;
   onOpenFile?: OpenFileFn;
-  allowRemoteMedia?: boolean;
 }) {
   const [fileMenu, setFileMenu] = useState<FileLinkMenu | null>(null);
   const onFileContextMenu = useCallback(
@@ -480,7 +452,6 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     ],
     [cwd],
   );
-  const remoteMedia = !!allowRemoteMedia;
 
   const onFileMenuPick = (id: string) => {
     if (!fileMenu) return;
@@ -516,36 +487,32 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   };
 
   return (
-    <RemoteMediaContext.Provider value={remoteMedia}>
-      <FileOpenContext.Provider value={fileOpen}>
-        <>
-          <Streamdown
-            className={`agent-markdown min-w-0 font-sans text-sm leading-6 ${className ?? ""}`}
-            components={MARKDOWN_COMPONENTS}
-            controls={false}
-            dir="auto"
-            isAnimating={!!streaming}
-            plugins={MARKDOWN_PLUGINS}
-            remarkPlugins={remarkPlugins}
-            rehypePlugins={
-              remoteMedia ? INBOX_MEDIA_REHYPE_PLUGINS : MARKDOWN_REHYPE_PLUGINS
-            }
-          >
-            {text}
-          </Streamdown>
-          {fileMenu ? (
-            <ExplorerMenu
-              x={fileMenu.x}
-              y={fileMenu.y}
-              items={fileLinkMenuItems(!!onOpenFile, !!cwd)}
-              ariaLabel="File link actions"
-              onPick={onFileMenuPick}
-              onClose={() => setFileMenu(null)}
-            />
-          ) : null}
-        </>
-      </FileOpenContext.Provider>
-    </RemoteMediaContext.Provider>
+    <FileOpenContext.Provider value={fileOpen}>
+      <>
+        <Streamdown
+          className={`agent-markdown min-w-0 font-sans text-sm leading-6 ${className ?? ""}`}
+          components={MARKDOWN_COMPONENTS}
+          controls={false}
+          dir="auto"
+          isAnimating={!!streaming}
+          plugins={MARKDOWN_PLUGINS}
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+        >
+          {text}
+        </Streamdown>
+        {fileMenu ? (
+          <ExplorerMenu
+            x={fileMenu.x}
+            y={fileMenu.y}
+            items={fileLinkMenuItems(!!onOpenFile, !!cwd)}
+            ariaLabel="File link actions"
+            onPick={onFileMenuPick}
+            onClose={() => setFileMenu(null)}
+          />
+        ) : null}
+      </>
+    </FileOpenContext.Provider>
   );
 });
 

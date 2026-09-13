@@ -6,7 +6,6 @@ import {
   CircleAlert,
   FolderOpen,
   ImagePlus,
-  Inbox,
   MoreHorizontal,
   Pin,
   PinOff,
@@ -108,7 +107,6 @@ function projectMenuExtraItems(
 type Props = {
   cwd: string;
   recents: RecentProject[];
-  inboxUnseen?: boolean;
   busyPaths?: Iterable<string>;
   canGoBack?: boolean;
   canGoForward?: boolean;
@@ -116,8 +114,6 @@ type Props = {
   onGoForward?: () => void;
   onSearch?: () => void;
   searchActive?: boolean;
-  onOpenInbox?: () => void;
-  inboxActive?: boolean;
   notesEnabled?: boolean;
   onOpenNotes?: () => void;
   notesActive?: boolean;
@@ -141,7 +137,6 @@ type Props = {
 export function ProjectRail({
   cwd,
   recents,
-  inboxUnseen = false,
   busyPaths,
   canGoBack = false,
   canGoForward = false,
@@ -149,8 +144,6 @@ export function ProjectRail({
   onGoForward,
   onSearch,
   searchActive = false,
-  onOpenInbox,
-  inboxActive = false,
   notesEnabled = true,
   onOpenNotes,
   notesActive = false,
@@ -405,15 +398,6 @@ export function ProjectRail({
               shortcut={`${MOD}K`}
               ariaLabel={`Search (${MOD}K)`}
             />
-            <div className="mt-0.5" />
-            <RailAction
-              label="Inbox"
-              icon={Inbox}
-              onClick={onOpenInbox}
-              active={inboxActive}
-              dot={inboxUnseen}
-              ariaLabel={inboxUnseen ? "Inbox, new items" : "Inbox"}
-            />
             {notesEnabled ? (
               <RailAction
                 label="Notes"
@@ -440,7 +424,7 @@ export function ProjectRail({
                 busy={busy}
                 sortable={pinnedSortable}
                 pinned
-                searchActive={searchActive || inboxActive || notesActive}
+                searchActive={searchActive || notesActive}
                 onSelect={onSelectProject}
                 onTogglePin={onTogglePin}
                 onContextMenu={onProjectContextMenu}
@@ -462,7 +446,7 @@ export function ProjectRail({
               busy={busy}
               sortable={projectSortable}
               pinned={false}
-              searchActive={searchActive || inboxActive || notesActive}
+              searchActive={searchActive || notesActive}
               onSelect={onSelectProject}
               onTogglePin={onTogglePin}
               onContextMenu={onProjectContextMenu}

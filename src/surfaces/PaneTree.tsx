@@ -85,7 +85,6 @@ type Shared = {
   onQueuedMessageEditingChange: (sessionId: string, messageId?: string) => void;
   onSteerQueuedMessage: (sessionId: string, messageId: string) => void;
   onResumeQueue: (sessionId: string) => void;
-  onInboxCardDismiss?: (sessionId: string) => void;
   onNoteCardDismiss?: (sessionId: string) => void;
   onHandoffCardDismiss?: (sessionId: string) => void;
   onApproval: (
@@ -174,7 +173,6 @@ function PaneTreeComponent({
   onQueuedMessageEditingChange,
   onSteerQueuedMessage,
   onResumeQueue,
-  onInboxCardDismiss,
   onNoteCardDismiss,
   onHandoffCardDismiss,
   onApproval,
@@ -389,7 +387,6 @@ function PaneTreeComponent({
                 onQueuedMessageEditingChange={onQueuedMessageEditingChange}
                 onSteerQueuedMessage={onSteerQueuedMessage}
                 onResumeQueue={onResumeQueue}
-                onInboxCardDismiss={onInboxCardDismiss}
                 onNoteCardDismiss={onNoteCardDismiss}
                 onHandoffCardDismiss={onHandoffCardDismiss}
                 onApproval={onApproval}
