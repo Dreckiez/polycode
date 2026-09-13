@@ -25,6 +25,8 @@ pub(crate) fn initialize() -> io::Result<()> {
             return Err(io::Error::last_os_error());
         }
     }
+    let home = crate::dirs_home().map(std::path::PathBuf::from);
+    silence_playwright_nodes(&home);
     managed_job().map(|_| ())
 }
 

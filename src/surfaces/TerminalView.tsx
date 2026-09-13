@@ -2,7 +2,6 @@ import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
 import {
   getPtyStatus,
-  killPty,
   resizePty,
   spawnPty,
   subscribePty,
@@ -138,6 +137,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     });
     term.open(host);
     termRef.current = term;
+    term.focus();
     let closed = false;
 
     const onCopy = (event: ClipboardEvent) => {
@@ -315,7 +315,6 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       renderSub.dispose();
       bufferSub.dispose();
       unsubscribe();
-      void starting.catch(() => undefined).then(() => killPty(id));
       term.dispose();
       termRef.current = null;
       spawned.current = false;

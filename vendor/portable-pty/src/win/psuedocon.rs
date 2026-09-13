@@ -17,15 +17,19 @@ use winapi::shared::winerror::{HRESULT, S_OK};
 use winapi::um::handleapi::*;
 use winapi::um::processthreadsapi::*;
 use winapi::um::winbase::{
-    CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, STARTF_USESTDHANDLES, STARTUPINFOEXW,
+    CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, STARTF_USESHOWWINDOW,
+    STARTF_USESTDHANDLES, STARTUPINFOEXW,
 };
 use winapi::um::wincon::COORD;
 use winapi::um::winnt::HANDLE;
 
 pub type HPCON = HANDLE;
 
+#[allow(dead_code)]
 pub const PSUEDOCONSOLE_INHERIT_CURSOR: DWORD = 0x1;
+#[allow(dead_code)]
 pub const PSEUDOCONSOLE_RESIZE_QUIRK: DWORD = 0x2;
+#[allow(dead_code)]
 pub const PSEUDOCONSOLE_WIN32_INPUT_MODE: DWORD = 0x4;
 #[allow(dead_code)]
 pub const PSEUDOCONSOLE_PASSTHROUGH_MODE: DWORD = 0x8;
@@ -84,9 +88,7 @@ impl PsuedoCon {
                 size,
                 input.as_raw_handle() as _,
                 output.as_raw_handle() as _,
-                PSUEDOCONSOLE_INHERIT_CURSOR
-                    | PSEUDOCONSOLE_RESIZE_QUIRK
-                    | PSEUDOCONSOLE_WIN32_INPUT_MODE,
+                PSUEDOCONSOLE_INHERIT_CURSOR | PSEUDOCONSOLE_RESIZE_QUIRK,
                 &mut con,
             )
         };
@@ -123,7 +125,8 @@ impl PsuedoCon {
         // For example, when daemonizing wezterm-mux-server, the stdio handles
         // are redirected to a log file and the spawned process would end up
         // writing its output there instead of to the pty we just created.
-        si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        si.StartupInfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+        si.StartupInfo.wShowWindow = 0; // SW_HIDE
         si.StartupInfo.hStdInput = INVALID_HANDLE_VALUE;
         si.StartupInfo.hStdOutput = INVALID_HANDLE_VALUE;
         si.StartupInfo.hStdError = INVALID_HANDLE_VALUE;

@@ -126,6 +126,7 @@ import {
   terminalTabLabel,
   type TerminalMetaPatch,
 } from "./lib/terminalTab";
+import { killPty } from "./lib/pty";
 import {
   applyHarnessEvent,
   appendUser,
@@ -591,7 +592,12 @@ export default function App({
     () => windowTransfer?.tabs ?? resumed?.tabs ?? [seed.tab],
   );
   const [projectTerminals, setProjectTerminals] = useState<ProjectTerminal[]>(
-    () => windowTransfer?.projectTerminals ?? resumed?.projectTerminals ?? [],
+    () =>
+      windowTransfer?.projectTerminals ??
+      (resumed?.projectTerminals ?? []).map((dock) => ({
+        ...dock,
+        open: false,
+      })),
   );
   const [projectTerminalFocused, setProjectTerminalFocused] = useState(false);
   const [activeTabId, setActiveTabId] = useState(
@@ -1717,6 +1723,7 @@ export default function App({
     const file = dock?.pane.files.find((entry) => entry.id === fileId);
     if (!file) return;
     const finishClose = () => {
+      void killPty(fileId);
       setProjectTerminals((prev) =>
         mapProjectTerminal(prev, projectCwdRef.current, (entry) =>
           closeTerminalInDock(entry, fileId),
@@ -1735,6 +1742,7 @@ export default function App({
     const closingIds = new Set(closingFiles.map((file) => file.id));
 
     const finishClose = () => {
+      for (const id of closingIds) void killPty(id);
       setProjectTerminals((prev) =>
         mapProjectTerminal(prev, projectPath, (entry) => {
           if (!entry.pane.files.some((file) => file.id === fileId)) {
@@ -1853,6 +1861,9 @@ export default function App({
       );
 
       const finishClose = () => {
+        for (const file of closingFiles) {
+          if (file.terminal) void killPty(file.id);
+        }
         const nextActiveTabId = closePlan.nextActiveTabId;
         const next = current.filter((t) => t.id !== id);
         const gone = new Set(
@@ -1912,6 +1923,7 @@ export default function App({
       const terminals = closingFiles.filter((file) => file.terminal);
 
       const finishClose = () => {
+        for (const file of terminals) void killPty(file.id);
         const sessionIds = new Set(
           closing.flatMap((tab) =>
             leafIds(tab.layout).filter((paneId) =>
@@ -2084,6 +2096,7 @@ export default function App({
         if (file.terminal) {
           const ok = await confirmCloseTerminal(file);
           if (!ok) return;
+          void killPty(file.id);
         }
         finishClose();
       })();
@@ -2146,6 +2159,7 @@ export default function App({
       if (terminals.length > 0) {
         const ok = await confirmCloseTerminals(terminals);
         if (!ok) return;
+        for (const file of terminals) void killPty(file.id);
       }
       finishClose();
     })();
@@ -2173,6 +2187,9 @@ export default function App({
       if (!oldSession) return;
 
       const finishClear = () => {
+        for (const file of closingFiles) {
+          if (file.terminal) void killPty(file.id);
+        }
         persistSession(oldSession);
 
         const session = newSession(

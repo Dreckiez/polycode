@@ -124,10 +124,9 @@ pub fn pty_spawn(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    if let Some(prev) = host.remove(&id) {
-        terminate(prev.pid);
-        #[cfg(unix)]
-        close_fd(prev.master_fd);
+    if host.get(&id).is_some() {
+        let _ = pty_resize(host, id, cols, rows);
+        return Ok(());
     }
 
     #[cfg(unix)]
@@ -413,23 +412,55 @@ fn spawn_windows(
         master: Mutex::new(pair.master),
         pid,
     });
-    host.insert(id.clone(), live);
+    host.insert(id.clone(), live.clone());
 
     let data_app = app.clone();
     let data_id = id.clone();
+    let write_live = live.clone();
     thread::spawn(move || {
         let mut buf = vec![0_u8; READ_CHUNK];
+        let query = b"\x1b[6n";
+        let mut matched = 0;
+        let mut answered_cursor = false;
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    // ponytail: caps bridge traffic at 125 emits/s; use a timed
-                    // drain only if sustained PTY throughput becomes limiting.
-                    thread::sleep(PTY_COALESCE);
-                    emit_pty_data(&data_app, &data_id, &buf[..n]);
+                    let mut emit_bytes = Vec::with_capacity(n);
+                    for &byte in &buf[..n] {
+                        if !answered_cursor {
+                            if byte == query[matched] {
+                                matched += 1;
+                                if matched == query.len() {
+                                    let mut w = write_live.writer.lock().unwrap_or_else(|e| e.into_inner());
+                                    let _ = w.write_all(b"\x1b[1;1R");
+                                    let _ = w.flush();
+                                    answered_cursor = true;
+                                    matched = 0;
+                                }
+                                continue;
+                            } else if matched > 0 {
+                                emit_bytes.extend_from_slice(&query[..matched]);
+                                if byte == query[0] {
+                                    matched = 1;
+                                    continue;
+                                } else {
+                                    matched = 0;
+                                }
+                            }
+                        }
+                        emit_bytes.push(byte);
+                    }
+                    if !emit_bytes.is_empty() {
+                        thread::sleep(PTY_COALESCE);
+                        emit_pty_data(&data_app, &data_id, &emit_bytes);
+                    }
                 }
                 Err(_) => break,
             }
+        }
+        if matched > 0 && !answered_cursor {
+            emit_pty_data(&data_app, &data_id, &query[..matched]);
         }
     });
 
@@ -461,12 +492,7 @@ fn working_dir(cwd: &str) -> std::path::PathBuf {
 fn default_shell() -> (String, Vec<String>) {
     #[cfg(windows)]
     {
-        if let Ok(comspec) = std::env::var("COMSPEC") {
-            if !comspec.is_empty() {
-                return (comspec, Vec::new());
-            }
-        }
-        ("powershell.exe".into(), vec!["-NoLogo".into()])
+        ("powershell.exe".into(), vec!["-NoExit".into(), "-NoLogo".into()])
     }
     #[cfg(not(windows))]
     {
@@ -818,5 +844,185 @@ mod tests {
         assert!(host.get("term").is_some());
         assert!(host.remove_if_pid("term", 42).is_some());
         assert!(host.get("term").is_none());
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_pty_tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn test_windows_pty_starts_and_accepts_input() {
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+
+        let (shell, args) = default_shell();
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut cmd = CommandBuilder::new(&shell);
+        cmd.args(&args);
+        let mut child = crate::windows::spawn_pty(pair.slave.as_ref(), cmd).unwrap();
+        let mut reader = pair.master.try_clone_reader().unwrap();
+        let mut writer = pair.master.take_writer().unwrap();
+
+        let mut buf = [0u8; 1024];
+        let mut got_prompt = false;
+
+        let mut answered = false;
+        for _i in 0..20 {
+            let n = reader.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if !answered && text.contains("\x1b[6n") {
+                let _ = writer.write_all(b"\x1b[1;1R");
+                let _ = writer.flush();
+                answered = true;
+            }
+            if text.contains(">") || text.contains("Windows") {
+                got_prompt = true;
+                break;
+            }
+        }
+        assert!(got_prompt, "Terminal prompt should appear once cursor query is answered");
+
+        // Test single character echo
+        let _ = writer.write_all(b"x");
+        let _ = writer.flush();
+        let mut got_echo = false;
+        for _ in 0..20 {
+            let n = reader.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if text.contains("x") {
+                got_echo = true;
+                break;
+            }
+        }
+        assert!(got_echo, "Single character 'x' should be echoed by the shell");
+
+        // Verify typing standard characters works
+        let _ = writer.write_all(b"Write-Output PTY_TEST_OK\r\n");
+        let _ = writer.flush();
+        let mut command_output = false;
+        for _ in 0..20 {
+            let n = reader.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if text.contains("PTY_TEST_OK") {
+                command_output = true;
+                break;
+            }
+        }
+        assert!(command_output, "Typed command output should be received from the PTY");
+
+        let _ = child.kill();
+    }
+
+    #[test]
+    fn test_windows_multiple_ptys() {
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+
+        let (shell, args) = default_shell();
+        let pty_system = native_pty_system();
+
+        // Spawn first PTY
+        let pair1 = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut cmd1 = CommandBuilder::new(&shell);
+        cmd1.args(&args);
+        let mut child1 = crate::windows::spawn_pty(pair1.slave.as_ref(), cmd1).unwrap();
+        let mut reader1 = pair1.master.try_clone_reader().unwrap();
+        let mut writer1 = pair1.master.take_writer().unwrap();
+
+        // Spawn second PTY concurrently
+        let pair2 = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut cmd2 = CommandBuilder::new(&shell);
+        cmd2.args(&args);
+        let mut child2 = crate::windows::spawn_pty(pair2.slave.as_ref(), cmd2).unwrap();
+        let mut reader2 = pair2.master.try_clone_reader().unwrap();
+        let mut writer2 = pair2.master.take_writer().unwrap();
+
+        let mut buf = [0u8; 1024];
+
+        // Both should produce prompt independently
+        let mut prompt1 = false;
+        let mut answered1 = false;
+        for _ in 0..20 {
+            let n = reader1.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if !answered1 && text.contains("\x1b[6n") {
+                let _ = writer1.write_all(b"\x1b[1;1R");
+                let _ = writer1.flush();
+                answered1 = true;
+            }
+            if text.contains(">") || text.contains("Windows") {
+                prompt1 = true;
+                break;
+            }
+        }
+        assert!(prompt1, "First terminal prompt should appear");
+
+        let mut prompt2 = false;
+        let mut answered2 = false;
+        for _ in 0..20 {
+            let n = reader2.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if !answered2 && text.contains("\x1b[6n") {
+                let _ = writer2.write_all(b"\x1b[1;1R");
+                let _ = writer2.flush();
+                answered2 = true;
+            }
+            if text.contains(">") || text.contains("Windows") {
+                prompt2 = true;
+                break;
+            }
+        }
+        assert!(prompt2, "Second terminal prompt should appear concurrently");
+
+        // Type into both
+        let _ = writer1.write_all(b"Write-Output TERM1_OK\r\n");
+        let _ = writer1.flush();
+        let _ = writer2.write_all(b"Write-Output TERM2_OK\r\n");
+        let _ = writer2.flush();
+
+        let mut ok1 = false;
+        for _ in 0..20 {
+            let n = reader1.read(&mut buf).unwrap();
+            if String::from_utf8_lossy(&buf[..n]).contains("TERM1_OK") {
+                ok1 = true;
+                break;
+            }
+        }
+        assert!(ok1, "First terminal should execute typed command");
+
+        let mut ok2 = false;
+        for _ in 0..20 {
+            let n = reader2.read(&mut buf).unwrap();
+            if String::from_utf8_lossy(&buf[..n]).contains("TERM2_OK") {
+                ok2 = true;
+                break;
+            }
+        }
+        assert!(ok2, "Second terminal should execute typed command");
+
+        let _ = child1.kill();
+        let _ = child2.kill();
     }
 }

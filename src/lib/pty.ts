@@ -113,13 +113,27 @@ function release() {
   }, 500);
 }
 
+const inFlightSpawns = new Map<string, Promise<void>>();
+
 export async function spawnPty(
   id: string,
   cwd: string,
   cols: number,
   rows: number,
 ): Promise<void> {
-  await invoke("pty_spawn", { id, cwd, cols, rows });
+  ensureBridge();
+  if (bridge) await bridge;
+  const existing = inFlightSpawns.get(id);
+  if (existing) return existing;
+  const promise = (async () => {
+    try {
+      await invoke("pty_spawn", { id, cwd, cols, rows });
+    } finally {
+      inFlightSpawns.delete(id);
+    }
+  })();
+  inFlightSpawns.set(id, promise);
+  return promise;
 }
 
 export async function writePty(id: string, data: string): Promise<void> {
