@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   COMPOSER_RUNNER_DEFAULT,
+  COMPOSER_EFFORT_VISIBLE_DEFAULT,
   DIFF_VIEWER_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
   loadComposerRunner,
+  loadComposerEffortVisible,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   NOTES_ENABLED_DEFAULT,
   saveComposerRunner,
+  saveComposerEffortVisible,
   saveDiffViewer,
   saveFollowUpBehavior,
   saveLiveAgentsEnabled,
@@ -19,6 +22,7 @@ import {
 } from "./settings";
 
 const KEY = "monocode.composerRunner";
+const COMPOSER_EFFORT_VISIBLE_KEY = "monocode.composerEffortVisible";
 const NOTES_KEY = "monocode.notesEnabled";
 const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
@@ -90,6 +94,26 @@ describe("composer runner setting", () => {
   });
 });
 
+describe("composer effort control setting", () => {
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    localStorage.removeItem(COMPOSER_EFFORT_VISIBLE_KEY);
+  });
+
+  it("keeps effort in the model picker by default", () => {
+    expect(COMPOSER_EFFORT_VISIBLE_DEFAULT).toBe(false);
+    expect(loadComposerEffortVisible()).toBe(false);
+  });
+
+  it("persists the standalone effort control preference", () => {
+    saveComposerEffortVisible(true);
+    expect(localStorage.getItem(COMPOSER_EFFORT_VISIBLE_KEY)).toBe("1");
+    expect(loadComposerEffortVisible()).toBe(true);
+    saveComposerEffortVisible(false);
+    expect(loadComposerEffortVisible()).toBe(false);
+  });
+});
+
 describe("notes enabled setting", () => {
   beforeEach(mockLocalStorage);
   afterEach(() => {
@@ -133,8 +157,8 @@ describe("live agents enabled setting", () => {
 
 describe("workspace navigation keybindings", () => {
   it("documents session and project cycling in the shortcut list", () => {
-    const rows = KEYBINDINGS.filter(
-      (row) => /^(Session|Project): (Previous|Next)$/.test(row.command),
+    const rows = KEYBINDINGS.filter((row) =>
+      /^(Session|Project): (Previous|Next)$/.test(row.command),
     );
     expect(rows.map((row) => row.command)).toEqual([
       "Session: Previous",
