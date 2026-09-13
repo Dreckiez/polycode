@@ -498,7 +498,7 @@ function ChangedFiles({
             aria-label="Generate commit message"
             disabled={!canGenerate}
             onClick={() => void generate()}
-            className="absolute top-1 right-1 grid size-5 place-items-center rounded-md text-content bg-content/10 hover:bg-content/20 hover:text-content disabled:opacity-40"
+            className="absolute top-1 right-1 grid size-5 cursor-pointer place-items-center rounded-md text-content bg-content/10 hover:bg-content/20 hover:text-content disabled:cursor-default disabled:opacity-40"
           >
             {busy === "generate" ? (
               <Loader className="size-3.5 animate-spin" strokeWidth={1.75} />
@@ -512,7 +512,7 @@ function ChangedFiles({
             type="button"
             disabled={!canCommit}
             onClick={() => void commit(false)}
-            className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-l-md bg-content text-[12px] font-medium text-background-base disabled:opacity-40"
+            className="flex h-7 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-l-md bg-content text-[12px] font-medium text-background-base disabled:cursor-default disabled:opacity-40"
           >
             <Check className="size-3.5" strokeWidth={2} />
             Commit
@@ -524,7 +524,7 @@ function ChangedFiles({
             aria-label="Commit options"
             disabled={!canCommit}
             onClick={() => setMenuOpen((open) => !open)}
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-r-md border-l border-background-base/10 bg-content text-background-base disabled:opacity-40"
+            className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-r-md border-l border-background-base/10 bg-content text-background-base disabled:cursor-default disabled:opacity-40"
           >
             <ChevronDown className="size-3.5" strokeWidth={2} />
           </button>
@@ -534,7 +534,7 @@ function ChangedFiles({
                 type="button"
                 disabled={!canCommitPush}
                 onClick={() => void commit(true)}
-                className="flex h-7 w-full items-center px-3 text-left text-[12px] text-content hover:bg-content/10 disabled:opacity-40"
+                className="flex h-7 w-full cursor-pointer items-center px-3 text-left text-[12px] text-content hover:bg-content/10 disabled:cursor-default disabled:opacity-40"
               >
                 Commit & Push
               </button>
@@ -542,7 +542,7 @@ function ChangedFiles({
                 type="button"
                 disabled={!canCommitPushPr}
                 onClick={() => void commit(true, true)}
-                className="flex h-7 w-full items-center px-3 text-left text-[12px] text-content hover:bg-content/10 disabled:opacity-40"
+                className="flex h-7 w-full cursor-pointer items-center px-3 text-left text-[12px] text-content hover:bg-content/10 disabled:cursor-default disabled:opacity-40"
               >
                 Commit, Push & Create PR
               </button>
@@ -782,7 +782,7 @@ function GitSyncActions({
     ? `View PR #${pr.number}: ${pr.title}`
     : "View pull request";
   const btn =
-    "flex h-7 w-full min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-medium disabled:opacity-40";
+    "flex h-7 w-full min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 text-[12px] font-medium disabled:cursor-default disabled:opacity-40";
   const secondary = `${btn} bg-content/10 text-content hover:bg-content/15`;
   const showCreatePr = !hasOpenPr && !onDefault;
   const showViewPr = hasOpenPr;
@@ -895,7 +895,7 @@ function FileSection({
         <button
           type="button"
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-1 text-left"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left"
         >
           {open ? (
             <ChevronDown
@@ -1054,7 +1054,7 @@ function ChangeDirRow({
         aria-expanded={open}
         onClick={toggle}
         style={{ paddingLeft: 8 + depth * 12 }}
-        className="flex h-7 w-full items-center gap-1.5 pr-2 text-left leading-none text-content hover:bg-content/5"
+        className="flex h-7 w-full cursor-pointer items-center gap-1.5 pr-2 text-left leading-none text-content hover:bg-content/5"
       >
         <span className="grid size-4 shrink-0 place-items-center text-content/50">
           {open ? (
@@ -1188,7 +1188,9 @@ function ChangeRow({
           onClick={() => {
             if (canOpen) onOpenFile(file.path, kind);
           }}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className={`flex min-w-0 flex-1 items-center gap-1.5 text-left ${
+            canOpen ? "cursor-pointer" : "cursor-default"
+          }`}
         >
           {tree ? <span className="size-4 shrink-0" /> : null}
           <FileTypeIcon name={name} isDir={false} size={16} />
@@ -1259,7 +1261,7 @@ function IconAction({
       aria-label={title}
       disabled={disabled}
       onClick={onClick}
-      className="grid size-5 place-items-center rounded text-content/55 hover:bg-content/10 hover:text-content disabled:opacity-40"
+      className="grid size-5 cursor-pointer place-items-center rounded text-content/55 hover:bg-content/10 hover:text-content disabled:cursor-default disabled:opacity-40"
     >
       {children}
     </button>

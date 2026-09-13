@@ -3,8 +3,6 @@ import {
   ChevronRight,
   FilePlus,
   FolderPlus,
-  FoldVertical,
-  GitCompare,
   Search,
 } from "./icons";
 import {
@@ -54,7 +52,6 @@ import { displayPath, parentPath, rebasePath } from "../lib/paths";
 import { IS_MAC, IS_WIN, MOD } from "../lib/platform";
 import type { OpenFileFn } from "../lib/search";
 import type { GitStatusMap } from "../hooks/useGitFileStatuses";
-import { useProjectDiffStats } from "../hooks/useProjectDiffStats";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import { FileTypeIcon } from "./FileTypeIcon";
 
@@ -73,8 +70,6 @@ type Props = {
   onFileDeleted?: (path: string) => void;
   onSearch?: () => void;
   gitStatuses?: GitStatusMap;
-  onShowSourceControl?: () => void;
-  sourceControlActive?: boolean;
 };
 
 type Creating = { id: number; parent: string; isDir: boolean };
@@ -224,8 +219,6 @@ export const FileTree = memo(function FileTree({
   onFileDeleted,
   onSearch,
   gitStatuses,
-  sourceControlActive = false,
-  onShowSourceControl,
 }: Props) {
   const [expanded, setExpanded] = useState(() => loadExpanded(cwd));
   const [selectedPath, setSelectedPath] = useState(() => loadSelected(cwd));
@@ -630,18 +623,6 @@ export const FileTree = memo(function FileTree({
           <HeaderIcon label="New Folder" onClick={() => startCreate(true)}>
             <FolderPlus className="size-3.5" strokeWidth={1.75} />
           </HeaderIcon>
-          <HeaderIcon
-            label="Collapse All"
-            onClick={() => {
-              setCreating(null);
-              setRenaming(null);
-              const next = new Set([cwd]);
-              saveExpanded(cwd, next);
-              setExpanded(next);
-            }}
-          >
-            <FoldVertical className="size-3.5" strokeWidth={1.75} />
-          </HeaderIcon>
           {onSearch ? (
             <HeaderIcon
               label={`Search in files (${MOD}Shift+F)`}
@@ -649,13 +630,6 @@ export const FileTree = memo(function FileTree({
             >
               <Search className="size-3.5" strokeWidth={1.75} />
             </HeaderIcon>
-          ) : null}
-          {onShowSourceControl ? (
-            <FileTreeDiffButton
-              cwd={cwd}
-              active={sourceControlActive}
-              onClick={onShowSourceControl}
-            />
           ) : null}
         </div>
         <div className="flex h-8 shrink-0 items-center">
@@ -676,7 +650,7 @@ export const FileTree = memo(function FileTree({
                 e.clientY,
               );
             }}
-            className={`flex min-w-0 flex-1 items-center gap-1 h-full pl-2 text-left`}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 h-full pl-2 text-left"
           >
             <span className="grid size-4 shrink-0 place-items-center text-content/50">
               {rootOpen ? (
@@ -748,67 +722,13 @@ function HeaderIcon({
       aria-pressed={active || undefined}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`flex h-6 min-w-0 flex-1 items-center justify-center self-center rounded-md ${
+      className={`flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-center self-center rounded-md ${
         active
           ? "bg-content/10 text-content"
           : "text-content/50 hover:bg-content/5 hover:text-content"
       }`}
     >
       {children}
-    </button>
-  );
-}
-
-function FileTreeDiffButton({
-  cwd,
-  active,
-  onClick,
-}: {
-  cwd: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const enabled = Boolean(cwd) && cwd !== "~";
-  const stats = useProjectDiffStats(cwd, enabled);
-  const files = stats?.files ?? 0;
-  const additions = stats?.additions ?? 0;
-  const deletions = stats?.deletions ?? 0;
-  const empty = files <= 0 && additions <= 0 && deletions <= 0;
-  const label = empty
-    ? active
-      ? "Hide changes"
-      : "Show changes"
-    : [
-        `${files} ${files === 1 ? "file" : "files"} changed`,
-        additions > 0 ? `+${additions}` : "",
-        deletions > 0 ? `-${deletions}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-  const badge = files > 99 ? "99+" : String(files);
-
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-      className={`relative flex h-6 min-w-0 flex-1 items-center justify-center self-center rounded-md ${
-        active
-          ? "bg-content/10 text-content"
-          : "text-content/50 hover:bg-content/5 hover:text-content"
-      }`}
-    >
-      <span className="relative">
-        <GitCompare className="size-3.5" strokeWidth={1.75} />
-        {files > 0 ? (
-          <span className="pointer-events-none absolute -top-1.5 -right-2 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-accent px-0.5 text-[7px] font-semibold leading-none text-white tabular-nums">
-            {badge}
-          </span>
-        ) : null}
-      </span>
     </button>
   );
 }
@@ -953,7 +873,7 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
           onClick={onClick}
           onContextMenu={(e) => onItemContextMenu(entry, e)}
           style={{ paddingLeft: 8 + depth * 12 }}
-          className={`flex h-7.5 w-full cursor-default items-center gap-1 pr-2 text-left text-[14px] leading-none ${
+          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-none ${
             selected
               ? "bg-content/10 text-content"
               : "text-content hover:bg-content/5"

@@ -20,9 +20,9 @@ pub fn dispatch(app: &AppHandle, id: &str) {
         "new_tab" | "close_tab" | "close_other_tabs" | "next_tab" | "prev_tab" | "back_tab"
         | "forward_tab" | "split_right" | "split_down" | "focus_left" | "focus_right"
         | "focus_up" | "focus_down" | "toggle_sidebar" | "sidebar_opacity" | "open_project"
-        | "go_to_file" | "open_search" | "open_notes" | "find_in_project"
-        | "find" | "new_terminal" | "new_terminal_tab" | "toggle_terminal"
-        | "open_model_picker" | "open_settings" | "check_for_updates" => {
+        | "go_to_file" | "open_search" | "open_notes" | "find_in_project" | "find"
+        | "new_terminal" | "new_terminal_tab" | "toggle_terminal" | "open_model_picker"
+        | "open_settings" | "check_for_updates" => {
             let _ = app.emit(id, ());
         }
         "zoom_in" | "zoom_out" | "zoom_reset" => {

@@ -122,7 +122,7 @@ export function SidebarUpdate({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
+      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
         busy
           ? "bg-content/5 text-content/75 hover:bg-content/10 hover:text-content"
           : "bg-accent/15 text-content hover:bg-accent/20"

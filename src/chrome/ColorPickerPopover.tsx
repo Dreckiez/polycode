@@ -46,7 +46,7 @@ export function ColorSwatchRow({
             aria-pressed={selected}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPickIndex(index)}
-            className="grid size-5 place-items-center rounded-full"
+            className="grid size-5 cursor-pointer place-items-center rounded-full"
           >
             <span
               className={`size-3.5 rounded-full ${
@@ -67,7 +67,7 @@ export function ColorSwatchRow({
         aria-pressed={customColor != null}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onToggleCustom}
-        className="grid size-5 place-items-center rounded-full"
+        className="grid size-5 cursor-pointer place-items-center rounded-full"
       >
         <span
           className={`grid size-3.5 place-items-center overflow-hidden rounded-full ${

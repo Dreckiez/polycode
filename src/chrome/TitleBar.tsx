@@ -428,12 +428,12 @@ export function IconButton({
       }}
       className={`grid size-6.5 place-items-center rounded-md ${
         disabled
-          ? "text-content/25"
+          ? "cursor-default text-content/25"
           : accent
-            ? "text-accent hover:bg-content/10"
+            ? "cursor-pointer text-accent hover:bg-content/10"
             : active
-              ? "text-content hover:bg-content/10"
-              : "text-content/50 hover:bg-content/10 hover:text-content"
+              ? "cursor-pointer text-content hover:bg-content/10"
+              : "cursor-pointer text-content/50 hover:bg-content/10 hover:text-content"
       }`}
     >
       {children}
@@ -758,9 +758,9 @@ function TitleBarComponent({
     >
       {/* Both the rail and the sidebar step aside without a project, so the
           title bar takes over the traffic lights and the rail toggle. */}
-      {projectless && railClosed ? (
+      {railClosed ? (
         <>
-          <div className="w-[78px] shrink-0" />
+          {IS_MAC ? <div className="w-[78px] shrink-0" /> : null}
           <div className="flex shrink-0 items-center px-1.5">
             <IconButton
               label={`Toggle Sidebar (${MOD}B)`}

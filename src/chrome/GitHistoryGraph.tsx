@@ -52,7 +52,7 @@ export function GitHistoryGraph({
         onClick={onToggleExpanded}
         aria-expanded={expanded}
         aria-label={expanded ? "Collapse graph" : "Expand graph"}
-        className={`flex w-full shrink-0 items-center gap-1 px-3 text-left leading-none hover:bg-content/5 ${
+        className={`flex w-full shrink-0 cursor-pointer items-center gap-1 px-3 text-left leading-none hover:bg-content/5 ${
           expanded ? "h-7" : "h-full"
         }`}
       >
@@ -123,7 +123,7 @@ function HistoryRow({
         title={`${commit.shortSha} ${commit.subject}${commit.author ? ` — ${commit.author}` : ""}`}
         onClick={onOpen}
         aria-pressed={active}
-        className={`git-history-item flex h-[22px] min-w-0 w-full items-stretch overflow-visible pr-2 text-left ${
+        className={`git-history-item flex h-[22px] min-w-0 w-full cursor-pointer items-stretch overflow-visible pr-2 text-left ${
           row.kind === "HEAD" ? "is-head" : ""
         } ${
           active

@@ -197,7 +197,7 @@ export function TabGroupMenu({
                 }
               })();
             }}
-            className="grid size-9 shrink-0 place-items-center rounded-lg border border-content/10 bg-content/5 hover:bg-content/10"
+            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-content/10 bg-content/5 hover:bg-content/10"
           >
             <ProjectLogoIcon
               path={logoPath}
@@ -222,7 +222,7 @@ export function TabGroupMenu({
               onClick={() => {
                 void clearProjectLogo(projectKey(logoProject)).then(onLogoChange);
               }}
-              className="grid size-7 shrink-0 place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content"
+              className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content"
             >
               <Trash2 className="size-3.5" strokeWidth={1.75} />
             </button>
@@ -335,7 +335,7 @@ function MascotSwatch({
       aria-pressed={selected}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onPick}
-      className={`grid size-5 shrink-0 place-items-center rounded-md ${
+      className={`grid size-5 shrink-0 cursor-pointer place-items-center rounded-md ${
         selected ? "bg-content/15 ring-1 ring-content/50" : "hover:bg-content/8"
       }`}
     >
@@ -358,7 +358,7 @@ function MenuRow({
       role="menuitem"
       onMouseDown={(e) => e.preventDefault()}
       onClick={onPick}
-      className={`flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] leading-none ${
+      className={`flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left text-[13px] leading-none ${
         item.danger
           ? "text-red-300/90 hover:bg-red-500/15"
           : "text-content hover:bg-content/5"

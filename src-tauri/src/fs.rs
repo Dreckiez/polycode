@@ -517,7 +517,6 @@ pub async fn git_pr_create(
     .map_err(|e| e.to_string())?
 }
 
-
 /// `owner/repo` for the GitHub remote of this working copy, via `gh`.
 #[tauri::command]
 pub async fn git_github_repo(cwd: String) -> Result<String, String> {

@@ -389,7 +389,7 @@ export function ProjectRail({
         />
       ) : (
         <>
-          <div className="flex shrink-0 flex-col gap-px px-2 pb-2 pt-0.5">
+          <div className="flex shrink-0 flex-col gap-[2px] px-2 pb-2 pt-0.5">
             <RailSearch
               label="Search"
               icon={Search}
@@ -569,7 +569,7 @@ type SortableHandle = ReturnType<typeof useSortable>;
 const LIVE_AGENT_MIN = 2;
 const LIVE_AGENT_CAP = 4;
 
-function LiveAgentsPreview({
+export function LiveAgentsPreview({
   agents,
   activeSessionId,
   onSelect,
@@ -649,7 +649,7 @@ function LiveAgentsPreview({
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((open) => !open)}
-            className="flex w-full items-center justify-center gap-1 px-2 py-1.5 text-[11px] text-content/50 hover:bg-content/8 hover:text-content"
+            className="flex w-full cursor-pointer items-center justify-center gap-1 px-2 py-1.5 text-[11px] text-content/50 hover:bg-content/8 hover:text-content"
           >
             {expanded ? (
               <ChevronUp className="size-3" strokeWidth={1.75} />
@@ -714,7 +714,7 @@ function LiveAgentCard({
       aria-current={selected ? "true" : undefined}
       onClick={() => onSelect?.(agent.id)}
       className={`relative flex w-full flex-col rounded-md px-2 py-1.5 text-left ${
-        selected ? "bg-content/10" : "hover:bg-content/8"
+        selected ? "bg-content/10 cursor-default" : "hover:bg-content/8 cursor-pointer"
       }`}
     >
       <span className="flex min-w-0 items-center gap-2">
@@ -815,7 +815,7 @@ function ProjectSection({
             title="Open project"
             aria-label="Open project"
             onClick={onAdd}
-            className="grid size-5 shrink-0 place-items-center rounded-md text-content/50 hover:bg-content/8 hover:text-content"
+            className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-md text-content/50 hover:bg-content/8 hover:text-content"
           >
             <Plus className="size-3.5" strokeWidth={1.75} />
           </button>
@@ -826,7 +826,7 @@ function ProjectSection({
           {emptyLabel}
         </p>
       ) : null}
-      <div className="flex flex-col gap-px px-2">
+      <div className="flex flex-col gap-0.5 px-2">
         {items.map((item, index) => (
           <ProjectCard
             key={item.path}
@@ -919,9 +919,9 @@ function ProjectCard({
       ref={(el) => sortable.setItemRef(item.path, el)}
       className={`group relative flex touch-none items-stretch rounded-md px-2 h-8 ${
         selected
-          ? "bg-content/12 text-content"
-          : "opacity-65 hover:bg-content/5 hover:text-content"
-      } ${dragging ? "opacity-40" : ""} cursor-default`}
+          ? "bg-content/12 text-content cursor-default"
+          : "opacity-65 hover:bg-content/5 hover:text-content cursor-pointer"
+      } ${dragging ? "opacity-40" : ""}`}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         if ((event.target as HTMLElement | null)?.closest("[data-no-drag]")) {
@@ -949,7 +949,9 @@ function ProjectCard({
         title={cardTitle}
         aria-label={cardAriaLabel}
         aria-current={selected ? "true" : undefined}
-        className="flex min-w-0 flex-1 cursor-default items-center gap-2 text-left group-hover:pr-6"
+        className={`flex min-w-0 flex-1 items-center gap-2 text-left group-hover:pr-6 ${
+          selected ? "cursor-default" : "cursor-pointer"
+        }`}
       >
         <div className="grid size-4 shrink-0 place-items-center transition-opacity group-hover:opacity-0">
           {logoPath && !busy ? (
@@ -992,7 +994,7 @@ function ProjectCard({
           event.stopPropagation();
           onOpenMenu(item.path, event.clientX, event.clientY);
         }}
-        className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-md text-content/55 hover:bg-content/8 hover:text-content group-hover:grid"
+        className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-content/55 hover:bg-content/8 hover:text-content group-hover:grid"
       >
         <MoreHorizontal className="size-4" strokeWidth={1.75} />
       </button>
@@ -1006,7 +1008,7 @@ function ProjectCard({
           event.stopPropagation();
           onTogglePin(item.path);
         }}
-        className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-content/55 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
+        className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 cursor-pointer place-items-center rounded-sm text-content/55 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
       >
         {pinned ? (
           <PinOff className="size-3.5" strokeWidth={1.75} />

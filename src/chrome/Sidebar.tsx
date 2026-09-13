@@ -7,6 +7,7 @@ import {
   CircleAlert,
   CircleDot,
   Clock,
+  File,
   Folder,
   GitBranch,
   GitPullRequest,
@@ -15,7 +16,6 @@ import {
   Plus,
   Search,
   Settings,
-  StickyNote,
 } from "./icons";
 import {
   memo,
@@ -129,10 +129,11 @@ import { ColorPickerPopover, ColorSwatchRow } from "./ColorPickerPopover";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import { FileTree } from "./FileTree";
 import { HarnessIcon } from "./HarnessIcon";
-import { ProjectRail } from "./ProjectRail";
-import { RailAction } from "./RailAction";
+import { LiveAgentsPreview } from "./ProjectRail";
+import { RailAction, RailSearch } from "./RailAction";
+import { SettingsNav } from "./SettingsRail";
 import { TerminalSpinner } from "./TerminalSpinner";
-import { DevModeSlot, IconButton, TabVisitNav } from "./TitleBar";
+import { DevModeSlot, TabVisitNav } from "./TitleBar";
 import { ProjectSearch } from "./ProjectSearch";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
 import { ProjectMascot } from "./ProjectMascot";
@@ -305,18 +306,18 @@ function SidebarComponent({
   selectedDiffKind,
   selectedCommitSha,
   textHarness,
-  onShowSourceControl,
+  onShowSourceControl: _onShowSourceControl,
   recents = [],
   busyProjectPaths,
   liveAgents = [],
   onSelectAgent,
   onSelectProject,
   onOpenProject,
-  onRemoveProject,
+  onRemoveProject: _onRemoveProject,
   onNew,
   onSearch,
   onOpenNotes,
-  onGoToFile,
+  onGoToFile: _onGoToFile,
   searchActive = false,
   notesActive = false,
   notesEnabled = true,
@@ -518,21 +519,16 @@ function SidebarComponent({
     { axis: "y" },
   );
   const visibleTabs = tabOrder;
-  const canDragTabs = visibleTabs.length > 1;
-  const showProjectRail = Boolean(onSelectProject && onOpenProject);
-  // Settings live in the rail slot, so they keep it visible even when the
-  // project rail itself is collapsed.
-  const railVisible = showProjectRail && (projectRailOpen || settingsOpen);
   const inProject = looksLikeProject(cwd);
-  const showSidebarFooter = !projectRailOpen;
-  // A blank session has no project to browse, so the shell stands alone until
-  // one is picked — whether or not the rail is open.
+  const showSidebarFooter = !settingsOpen;
   const sidebarVisible =
     open &&
-    !searchActive &&
-    !notesActive &&
-    !settingsOpen &&
-    inProject;
+    (projectRailOpen || settingsOpen) &&
+    (inProject || settingsOpen);
+  const [groupLabels] = useState(loadTabGroupLabels);
+  const [groupColors] = useState(loadTabGroupColors);
+  const [groupCustomColors] = useState(loadTabGroupCustomColors);
+  const [groupMascots] = useState(loadTabGroupMascots);
   const gitStatuses = useGitFileStatuses(gitRoot, open && tab === "files");
   const changeStats = useProjectDiffStats(gitRoot, open);
 
@@ -1092,7 +1088,7 @@ function SidebarComponent({
         ref={(el) => sortable.setItemRef(itemId, el)}
         className={`relative flex min-w-0 flex-1 touch-none items-stretch ${
           draggingTab ? "opacity-40" : ""
-        } ${canDragTabs ? "cursor-grab active:cursor-grabbing" : ""}`}
+        }`}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           onTabPick(itemId);
@@ -1127,11 +1123,11 @@ function SidebarComponent({
             if (sortable.consumeClick()) return;
             onTabPick(itemId);
           }}
-          className={`flex h-6 min-w-0 flex-1 items-center justify-center self-center rounded-md px-2 text-[12px] leading-none ${
+          className={`flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-center self-center rounded-md px-2 text-[12px] leading-none ${
             active
               ? "bg-content/10 text-content"
               : "text-content/50 hover:bg-content/5 hover:text-content"
-          } ${canDragTabs ? "cursor-grab active:cursor-grabbing" : ""}`}
+          }`}
         >
           {isChangesTab && hasChangeStats ? (
             <DiffStat additions={changeAdditions} deletions={changeDeletions} />
@@ -1150,26 +1146,7 @@ function SidebarComponent({
       ref={resize.setPaneRef}
       className="sidebar-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-content/10"
     >
-      {railVisible ? (
-        <>
-          <div
-            className="flex h-10 shrink-0 select-none items-center gap-1 border-b border-content/10 pl-3 pr-1.5"
-            data-tauri-drag-region="deep"
-          >
-            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
-              Workspace
-            </span>
-            <WorkspaceTitleActions onSearch={onGoToFile} onNew={onNew} />
-          </div>
-          <div
-            role="tablist"
-            aria-label="Workspace"
-            className="flex h-9 shrink-0 items-center gap-px border-b border-content/10 px-2"
-          >
-            {workspaceTabItems}
-          </div>
-        </>
-      ) : (
+      {settingsOpen ? (
         <>
           <div
             className="flex h-10 shrink-0 select-none items-center border-b border-content/10 pr-1.5"
@@ -1183,9 +1160,53 @@ function SidebarComponent({
               onGoBack={onGoBack}
               onGoForward={onGoForward}
               onTogglePanel={onToggleProjectRail}
-              panelActive={false}
+              panelActive
             />
           </div>
+          <SettingsNav
+            section={settingsSection}
+            onSelect={(next) => onSelectSettingsSection?.(next)}
+            onClose={() => onCloseSettings?.()}
+          />
+        </>
+      ) : (
+        <>
+          <div
+            className="flex h-10 shrink-0 select-none items-center pr-1.5"
+            data-tauri-drag-region="deep"
+          >
+            {IS_MAC ? <div className="w-[78px] shrink-0" /> : null}
+            <DevModeSlot />
+            <TabVisitNav
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              onGoBack={onGoBack}
+              onGoForward={onGoForward}
+              onTogglePanel={onToggleProjectRail}
+              panelActive
+            />
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-px px-2 pb-2 pt-0.5">
+            <RailSearch
+              label="Search"
+              icon={Search}
+              onClick={onSearch}
+              active={searchActive}
+              shortcut={`${MOD}K`}
+              ariaLabel={`Search (${MOD}K)`}
+            />
+            {notesEnabled ? (
+              <RailAction
+                label="Notes"
+                icon={File}
+                onClick={onOpenNotes}
+                active={notesActive}
+                ariaLabel="Notes"
+              />
+            ) : null}
+          </div>
+
           {onSelectProject ? (
             <SidebarProjectPicker
               cwd={cwd}
@@ -1193,13 +1214,9 @@ function SidebarComponent({
               busy={projectPathBusy(busyProjectPaths, cwd)}
               onSelectProject={onSelectProject}
               onOpenProject={onOpenProject}
-              onNew={onNew}
-              onSearch={onSearch}
-              onOpenNotes={notesEnabled ? onOpenNotes : undefined}
-              searchActive={searchActive}
-              notesActive={notesActive}
             />
           ) : null}
+
           <div
             role="tablist"
             aria-label="Workspace"
@@ -1209,7 +1226,8 @@ function SidebarComponent({
           </div>
         </>
       )}
-      <>
+      {!settingsOpen ? (
+        <>
         <div
           className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
             tab === "files" ? "" : "hidden"
@@ -1233,8 +1251,6 @@ function SidebarComponent({
                 onFileDeleted={onFileDeleted}
                 onSearch={onOpenFilesSearch}
                 gitStatuses={gitStatuses}
-                sourceControlActive={open && tab === "changes"}
-                onShowSourceControl={onShowSourceControl}
               />
             </div>
           ) : (
@@ -1566,12 +1582,23 @@ function SidebarComponent({
         ) : null}
         {showSidebarFooter ? (
           <>
+            {liveAgents && liveAgents.length > 0 ? (
+              <LiveAgentsPreview
+                agents={liveAgents}
+                activeSessionId={activeSessionId}
+                onSelect={onSelectAgent}
+                groupLabels={groupLabels}
+                groupColors={groupColors}
+                groupCustomColors={groupCustomColors}
+                groupMascots={groupMascots}
+              />
+            ) : null}
             <SidebarUpdateFooter
               update={updateNotice}
               onOpenWhatsNew={onOpenWhatsNew}
               onDismissUpdate={onDismissUpdate}
             />
-            <div className="flex shrink-0 flex-col gap-px p-2">
+            <div className="flex shrink-0 flex-col gap-px p-2 border-t border-content/10">
               <RailAction
                 label="Settings"
                 icon={Settings}
@@ -1583,6 +1610,7 @@ function SidebarComponent({
           </>
         ) : null}
       </>
+    ) : null}
       {sessionMenu ? (
         <ExplorerMenu
           x={sessionMenu.x}
@@ -1645,40 +1673,9 @@ function SidebarComponent({
   return (
     <div
       className={`flex h-full shrink-0 ${
-        railVisible || sidebarVisible ? "" : "hidden"
+        sidebarVisible ? "" : "hidden"
       }`}
     >
-      {railVisible && onSelectProject && onOpenProject ? (
-        <ProjectRail
-          cwd={cwd}
-          recents={recents}
-          busyPaths={busyProjectPaths}
-          liveAgents={liveAgents}
-          activeSessionId={activeSessionId}
-          onSelectAgent={onSelectAgent}
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onGoBack={onGoBack}
-          onGoForward={onGoForward}
-          onSearch={onSearch}
-          searchActive={searchActive}
-          notesEnabled={notesEnabled}
-          onOpenNotes={onOpenNotes}
-          notesActive={notesActive}
-          onTogglePanel={onToggleProjectRail}
-          onSelectProject={onSelectProject}
-          onOpenProject={onOpenProject}
-          onRemoveProject={onRemoveProject}
-          settingsOpen={settingsOpen}
-          settingsSection={settingsSection}
-          onOpenSettings={onOpenSettings}
-          onSelectSettingsSection={onSelectSettingsSection}
-          onCloseSettings={onCloseSettings}
-          updateNotice={updateNotice}
-          onOpenWhatsNew={onOpenWhatsNew}
-          onDismissUpdate={onDismissUpdate}
-        />
-      ) : null}
       {sidebarVisible ? sidebarContent : null}
     </div>
   );
@@ -1692,22 +1689,12 @@ function SidebarProjectPicker({
   busy,
   onSelectProject,
   onOpenProject,
-  onNew,
-  onSearch,
-  onOpenNotes,
-  searchActive = false,
-  notesActive = false,
 }: {
   cwd: string;
   recents: RecentProject[];
   busy: boolean;
   onSelectProject: (path: string) => void;
   onOpenProject?: () => void;
-  onNew?: () => void;
-  onSearch?: () => void;
-  onOpenNotes?: () => void;
-  searchActive?: boolean;
-  notesActive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1783,7 +1770,7 @@ function SidebarProjectPicker({
 
   return (
     <div
-      className="flex h-9 items-center gap-0.5 border-b border-content/10 px-2"
+      className="flex h-9 shrink-0 items-center border-b border-content/10 px-2"
       data-tauri-drag-region="deep"
     >
       <div
@@ -1804,32 +1791,32 @@ function SidebarProjectPicker({
             event.preventDefault();
             openPicker();
           }}
-          className={`flex h-6.5 min-w-0 items-center gap-1.5 rounded-md px-2 text-[12px] leading-none hover:text-content ${
+          className={`flex h-7.5 w-full cursor-pointer min-w-0 items-center gap-2 rounded-md px-2 text-[13px] hover:text-content ${
             open
               ? "bg-content/10 text-content"
-              : "text-content/50 hover:bg-content/5"
+              : "text-content/75 hover:bg-content/5 hover:text-content"
           }`}
         >
           {logoPath ? (
             <ProjectLogoIcon
               path={logoPath}
-              className="size-3.5 shrink-0 rounded-sm"
-              imageClassName="size-3.5"
+              className="size-4 shrink-0 rounded-sm"
+              imageClassName="size-4"
             />
           ) : (
             <ProjectMascot
               project={seed}
               color={color}
               name={resolveTabGroupMascot(key, groupMascots)}
-              className="size-3 shrink-0"
+              className="size-3.5 shrink-0"
               active={busy}
             />
           )}
-          <span className="min-w-0 truncate font-medium text-content/90">
+          <span className="min-w-0 flex-1 truncate text-left font-medium leading-normal py-0.5 text-content/90">
             {label}
           </span>
           <ChevronDown
-            className={`size-3 shrink-0 text-content/45 transition-transform ${
+            className={`size-3.5 shrink-0 text-content/45 ml-auto transition-transform ${
               open ? "rotate-180" : ""
             }`}
             strokeWidth={1.75}
@@ -1945,54 +1932,6 @@ function SidebarProjectPicker({
           </Popover>
         ) : null}
       </div>
-      <div className="flex items-center ml-auto">
-        {onNew ? (
-          <IconButton label={`New tab (${MOD}T)`} onClick={onNew}>
-            <Plus className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
-        {onSearch ? (
-          <IconButton
-            label={`Search (${MOD}K)`}
-            active={searchActive}
-            onClick={onSearch}
-          >
-            <Search className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
-        {onOpenNotes ? (
-          <IconButton label="Notes" active={notesActive} onClick={onOpenNotes}>
-            <StickyNote className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function WorkspaceTitleActions({
-  onSearch,
-  onNew,
-}: {
-  onSearch?: () => void;
-  onNew?: () => void;
-}) {
-  if (!onSearch && !onNew) return null;
-  return (
-    <div
-      className="flex shrink-0 items-center gap-0.5"
-      data-tauri-drag-region="false"
-    >
-      {onSearch ? (
-        <IconButton label={`Go to File (${MOD}P)`} onClick={onSearch}>
-          <Search className="size-3.5" strokeWidth={1.75} />
-        </IconButton>
-      ) : null}
-      {onNew ? (
-        <IconButton label={`New session (${MOD}T)`} onClick={onNew}>
-          <Plus className="size-3.5" strokeWidth={1.75} />
-        </IconButton>
-      ) : null}
     </div>
   );
 }
@@ -2021,7 +1960,7 @@ function SessionsHeaderButton({
       aria-haspopup={hasPopup ? "menu" : undefined}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={onClick}
-      className={`relative z-50 grid size-6 place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content ${
+      className={`relative z-50 grid size-6 cursor-pointer place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content ${
         open || active ? "bg-content/10 text-content" : ""
       }`}
     >
