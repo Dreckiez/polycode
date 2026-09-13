@@ -7,7 +7,6 @@ import {
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { looksLikeProject } from "../lib/recents";
 import {
   isValidSkillName,
   slugSkillName,
@@ -190,7 +189,7 @@ function SkillList({
 /** Shared starter-skill form for the composer picker and Settings. */
 export function CreateSkillForm({
   query,
-  cwd,
+  cwd: _cwd,
   monospace = true,
   error,
   busy,
@@ -206,11 +205,7 @@ export function CreateSkillForm({
   onCreate: (name: string, scope: "project" | "user") => void;
 }): ReactNode {
   const input = useRef<HTMLInputElement>(null);
-  const project = looksLikeProject(cwd);
   const [name, setName] = useState(() => slugSkillName(query));
-  const [scope, setScope] = useState<"project" | "user">(
-    project ? "project" : "user",
-  );
 
   useEffect(() => {
     input.current?.focus();
@@ -223,13 +218,13 @@ export function CreateSkillForm({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!valid || busy) return;
-    onCreate(slug, project ? scope : "user");
+    onCreate(slug, "user");
   };
 
   return (
     <form onSubmit={submit} className="px-2.5 py-2">
       <p className="mb-2 text-[11px] text-content/50">
-        Writes a starter SKILL.md you can edit.
+        Writes a starter SKILL.md to ~/.agents/skills you can edit.
       </p>
       <input
         ref={input}
@@ -246,24 +241,6 @@ export function CreateSkillForm({
         }}
         className={`mb-2 w-full rounded-md bg-content/10 px-2 py-1.5 text-[13px] text-content outline-none placeholder:text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
       />
-      <div className="mb-2 flex gap-1">
-        <ScopeButton
-          label="Project"
-          hint=".agents/skills"
-          monospace={monospace}
-          selected={scope === "project"}
-          disabled={!project || busy}
-          onClick={() => setScope("project")}
-        />
-        <ScopeButton
-          label="Personal"
-          hint="~/.agents/skills"
-          monospace={monospace}
-          selected={scope === "user"}
-          disabled={busy}
-          onClick={() => setScope("user")}
-        />
-      </div>
       {error ? (
         <p className="mb-2 text-[12px] text-content/70">{error}</p>
       ) : !name.trim() || valid ? null : (
@@ -292,39 +269,6 @@ export function CreateSkillForm({
   );
 }
 
-function ScopeButton({
-  label,
-  hint,
-  monospace,
-  selected,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  hint: string;
-  monospace: boolean;
-  selected: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex min-w-0 flex-1 flex-col rounded-md px-2 py-1.5 text-left ${
-        selected ? "bg-content/20 text-content" : "bg-content/10 text-content/70"
-      } disabled:opacity-40`}
-    >
-      <span className="text-[12px]">{label}</span>
-      <span
-        className={`truncate text-[10px] text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
-      >
-        {hint}
-      </span>
-    </button>
-  );
-}
 
 function scopeLabel(skill: Skill): string {
   if (skill.kind === "native") {

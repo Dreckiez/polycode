@@ -95,6 +95,125 @@ pub fn list_skills(
     ))
 }
 
+#[tauri::command(async)]
+pub fn import_skill(source_path: String) -> Result<DiscoveredSkill, String> {
+    let source = expand_home(&source_path);
+    if !source.exists() {
+        return Err(format!("{}: No such file or directory", source.display()));
+    }
+
+    let home = dirs_home().ok_or_else(|| "Could not determine home directory".to_string())?;
+    let global_skills = PathBuf::from(home).join(".agents").join("skills");
+    if let Err(e) = std::fs::create_dir_all(&global_skills) {
+        return Err(format!("Could not create skills folder: {e}"));
+    }
+
+    if source.is_file() {
+        let ext = source.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "md" && ext != "markdown" {
+            return Err("Selected file is not a Markdown file (.md)".into());
+        }
+
+        let bytes = read_prefix(&source, MAX_FRONTMATTER_BYTES).unwrap_or_default();
+        let text = String::from_utf8_lossy(&bytes);
+        let fallback_stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("skill");
+        let parent_name = source
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            .unwrap_or("skill");
+        let fallback = if fallback_stem.eq_ignore_ascii_case("skill") {
+            parent_name
+        } else {
+            fallback_stem
+        };
+        let fallback_slug = slug_name(fallback);
+        let (name, description) = parse_frontmatter(&text, &fallback_slug);
+        let skill_name = if name.is_empty() { fallback_slug } else { name };
+
+        let target_dir = global_skills.join(&skill_name);
+        if let Err(e) = std::fs::create_dir_all(&target_dir) {
+            return Err(format!(
+                "Could not create skill folder {}: {e}",
+                target_dir.display()
+            ));
+        }
+
+        let parent = source.parent().unwrap();
+        let is_skill_dir = parent.is_dir()
+            && (fallback_stem.eq_ignore_ascii_case("skill")
+                || parent.file_name().and_then(|s| s.to_str()) == Some(&skill_name));
+
+        let target_skill_md = target_dir.join("SKILL.md");
+        if is_skill_dir && parent != target_dir && !target_dir.starts_with(parent) {
+            copy_dir_contents(parent, &target_dir)?;
+        } else {
+            std::fs::copy(&source, &target_skill_md)
+                .map_err(|e| format!("Could not copy SKILL.md: {e}"))?;
+        }
+
+        Ok(DiscoveredSkill {
+            name: skill_name,
+            description,
+            path: crate::fs::path_to_js(&target_skill_md),
+            scope: "user".into(),
+            source: "agents".into(),
+        })
+    } else if source.is_dir() {
+        let skill_md = skill_md_path(&source)
+            .ok_or_else(|| "The selected folder does not contain a SKILL.md file".to_string())?;
+
+        let bytes = read_prefix(&skill_md, MAX_FRONTMATTER_BYTES).unwrap_or_default();
+        let text = String::from_utf8_lossy(&bytes);
+        let fallback = source.file_name().and_then(|s| s.to_str()).unwrap_or("skill");
+        let fallback_slug = slug_name(fallback);
+        let (name, description) = parse_frontmatter(&text, &fallback_slug);
+        let skill_name = if name.is_empty() { fallback_slug } else { name };
+
+        let target_dir = global_skills.join(&skill_name);
+        if source == target_dir {
+            return Err("This skill is already installed in the global skills directory".into());
+        }
+
+        if let Err(e) = std::fs::create_dir_all(&target_dir) {
+            return Err(format!(
+                "Could not create skill folder {}: {e}",
+                target_dir.display()
+            ));
+        }
+
+        copy_dir_contents(&source, &target_dir)?;
+
+        let target_skill_md = target_dir.join("SKILL.md");
+        Ok(DiscoveredSkill {
+            name: skill_name,
+            description,
+            path: crate::fs::path_to_js(&target_skill_md),
+            scope: "user".into(),
+            source: "agents".into(),
+        })
+    } else {
+        Err("Selected path is neither a file nor a directory".into())
+    }
+}
+
+pub(crate) fn copy_dir_contents(from: &Path, to: &Path) -> Result<(), String> {
+    if !to.exists() {
+        std::fs::create_dir_all(to).map_err(|e| format!("{}: {e}", to.display()))?;
+    }
+    for ent in std::fs::read_dir(from).map_err(|e| format!("{}: {e}", from.display()))? {
+        let ent = ent.map_err(|e| e.to_string())?;
+        let src = ent.path();
+        let dst = to.join(ent.file_name());
+        if src.is_dir() {
+            copy_dir_contents(&src, &dst)?;
+        } else {
+            std::fs::copy(&src, &dst).map_err(|e| format!("{}: {e}", dst.display()))?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn list_skills_from(
     project: &Path,
     home: Option<&Path>,
@@ -128,8 +247,12 @@ pub(crate) fn list_skills_from(
 
     // Highest priority first so later roots cannot replace a name.
     add_root(project.join(".agents/skills"), "project", "agents");
+    add_root(project.join(".agent/skills"), "project", "agents");
+    add_root(project.join(".agents"), "project", "agents");
+    add_root(project.join(".agent"), "project", "agents");
     if let Some(home) = home {
         add_root(home.join(".agents/skills"), "user", "agents");
+        add_root(home.join(".agent/skills"), "user", "agents");
     }
 
     for dir in [
@@ -137,6 +260,7 @@ pub(crate) fn list_skills_from(
         ".gemini/config/skills",
         ".antigravity/skills",
         ".agent/skills",
+        ".agents/skills",
     ] {
         add_root(project.join(dir), "project", "antigravity");
     }
@@ -1143,5 +1267,19 @@ mod tests {
         let bs = skills.iter().find(|s| s.name == "brainstorming").unwrap();
         assert_eq!(bs.source, "antigravity");
         assert_eq!(bs.scope, "user");
+    }
+
+    #[test]
+    fn test_copy_dir_contents() {
+        let src = tmp("src-dir");
+        let dst = tmp("dst-dir");
+        std::fs::write(src.0.join("test.txt"), "hello").unwrap();
+        let sub = src.0.join("nested");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(sub.join("sub.txt"), "world").unwrap();
+
+        copy_dir_contents(&src.0, &dst.0).unwrap();
+        assert_eq!(std::fs::read_to_string(dst.0.join("test.txt")).unwrap(), "hello");
+        assert_eq!(std::fs::read_to_string(dst.0.join("nested").join("sub.txt")).unwrap(), "world");
     }
 }

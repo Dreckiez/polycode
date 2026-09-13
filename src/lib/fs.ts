@@ -49,6 +49,10 @@ export function listSkills(
   });
 }
 
+export function importSkill(sourcePath: string): Promise<DiscoveredSkill> {
+  return invoke<DiscoveredSkill>("import_skill", { sourcePath });
+}
+
 export function listProjectFiles(cwd: string): Promise<ProjectFile[]> {
   return invoke<ProjectFile[]>("list_project_files", { cwd });
 }
@@ -354,6 +358,21 @@ export async function pickFolder(title = "Open project"): Promise<string | null>
     directory: true,
     multiple: false,
     title,
+  });
+  return typeof selected === "string" && selected ? slash(selected) : null;
+}
+
+export async function pickSkillFile(title = "Select SKILL.md"): Promise<string | null> {
+  const selected = await open({
+    directory: false,
+    multiple: false,
+    title,
+    filters: [
+      {
+        name: "Skill Markdown",
+        extensions: ["md", "markdown"],
+      },
+    ],
   });
   return typeof selected === "string" && selected ? slash(selected) : null;
 }

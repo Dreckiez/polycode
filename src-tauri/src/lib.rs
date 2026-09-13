@@ -253,6 +253,7 @@ pub fn run() {
             fs::read_text_file,
             fs::write_text_file,
             skills::list_skills,
+            skills::import_skill,
             search::search_project,
             cursor_store::cursor_tool_calls,
             harness::harness_resolve_cursor,

@@ -41,7 +41,7 @@ export const SETTINGS_SECTIONS: {
     id: "skills",
     label: "Skills",
     description:
-      "Discover and manage file skills from project, personal, and harness folders.",
+      "Discover and manage global skills across all your agent harnesses.",
   },
   {
     id: "archive",
