@@ -195,10 +195,46 @@ export const MODELS: AgentModel[] = [
     nativeId: "gemini-3.7-flash-high",
   },
   {
+    id: "antigravity:gemini-3.7-flash-medium",
+    harness: "antigravity",
+    name: "Gemini 3.7 Flash (Medium)",
+    nativeId: "gemini-3.7-flash-medium",
+  },
+  {
+    id: "antigravity:gemini-3.7-flash-low",
+    harness: "antigravity",
+    name: "Gemini 3.7 Flash (Low)",
+    nativeId: "gemini-3.7-flash-low",
+  },
+  {
+    id: "antigravity:gemini-3.6-flash-high",
+    harness: "antigravity",
+    name: "Gemini 3.6 Flash (High)",
+    nativeId: "gemini-3.6-flash-high",
+  },
+  {
+    id: "antigravity:gemini-3.6-flash-medium",
+    harness: "antigravity",
+    name: "Gemini 3.6 Flash (Medium)",
+    nativeId: "gemini-3.6-flash-medium",
+  },
+  {
+    id: "antigravity:gemini-3.6-flash-low",
+    harness: "antigravity",
+    name: "Gemini 3.6 Flash (Low)",
+    nativeId: "gemini-3.6-flash-low",
+  },
+  {
     id: "antigravity:gemini-3.1-pro-high",
     harness: "antigravity",
     name: "Gemini 3.1 Pro (High)",
     nativeId: "gemini-3.1-pro-high",
+  },
+  {
+    id: "antigravity:gemini-3.1-pro-low",
+    harness: "antigravity",
+    name: "Gemini 3.1 Pro (Low)",
+    nativeId: "gemini-3.1-pro-low",
   },
   {
     id: "antigravity:claude-sonnet-4-6",

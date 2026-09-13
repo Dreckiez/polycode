@@ -133,6 +133,51 @@ fn resume_child(pid: u32) -> io::Result<()> {
     }
 }
 
+/// Playwright-Go (used internally by the Antigravity CLI `agy`) bundles a headless `node.exe`
+/// driver. In official builds, that `node.exe` is marked with PE subsystem 3 (CUI / Console).
+/// When `agy models` runs inside a GUI application without an attached console, Windows
+/// allocates a new console window (conhost.exe) for `node.exe`, causing a black terminal
+/// to flash on screen.
+///
+/// Setting the PE Optional Header subsystem field from 3 (CUI) to 2 (GUI) tells Windows
+/// that the process is a GUI application, preventing Windows from ever allocating a console
+/// window while keeping stdio pipes and headless execution 100% intact.
+pub(crate) fn silence_playwright_nodes(home: &Option<std::path::PathBuf>) {
+    let Some(home) = home else { return };
+    let playwright_dir = home.join("AppData/Local/ms-playwright-go");
+    let Ok(entries) = std::fs::read_dir(playwright_dir) else { return };
+    for entry in entries.flatten() {
+        let node_path = entry.path().join("node.exe");
+        if node_path.is_file() {
+            let _ = set_pe_subsystem_gui(&node_path);
+        }
+    }
+}
+
+fn set_pe_subsystem_gui(path: &std::path::Path) -> std::io::Result<()> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)?;
+    let mut e_lfanew = [0u8; 4];
+    file.seek(SeekFrom::Start(0x3C))?;
+    file.read_exact(&mut e_lfanew)?;
+    let pe_offset = u32::from_le_bytes(e_lfanew) as u64;
+
+    // PE signature (4) + COFF header (20) + Subsystem offset in OptionalHeader (68) = 92
+    let subsystem_offset = pe_offset + 24 + 68;
+    file.seek(SeekFrom::Start(subsystem_offset))?;
+    let mut current_subsystem = [0u8; 2];
+    file.read_exact(&mut current_subsystem)?;
+    // 3 = IMAGE_SUBSYSTEM_WINDOWS_CUI
+    if u16::from_le_bytes(current_subsystem) == 3 {
+        file.seek(SeekFrom::Start(subsystem_offset))?;
+        file.write_all(&2u16.to_le_bytes())?; // 2 = IMAGE_SUBSYSTEM_WINDOWS_GUI
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

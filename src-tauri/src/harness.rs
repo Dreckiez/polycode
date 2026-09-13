@@ -1450,6 +1450,9 @@ fn resolve_antigravity() -> Option<PathBuf> {
         candidates.push(from_shell);
     }
 
+    #[cfg(windows)]
+    crate::windows::silence_playwright_nodes(&home);
+
     first_binary(candidates)
 }
 
