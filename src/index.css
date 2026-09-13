@@ -78,6 +78,14 @@ html:not(.is-mac) #root {
   text-rendering: optimizeLegibility;
 }
 
+/* Interactive controls in settings (tabs, buttons, switches, sliders) show cursor: pointer */
+[data-app-settings] button:not(:disabled),
+[data-app-settings] [role="switch"]:not(:disabled),
+[data-app-settings] [role="radio"]:not(:disabled),
+[data-app-settings] input[type="range"]:not(:disabled) {
+  cursor: pointer;
+}
+
 html:not(.is-mac) ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

@@ -234,7 +234,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Clear filter"
-                className="text-content/40 hover:text-content transition-colors"
+                className="cursor-pointer text-content/40 hover:text-content transition-colors"
               >
                 <X className="size-3" strokeWidth={1.75} />
               </button>
@@ -251,7 +251,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
               window.dispatchEvent(new Event(SKILLS_CHANGE_EVENT));
               setReload((value) => value + 1);
             }}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-content/10 bg-content/[0.03] px-2.5 text-[12px] text-content/60 hover:bg-content/10 hover:text-content transition-colors"
+            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-content/10 bg-content/[0.03] px-2.5 text-[12px] text-content/60 hover:bg-content/10 hover:text-content transition-colors"
           >
             <RefreshCw className="size-3.5" strokeWidth={1.75} />
             <span>Rescan</span>
@@ -265,7 +265,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
             aria-label="Add skill"
             disabled={busy}
             onClick={() => setAddMenuOpen((v) => !v)}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-content/10 bg-content/5 px-3 text-[12px] font-medium text-content hover:bg-content/10 transition-colors disabled:opacity-40"
+            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-content/10 bg-content/5 px-3 text-[12px] font-medium text-content hover:bg-content/10 transition-colors disabled:opacity-40"
             title="Add a skill by selecting a folder or SKILL.md file"
           >
             {busy ? (
@@ -296,7 +296,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                   setAddMenuOpen(false);
                   void handleSelectFolder();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-content/5 transition-colors"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-content/5 transition-colors"
               >
                 <FolderOpen className="size-4 shrink-0 text-content/70" strokeWidth={1.75} />
                 <div className="min-w-0 flex-1">
@@ -310,7 +310,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                   setAddMenuOpen(false);
                   void handleSelectFile();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-content/5 transition-colors"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-content/5 transition-colors"
               >
                 <File className="size-4 shrink-0 text-content/70" strokeWidth={1.75} />
                 <div className="min-w-0 flex-1">
@@ -329,7 +329,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="text-red-400/60 hover:text-red-400"
+            className="cursor-pointer text-red-400/60 hover:text-red-400"
           >
             <X className="size-3.5" />
           </button>
@@ -371,7 +371,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="mt-1 rounded-md border border-content/10 px-2.5 py-1 text-[11.5px] text-content/60 hover:bg-content/10 hover:text-content transition-colors"
+            className="mt-1 cursor-pointer rounded-md border border-content/10 px-2.5 py-1 text-[11.5px] text-content/60 hover:bg-content/10 hover:text-content transition-colors"
           >
             Clear search
           </button>
@@ -439,7 +439,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                           onClick={() => onReveal(skill.path)}
                           aria-label={`Reveal ${skill.name} in file manager`}
                           title="Reveal folder in Explorer"
-                          className="grid size-7 place-items-center rounded-md border border-content/5 bg-content/[0.02] text-content/40 hover:border-content/15 hover:bg-content/10 hover:text-content transition-all"
+                          className="grid size-7 cursor-pointer place-items-center rounded-md border border-content/5 bg-content/[0.02] text-content/40 hover:border-content/15 hover:bg-content/10 hover:text-content transition-all"
                         >
                           <FolderOpen className="size-3.5" strokeWidth={1.75} />
                         </button>
@@ -449,7 +449,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                           aria-label={`Include ${skill.name} in MonoCode catalog`}
                           aria-checked={!disabled}
                           onClick={() => onToggle(skill.path, disabled)}
-                          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                          className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${
                             disabled
                               ? "bg-content/20 hover:bg-content/30"
                               : "bg-accent hover:brightness-105"

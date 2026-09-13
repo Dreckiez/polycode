@@ -104,6 +104,7 @@ import { refreshHarnessCatalogs } from "../lib/harness/registry";
 import {
   defaultModelId,
   getModelSnapshot,
+  hasLiveCatalog,
   isPickerProviderVisible,
   loadDefaultModels,
   loadLastModelChoice,
@@ -243,7 +244,7 @@ export function SettingsView({
             type="button"
             data-tauri-drag-region="false"
             onClick={appearance.restoreDefaults}
-            className="mr-2 flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
+            className="mr-2 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
           >
             <RotateCcw className="size-3.5" strokeWidth={1.75} />
             Restore defaults
@@ -932,7 +933,7 @@ function ChatBackgroundCard({
             type="button"
             onClick={() => void appearance.onChooseChatBackground()}
             disabled={busy}
-            className="flex h-36 w-full flex-col items-center justify-center gap-2 text-content/40 hover:bg-content/5 hover:text-content/70 disabled:cursor-default disabled:opacity-40"
+            className="flex h-36 w-full cursor-pointer flex-col items-center justify-center gap-2 text-content/40 hover:bg-content/5 hover:text-content/70 disabled:cursor-default disabled:opacity-40"
           >
             {busy ? (
               <Loader className="size-5 animate-spin" aria-hidden />
@@ -1119,23 +1120,47 @@ function ProviderRow({
   onDefault: (harness: HarnessId, model: string) => void;
   onModelChange: (harness: HarnessId, model: string) => void;
 }) {
-  const models = modelsFor(harness);
   const available = isHarnessAvailable(harness);
+  const live = hasLiveCatalog(harness);
+  const models = available && live ? modelsFor(harness) : [];
   const current =
     models.length > 0 ? resolveModel(harness, selectedModel) : null;
   const [inPicker, setInPicker] = useState(() =>
     isPickerProviderVisible(harness),
   );
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!available || models.length > 0) return;
-    void refreshHarnessCatalogs([harness]);
-  }, [available, harness, models.length]);
+    if (!available || hasLiveCatalog(harness)) return;
+    setRefreshing(true);
+    void refreshHarnessCatalogs([harness]).finally(() => {
+      setRefreshing(false);
+    });
+  }, [available, harness]);
 
   const onPickerVisible = (visible: boolean) => {
     savePickerProviderVisible(harness, visible);
     setInPicker(visible);
   };
+
+  const onRetry = () => {
+    setRefreshing(true);
+    void refreshHarnessCatalogs([harness]).finally(() => {
+      setRefreshing(false);
+    });
+  };
+
+  let description: string;
+  if (!available) {
+    description = harnessUnavailableHint(harness);
+  } else if (refreshing) {
+    description = "Checking available models…";
+  } else if (live && models.length > 0) {
+    description = `${models.length} ${models.length === 1 ? "model" : "models"} available.`;
+  } else {
+    description =
+      "CLI detected, but could not retrieve models. Make sure it is authenticated and try again.";
+  }
 
   return (
     <Row
@@ -1150,13 +1175,21 @@ function ProviderRow({
           ) : null}
         </span>
       }
-      description={
-        available
-          ? `${models.length} ${models.length === 1 ? "model" : "models"} available.`
-          : harnessUnavailableHint(harness)
-      }
+      description={description}
     >
-      {current ? (
+      {refreshing ? (
+        <div className="flex items-center gap-1.5 text-[12px] text-content/40">
+          <Loader className="size-3.5 animate-spin" aria-hidden />
+          <span>Checking…</span>
+        </div>
+      ) : null}
+      {available && !live && !refreshing ? (
+        <SecondaryButton onClick={onRetry}>
+          <RefreshCw className="size-3.5" strokeWidth={1.75} />
+          Retry
+        </SecondaryButton>
+      ) : null}
+      {current && live ? (
         <Select
           label={`${HARNESS_TITLE[harness]} model`}
           value={current.id}
@@ -1167,13 +1200,15 @@ function ProviderRow({
           }))}
         />
       ) : null}
-      <SecondaryButton
-        onClick={() => current && onDefault(harness, current.id)}
-        disabled={isDefault || !current}
-      >
-        {isDefault ? "Default" : "Use by default"}
-      </SecondaryButton>
-      {available ? (
+      {current && live ? (
+        <SecondaryButton
+          onClick={() => current && onDefault(harness, current.id)}
+          disabled={isDefault}
+        >
+          {isDefault ? "Default" : "Use by default"}
+        </SecondaryButton>
+      ) : null}
+      {available && live ? (
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-content/50">Show in picker</span>
           <Toggle
@@ -1317,7 +1352,7 @@ function ArchivePage({
               <button
                 type="button"
                 onClick={() => onOpenSession(session.id)}
-                className="min-w-0 flex-1 truncate text-left text-[13px] hover:text-content"
+                className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px] hover:text-content"
               >
                 {sessionDisplayTitle(session.title, session.harness)}
               </button>
@@ -1462,7 +1497,7 @@ function Segmented<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`min-w-0 whitespace-nowrap rounded-[5px] px-2.5 py-1 ${
+          className={`min-w-0 cursor-pointer whitespace-nowrap rounded-[5px] px-2.5 py-1 ${
             value === option.value
               ? "bg-content/10 text-content"
               : "text-content/50 hover:text-content"
@@ -1509,7 +1544,7 @@ function Slider({
         aria-valuenow={value}
         aria-label={label}
         disabled={disabled}
-        className="sidebar-opacity-slider min-w-0 flex-1 disabled:cursor-not-allowed"
+        className="sidebar-opacity-slider min-w-0 flex-1 cursor-pointer disabled:cursor-not-allowed"
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <span className="w-10 shrink-0 text-right text-[12px] text-content tabular-nums">
@@ -1530,7 +1565,7 @@ function NotificationsBlocked() {
           onClick={() => {
             void openNotificationSettings().catch(() => {});
           }}
-          className="rounded-md border border-content/10 px-2 py-1 text-content/70 hover:bg-content/10 hover:text-content"
+          className="cursor-pointer rounded-md border border-content/10 px-2 py-1 text-content/70 hover:bg-content/10 hover:text-content"
         >
           Open System Settings
         </button>
@@ -1561,7 +1596,7 @@ function Toggle({
         onChange(!on);
         playCue("switch");
       }}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         on ? "bg-accent" : "bg-content/20"
       }`}
     >
@@ -1666,7 +1701,7 @@ function Select({
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-2 rounded-md border border-content/10 bg-content/5 px-2 py-1 text-left text-[12px] text-content outline-none hover:border-content/20"
+        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-content/10 bg-content/5 px-2 py-1 text-left text-[12px] text-content outline-none hover:border-content/20"
       >
         <span className="min-w-0 flex-1 truncate">
           {selected ? selected.label : value}
@@ -1710,7 +1745,7 @@ function Select({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => pick(option.value)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
                   highlighted || isSelected
                     ? "bg-content/10 text-content"
                     : "text-content hover:bg-content/5"
@@ -1750,7 +1785,7 @@ function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex shrink-0 items-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1 text-[12px] ${
+      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1 text-[12px] ${
         danger
           ? "text-red-400 hover:border-red-400/40 hover:bg-red-400/10"
           : "text-content/70 hover:bg-content/10 hover:text-content"
