@@ -35,6 +35,7 @@ export type DiscoveredSkill = {
     | "omp"
     | "fx"
     | "grok"
+    | "antigravity"
     | "monocode";
 };
 

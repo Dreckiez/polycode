@@ -145,7 +145,9 @@ fn resume_child(pid: u32) -> io::Result<()> {
 pub(crate) fn silence_playwright_nodes(home: &Option<std::path::PathBuf>) {
     let Some(home) = home else { return };
     let playwright_dir = home.join("AppData/Local/ms-playwright-go");
-    let Ok(entries) = std::fs::read_dir(playwright_dir) else { return };
+    let Ok(entries) = std::fs::read_dir(playwright_dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let node_path = entry.path().join("node.exe");
         if node_path.is_file() {

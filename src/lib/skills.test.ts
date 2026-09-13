@@ -274,6 +274,13 @@ describe("mergeCatalog", () => {
         scope: "project",
         source: "cursor",
       },
+      {
+        name: "pdf",
+        description: "antigravity global",
+        path: "/home/.gemini/config/skills/pdf/SKILL.md",
+        scope: "user",
+        source: "antigravity",
+      },
     ]);
     expect(catalog.find((s) => s.name === "review-pr")?.description).toBe(
       "from agents",
@@ -283,6 +290,9 @@ describe("mergeCatalog", () => {
     );
     expect(catalog.find((s) => s.name === "cursor-only")?.source).toBe(
       "cursor",
+    );
+    expect(catalog.find((s) => s.name === "pdf")?.source).toBe(
+      "antigravity",
     );
   });
 });

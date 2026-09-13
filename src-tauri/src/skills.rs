@@ -132,6 +132,15 @@ pub(crate) fn list_skills_from(
         add_root(home.join(".agents/skills"), "user", "agents");
     }
 
+    for dir in [
+        ".gemini/skills",
+        ".gemini/config/skills",
+        ".antigravity/skills",
+        ".agent/skills",
+    ] {
+        add_root(project.join(dir), "project", "antigravity");
+    }
+
     for (dir, source) in [
         (".claude/skills", "claude"),
         (".cursor/skills", "cursor"),
@@ -148,6 +157,21 @@ pub(crate) fn list_skills_from(
         }
     }
     if let Some(home) = home {
+        for dir in [
+            ".gemini/config/skills",
+            ".gemini/skills",
+            ".antigravity/skills",
+            ".gemini/antigravity/skills",
+            ".gemini/antigravity-ide/skills",
+            ".gemini/antigravity-cli/skills",
+            ".gemini/antigravity-cli/builtin/skills",
+            ".gemini/antigravity/builtin/skills",
+            ".gemini/antigravity-ide/builtin/skills",
+            ".agent/skills",
+        ] {
+            add_root(home.join(dir), "user", "antigravity");
+        }
+
         add_root(home.join(".pi/agent/skills"), "user", "pi");
         add_root(home.join(".omp/agent/skills"), "user", "omp");
         for (root, scope, namespace) in claude_plugin_skill_roots(home, project) {
@@ -357,6 +381,13 @@ fn path_is_within(path: &Path, root: &Path) -> bool {
 }
 
 fn scan_root(root: &Path, scope: &str, source: &str) -> Vec<DiscoveredSkill> {
+    scan_root_depth(root, scope, source, 0)
+}
+
+fn scan_root_depth(root: &Path, scope: &str, source: &str, depth: usize) -> Vec<DiscoveredSkill> {
+    if depth > 2 {
+        return Vec::new();
+    }
     let Ok(reader) = std::fs::read_dir(root) else {
         return Vec::new();
     };
@@ -372,29 +403,34 @@ fn scan_root(root: &Path, scope: &str, source: &str) -> Vec<DiscoveredSkill> {
         if folder.starts_with('.') || folder == "skills-cursor" {
             continue;
         }
-        let skill_md = skill_md_path(&dir);
-        let Some(skill_md) = skill_md else { continue };
-        let Ok(bytes) = read_prefix(&skill_md, MAX_FRONTMATTER_BYTES) else {
-            continue;
-        };
-        let Ok(text) = String::from_utf8(bytes) else {
-            continue;
-        };
-        let fallback = slug_name(folder);
-        if fallback.is_empty() {
-            continue;
+        if let Some(skill_md) = skill_md_path(&dir) {
+            let Ok(bytes) = read_prefix(&skill_md, MAX_FRONTMATTER_BYTES) else {
+                continue;
+            };
+            let Ok(text) = String::from_utf8(bytes) else {
+                continue;
+            };
+            let fallback = slug_name(folder);
+            if fallback.is_empty() {
+                continue;
+            }
+            let (name, description) = parse_frontmatter(&text, &fallback);
+            if name.is_empty() {
+                continue;
+            }
+            out.push(DiscoveredSkill {
+                name,
+                description,
+                path: crate::fs::path_to_js(&skill_md),
+                scope: scope.to_string(),
+                source: source.to_string(),
+            });
+        } else if depth < 2 {
+            let nested = dir.join("skills");
+            if nested.is_dir() {
+                out.extend(scan_root_depth(&nested, scope, source, depth + 1));
+            }
         }
-        let (name, description) = parse_frontmatter(&text, &fallback);
-        if name.is_empty() {
-            continue;
-        }
-        out.push(DiscoveredSkill {
-            name,
-            description,
-            path: crate::fs::path_to_js(&skill_md),
-            scope: scope.to_string(),
-            source: source.to_string(),
-        });
     }
     out
 }
@@ -469,7 +505,20 @@ fn parse_frontmatter(text: &str, fallback: &str) -> (String, String) {
     }
 
     let folder = fallback.to_string();
-    let name = name.filter(|n| is_valid_skill_name(n)).unwrap_or(folder);
+    let name = name
+        .and_then(|n| {
+            if is_valid_skill_name(&n) {
+                Some(n)
+            } else {
+                let slug = slug_name(&n);
+                if is_valid_skill_name(&slug) {
+                    Some(slug)
+                } else {
+                    None
+                }
+            }
+        })
+        .unwrap_or(folder);
     (name, description.trim().to_string())
 }
 
@@ -1050,5 +1099,49 @@ mod tests {
             slash_skill.is_some(),
             "distinct backslash path on Unix must not be disabled by colliding slash path"
         );
+    }
+
+    #[test]
+    fn discovers_antigravity_project_and_user_skills() {
+        let project = tmp("proj-agy");
+        let home = tmp("home-agy");
+        write_skill(
+            &project.0.join(".gemini/skills"),
+            "agy-proj",
+            "---\nname: agy-proj\ndescription: Antigravity project skill\n---\n",
+        );
+        write_skill(
+            &home.0.join(".gemini/config/skills"),
+            "pdf",
+            "---\nname: pdf\ndescription: Global PDF skill\n---\n",
+        );
+        write_skill(
+            &home.0.join(".gemini/antigravity-cli/builtin/skills"),
+            "generative_ui",
+            "---\nname: generative_ui\ndescription: Generative UI\n---\n",
+        );
+        // Test nested bundle like superpowers/skills/brainstorming
+        write_skill(
+            &home.0.join(".gemini/config/skills/superpowers/skills"),
+            "brainstorming",
+            "---\nname: brainstorming\ndescription: Brainstorming skill\n---\n",
+        );
+
+        let skills = list_skills_from(&project.0, Some(&home.0), None);
+        let proj = skills.iter().find(|s| s.name == "agy-proj").unwrap();
+        assert_eq!(proj.source, "antigravity");
+        assert_eq!(proj.scope, "project");
+
+        let pdf = skills.iter().find(|s| s.name == "pdf").unwrap();
+        assert_eq!(pdf.source, "antigravity");
+        assert_eq!(pdf.scope, "user");
+
+        let gen_ui = skills.iter().find(|s| s.name == "generative-ui").unwrap();
+        assert_eq!(gen_ui.source, "antigravity");
+        assert_eq!(gen_ui.scope, "user");
+
+        let bs = skills.iter().find(|s| s.name == "brainstorming").unwrap();
+        assert_eq!(bs.source, "antigravity");
+        assert_eq!(bs.scope, "user");
     }
 }
