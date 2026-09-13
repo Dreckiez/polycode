@@ -4,22 +4,16 @@ import { describe, expect, it } from "vitest";
 import { EmptySession } from "./EmptySession";
 
 describe("empty session background", () => {
-  it("renders the arcade when no chat background is selected", () => {
-    const markup = renderToStaticMarkup(
-      createElement(EmptySession, { cwd: "/work/demo" }),
-    );
-
-    expect(markup).toContain("<canvas");
-  });
-
-  it("does not render the arcade over a selected chat background", () => {
+  it("renders the composer container and prompt title", () => {
     const markup = renderToStaticMarkup(
       createElement(EmptySession, {
         cwd: "/work/demo",
-        hasChatBackground: true,
+        composer: createElement("div", { id: "composer-slot" }),
       }),
     );
 
+    expect(markup).toContain('id="composer-slot"');
+    expect(markup).toContain("What should we work on in demo?");
     expect(markup).not.toContain("<canvas");
   });
 });

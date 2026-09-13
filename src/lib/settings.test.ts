@@ -3,20 +3,17 @@ import {
   COMPOSER_RUNNER_DEFAULT,
   DIFF_VIEWER_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
-  GRID_ARCADE_ENABLED_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
-  loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   NOTES_ENABLED_DEFAULT,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
-  saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
   saveNotesEnabled,
 } from "./settings";
@@ -24,7 +21,6 @@ import {
 const KEY = "monocode.composerRunner";
 const NOTES_KEY = "monocode.notesEnabled";
 const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
-const GRID_ARCADE_KEY = "monocode.gridArcadeEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
 const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
 
@@ -134,25 +130,6 @@ describe("live agents enabled setting", () => {
   });
 });
 
-describe("grid arcade enabled setting", () => {
-  beforeEach(mockLocalStorage);
-  afterEach(() => {
-    localStorage.removeItem(GRID_ARCADE_KEY);
-  });
-
-  it("defaults to on", () => {
-    expect(GRID_ARCADE_ENABLED_DEFAULT).toBe(true);
-    expect(loadGridArcadeEnabled()).toBe(true);
-  });
-
-  it("persists an off switch", () => {
-    saveGridArcadeEnabled(false);
-    expect(localStorage.getItem(GRID_ARCADE_KEY)).toBe("0");
-    expect(loadGridArcadeEnabled()).toBe(false);
-    saveGridArcadeEnabled(true);
-    expect(loadGridArcadeEnabled()).toBe(true);
-  });
-});
 
 describe("workspace navigation keybindings", () => {
   it("documents session and project cycling in the shortcut list", () => {

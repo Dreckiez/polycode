@@ -141,14 +141,12 @@ import {
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
-  loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   saveClaudeHooks,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
-  saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
   saveNotesEnabled,
   settingsSectionDescription,
@@ -302,9 +300,6 @@ function GeneralPage({
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
-  const [gridArcadeEnabled, setGridArcadeEnabled] = useState(
-    loadGridArcadeEnabled,
-  );
   const [notesEnabled, setNotesEnabled] = useState(loadNotesEnabled);
   const [liveAgentsEnabled, setLiveAgentsEnabled] = useState(
     loadLiveAgentsEnabled,
@@ -362,11 +357,6 @@ function GeneralPage({
   const onComposerRunner = (next: boolean) => {
     saveComposerRunner(next);
     setComposerRunner(next);
-  };
-
-  const onGridArcadeEnabled = (next: boolean) => {
-    saveGridArcadeEnabled(next);
-    setGridArcadeEnabled(next);
   };
 
   const onNotesEnabled = (next: boolean) => {
@@ -458,16 +448,6 @@ function GeneralPage({
           label="Composer mascot"
           on={composerRunner}
           onChange={onComposerRunner}
-        />
-      </Row>
-      <Row
-        label="Empty session games"
-        description="Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still."
-      >
-        <Toggle
-          label="Empty session games"
-          on={gridArcadeEnabled}
-          onChange={onGridArcadeEnabled}
         />
       </Row>
       <Row
