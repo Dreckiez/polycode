@@ -171,70 +171,79 @@ export const MODELS: AgentModel[] = [
     nativeId: "zai/glm-5.2-fast",
   },
   {
-    id: "antigravity:gemini-3.8-flash-high",
+    id: "antigravity:gemini-3.8-flash",
     harness: "antigravity",
-    name: "Gemini 3.8 Flash (High)",
-    nativeId: "gemini-3.8-flash-high",
+    name: "Gemini 3.8 Flash",
+    nativeId: "gemini-3.8-flash",
+    settings: [
+      {
+        id: "effort",
+        label: "Effort",
+        kind: "select",
+        value: "high",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+        ],
+      },
+    ],
   },
   {
-    id: "antigravity:gemini-3.8-flash-medium",
+    id: "antigravity:gemini-3.7-flash",
     harness: "antigravity",
-    name: "Gemini 3.8 Flash (Medium)",
-    nativeId: "gemini-3.8-flash-medium",
+    name: "Gemini 3.7 Flash",
+    nativeId: "gemini-3.7-flash",
+    settings: [
+      {
+        id: "effort",
+        label: "Effort",
+        kind: "select",
+        value: "high",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+        ],
+      },
+    ],
   },
   {
-    id: "antigravity:gemini-3.8-flash-low",
+    id: "antigravity:gemini-3.6-flash",
     harness: "antigravity",
-    name: "Gemini 3.8 Flash (Low)",
-    nativeId: "gemini-3.8-flash-low",
+    name: "Gemini 3.6 Flash",
+    nativeId: "gemini-3.6-flash",
+    settings: [
+      {
+        id: "effort",
+        label: "Effort",
+        kind: "select",
+        value: "high",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+        ],
+      },
+    ],
   },
   {
-    id: "antigravity:gemini-3.7-flash-high",
+    id: "antigravity:gemini-3.1-pro",
     harness: "antigravity",
-    name: "Gemini 3.7 Flash (High)",
-    nativeId: "gemini-3.7-flash-high",
-  },
-  {
-    id: "antigravity:gemini-3.7-flash-medium",
-    harness: "antigravity",
-    name: "Gemini 3.7 Flash (Medium)",
-    nativeId: "gemini-3.7-flash-medium",
-  },
-  {
-    id: "antigravity:gemini-3.7-flash-low",
-    harness: "antigravity",
-    name: "Gemini 3.7 Flash (Low)",
-    nativeId: "gemini-3.7-flash-low",
-  },
-  {
-    id: "antigravity:gemini-3.6-flash-high",
-    harness: "antigravity",
-    name: "Gemini 3.6 Flash (High)",
-    nativeId: "gemini-3.6-flash-high",
-  },
-  {
-    id: "antigravity:gemini-3.6-flash-medium",
-    harness: "antigravity",
-    name: "Gemini 3.6 Flash (Medium)",
-    nativeId: "gemini-3.6-flash-medium",
-  },
-  {
-    id: "antigravity:gemini-3.6-flash-low",
-    harness: "antigravity",
-    name: "Gemini 3.6 Flash (Low)",
-    nativeId: "gemini-3.6-flash-low",
-  },
-  {
-    id: "antigravity:gemini-3.1-pro-high",
-    harness: "antigravity",
-    name: "Gemini 3.1 Pro (High)",
-    nativeId: "gemini-3.1-pro-high",
-  },
-  {
-    id: "antigravity:gemini-3.1-pro-low",
-    harness: "antigravity",
-    name: "Gemini 3.1 Pro (Low)",
-    nativeId: "gemini-3.1-pro-low",
+    name: "Gemini 3.1 Pro",
+    nativeId: "gemini-3.1-pro",
+    settings: [
+      {
+        id: "effort",
+        label: "Effort",
+        kind: "select",
+        value: "high",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "high", label: "High" },
+        ],
+      },
+    ],
   },
   {
     id: "antigravity:claude-sonnet-4-6",
@@ -257,7 +266,7 @@ export const MODELS: AgentModel[] = [
 ];
 
 export const DEFAULT_MODEL_ID: Record<HarnessId, string> = {
-  antigravity: "antigravity:gemini-3.8-flash-high",
+  antigravity: "antigravity:gemini-3.8-flash",
   claude: "claude:sonnet-5",
   codex: "",
   cursor: "cursor:composer-2.5",

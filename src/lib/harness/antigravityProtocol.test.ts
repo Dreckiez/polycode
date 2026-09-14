@@ -7,6 +7,7 @@ import {
   toolKindFromName,
   toolTitle,
 } from "./antigravityProtocol";
+import { parseModelsOutput } from "./antigravityCatalog";
 
 describe("buildAgySpawnArgs", () => {
   it("includes stream-json and auto-approval flags", () => {
@@ -38,6 +39,28 @@ describe("buildAgySpawnArgs", () => {
     expect(args).toContain("--conversation");
     expect(args[args.indexOf("--conversation") + 1]).toBe("conv-1234");
     expect(args[args.length - 1]).toBe("-p=");
+  });
+
+  it("normalizes base model and effort arguments", () => {
+    const args = buildAgySpawnArgs({
+      model: "antigravity:gemini-3.8-flash",
+      effort: "medium",
+    });
+    const modelIdx = args.indexOf("--model");
+    const effortIdx = args.indexOf("--effort");
+    expect(args[modelIdx + 1]).toBe("gemini-3.8-flash");
+    expect(args[effortIdx + 1]).toBe("medium");
+  });
+
+  it("strips legacy suffix when explicit effort is supplied", () => {
+    const args = buildAgySpawnArgs({
+      model: "antigravity:gemini-3.8-flash-high",
+      effort: "low",
+    });
+    const modelIdx = args.indexOf("--model");
+    const effortIdx = args.indexOf("--effort");
+    expect(args[modelIdx + 1]).toBe("gemini-3.8-flash");
+    expect(args[effortIdx + 1]).toBe("low");
   });
 });
 
@@ -126,3 +149,40 @@ describe("previewFromTool", () => {
     expect(preview?.path).toBe("/repo/package.json");
   });
 });
+
+describe("parseModelsOutput", () => {
+  it("groups models with effort suffixes and generates an effort setting", () => {
+    const raw = `
+gemini-3.8-flash-high\tGemini 3.8 Flash (High)
+gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)
+gemini-3.8-flash-low\tGemini 3.8 Flash (Low)
+claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)
+gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
+`;
+    const models = parseModelsOutput(raw);
+    expect(models).toHaveLength(3);
+
+    const flash = models.find((m) => m.nativeId === "gemini-3.8-flash");
+    expect(flash).toBeDefined();
+    expect(flash?.name).toBe("Gemini 3.8 Flash");
+    expect(flash?.settings).toBeDefined();
+    const effortSetting = flash?.settings?.find((s) => s.id === "effort");
+    expect(effortSetting).toBeDefined();
+    expect(effortSetting?.value).toBe("high");
+    expect(effortSetting?.options.map((o) => o.value)).toEqual([
+      "low",
+      "medium",
+      "high",
+    ]);
+
+    const claude = models.find((m) => m.nativeId === "claude-sonnet-4-6");
+    expect(claude).toBeDefined();
+    expect(claude?.settings).toBeUndefined();
+
+    const gpt = models.find((m) => m.nativeId === "gpt-oss-120b-medium");
+    expect(gpt).toBeDefined();
+    expect(gpt?.name).toBe("GPT-OSS 120B (Medium)");
+    expect(gpt?.settings).toBeUndefined();
+  });
+});
+

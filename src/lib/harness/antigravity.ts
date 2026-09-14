@@ -165,10 +165,21 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   const planning = input.intent === "plan";
   const existing = liveByThread.get(input.sessionId);
 
+  const currentEffort =
+    input.modelSettings?.effort ??
+    input.modelSettings?.reasoningEffort ??
+    input.modelSettings?.reasoning;
+
+  const existingEffort =
+    existing?.modelSettings?.effort ??
+    existing?.modelSettings?.reasoningEffort ??
+    existing?.modelSettings?.reasoning;
+
   if (
     existing &&
     existing.cwd === input.cwd &&
     existing.model === input.model &&
+    (existingEffort ?? "high") === (currentEffort ?? "high") &&
     existing.planning === planning
   ) {
     existing.onEvent = input.onEvent;
@@ -233,7 +244,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
 
   const spawnArgs = buildAgySpawnArgs({
     model: input.model,
-    effort: input.modelSettings?.effort,
+    effort: currentEffort,
     resume: resume?.conversationId,
     mode: planning ? "plan" : undefined,
   });

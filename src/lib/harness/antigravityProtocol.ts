@@ -92,15 +92,31 @@ export function buildAgySpawnArgs(input: {
   if (input.resume) {
     args.push("--conversation", input.resume);
   }
+  let effort = input.effort;
   if (input.model) {
     // If model starts with "antigravity:", strip it
-    const native = input.model.startsWith("antigravity:")
+    let native = input.model.startsWith("antigravity:")
       ? input.model.slice("antigravity:".length)
       : input.model;
+
+    const match = native.match(/^(.*)-(low|medium|high)$/);
+    if (match) {
+      if (effort) {
+        native = match[1];
+      }
+    } else if (
+      !effort &&
+      (native.startsWith("gemini-") ||
+        native.includes("flash") ||
+        native.includes("pro"))
+    ) {
+      effort = "high";
+    }
+
     if (native) args.push("--model", native);
   }
-  if (input.effort) {
-    args.push("--effort", input.effort);
+  if (effort) {
+    args.push("--effort", effort);
   }
   if (input.mode) {
     args.push("--mode", input.mode);
