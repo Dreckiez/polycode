@@ -208,11 +208,11 @@ function ToolButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className={`grid size-6.5 shrink-0 place-items-center rounded-md ${
+      className={`grid size-6.5 shrink-0 cursor-pointer place-items-center rounded-md ${
         active
           ? "bg-content/20 text-content"
           : "bg-content/10 text-content/50 hover:bg-content/15 hover:text-content"
-      } disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content/50`}
+      } disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content/50`}
     >
       {children}
     </button>
@@ -282,7 +282,7 @@ function MessageQueue({
             <button
               type="button"
               onClick={onResume}
-              className="flex h-6 shrink-0 items-center gap-1.5 rounded-md px-1.5 hover:bg-content/10 hover:text-content"
+              className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5 hover:bg-content/10 hover:text-content"
             >
               <Play className="size-3.5" />
               Resume
@@ -330,7 +330,7 @@ function MessageQueue({
                       !editDraft.trim() && message.attachments.length === 0
                     }
                     onClick={() => saveEdit(message)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content disabled:opacity-30"
+                    className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-content/10 hover:text-content disabled:cursor-default disabled:opacity-30"
                   >
                     <Check className="size-3.5" />
                   </button>
@@ -339,7 +339,7 @@ function MessageQueue({
                     title="Cancel queued message edit"
                     aria-label="Cancel queued message edit"
                     onClick={cancelEdit}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-content/10 hover:text-content"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -352,7 +352,7 @@ function MessageQueue({
                   <button
                     type="button"
                     onClick={() => onSteer?.(message.id)}
-                    className="flex h-6 shrink-0 items-center gap-1.5 rounded-md px-1.5 hover:bg-content/10 hover:text-content"
+                    className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5 hover:bg-content/10 hover:text-content"
                   >
                     <CornerDownRight className="size-3.5" />
                     Steer
@@ -362,7 +362,7 @@ function MessageQueue({
                     title="Edit queued message"
                     aria-label="Edit queued message"
                     onClick={() => startEdit(message)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-content/10 hover:text-content"
                   >
                     <Pencil className="size-3.5" />
                   </button>
@@ -371,7 +371,7 @@ function MessageQueue({
                     title="Remove queued message"
                     aria-label="Remove queued message"
                     onClick={() => onDelete?.(message.id)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-content/10 hover:text-content"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -1439,7 +1439,7 @@ export function Composer({
                       setPlusOpen(false);
                       attachFromPicker();
                     }}
-                    className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left text-content hover:bg-content/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg px-2 py-2 text-left text-content hover:bg-content/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <FilePlus className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0">
@@ -1460,7 +1460,7 @@ export function Composer({
                       setPlusOpen(false);
                       ref.current?.focus();
                     }}
-                    className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left text-content hover:bg-content/10"
+                    className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg px-2 py-2 text-left text-content hover:bg-content/10"
                   >
                     <AiIdea className="mt-0.5 size-4 shrink-0 text-yellow-300/80" />
                     <span className="min-w-0 flex-1">
@@ -1485,7 +1485,7 @@ export function Composer({
                   setPlanSelected(false);
                   ref.current?.focus();
                 }}
-                className="flex h-6.5 shrink-0 items-center gap-1 rounded-md bg-yellow-300/12 px-1.5 text-[11px] text-yellow-200/90 hover:bg-yellow-300/18"
+                className="flex h-6.5 shrink-0 cursor-pointer items-center gap-1 rounded-md bg-yellow-300/12 px-1.5 text-[11px] text-yellow-200/90 hover:bg-yellow-300/18"
               >
                 <AiIdea className="size-3.5" />
                 Plan
@@ -1654,7 +1654,7 @@ function ComposerAction({
             title="Send"
             aria-label="Send"
             onClick={onSend}
-            className="composer-send grid size-6.5 place-items-center rounded-md bg-white text-black hover:bg-white/90"
+            className="composer-send grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90"
           >
             <ArrowUp className="size-3.5" strokeWidth={2.25} />
           </button>
@@ -1664,7 +1664,7 @@ function ComposerAction({
           title="Stop"
           aria-label="Stop"
           onClick={onStop}
-          className="grid size-6.5 place-items-center rounded-md bg-white text-black hover:bg-white/90"
+          className="grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90"
         >
           <Square className="size-2.5 fill-current" strokeWidth={0} />
         </button>
@@ -1679,7 +1679,7 @@ function ComposerAction({
       aria-label="Send"
       disabled={!hasValue}
       onClick={onSend}
-      className="composer-send grid size-6.5 place-items-center rounded-md bg-white text-black hover:bg-white/90 disabled:cursor-default disabled:bg-white/30 disabled:text-black/40 disabled:hover:bg-white/30"
+      className="composer-send grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90 disabled:cursor-default disabled:bg-white/30 disabled:text-black/40 disabled:hover:bg-white/30"
     >
       <ArrowUp className="size-3.5" strokeWidth={2.25} />
     </button>

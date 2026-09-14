@@ -298,14 +298,14 @@ function FileList({
             onMouseDown={(e) => e.preventDefault()}
             onMouseEnter={() => onRowEnter(index)}
             onClick={() => onPick(file)}
-            className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm leading-none ${
+            className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm leading-normal ${
               highlighted ? "bg-content/10 text-content" : "text-content"
             }`}
           >
             <span className="shrink-0">
               <FileTypeIcon name={file.name} isDir={false} />
             </span>
-            <span className="min-w-0 flex-1 truncate">
+            <span className="min-w-0 flex-1 truncate py-0.5">
               <MatchText
                 text={file.name}
                 positions={file.positions

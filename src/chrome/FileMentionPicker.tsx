@@ -102,7 +102,7 @@ export function FileMentionPicker({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => onRowEnter(index)}
                 onClick={() => onPick(file)}
-                className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] leading-none ${
+                className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[13px] leading-normal ${
                   highlighted ? "bg-content/10 text-content" : "text-content"
                 }`}
               >
@@ -118,7 +118,7 @@ export function FileMentionPicker({
                   )}
                 </span>
                 <span
-                  className={`min-w-0 flex-1 truncate ${
+                  className={`min-w-0 flex-1 truncate py-0.5 ${
                     highlighted ? "text-mention" : ""
                   }`}
                 >

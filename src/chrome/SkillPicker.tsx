@@ -159,7 +159,7 @@ function SkillList({
             onMouseDown={(e) => e.preventDefault()}
             onMouseEnter={() => onRowEnter(index)}
             onClick={() => onPick(skill)}
-            className={`flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left ${
+            className={`flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-left ${
               highlighted ? "bg-skill/15 text-content" : "text-content"
             }`}
           >
@@ -259,14 +259,14 @@ export function CreateSkillForm({
           type="button"
           disabled={busy}
           onClick={onCancel}
-          className="rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
+          className="cursor-pointer rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content disabled:cursor-default"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!valid || busy}
-          className="rounded-md bg-content/20 px-2 py-1 text-[12px] text-content disabled:opacity-40"
+          className="cursor-pointer rounded-md bg-content/20 px-2 py-1 text-[12px] text-content disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Creating…" : "Create"}
         </button>

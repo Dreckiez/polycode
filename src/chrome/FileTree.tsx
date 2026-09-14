@@ -873,7 +873,7 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
           onClick={onClick}
           onContextMenu={(e) => onItemContextMenu(entry, e)}
           style={{ paddingLeft: 8 + depth * 12 }}
-          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-none ${
+          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal ${
             selected
               ? "bg-content/10 text-content"
               : "text-content hover:bg-content/5"
@@ -892,7 +892,7 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
             <FileTypeIcon name={entry.name} isDir={entry.isDir} isOpen={open} />
           </span>
           <span
-            className={`min-w-0 truncate ${
+            className={`min-w-0 truncate py-0.5 ${
               entry.ignored ? "italic text-content/50" : (gitColor ?? "")
             }`}
           >
@@ -1019,7 +1019,7 @@ function NameRow({
             }
           }}
           onBlur={() => finish(issue === null || issue.severity !== "error")}
-          className="h-5 min-w-0 flex-1 rounded-sm bg-content/10 px-1 text-[14px] leading-none text-content outline-none ring-1 ring-accent"
+          className="h-6 min-w-0 flex-1 rounded-sm bg-content/10 px-1 text-[14px] leading-normal text-content outline-none ring-1 ring-accent"
         />
       </div>
       {showIssue ? (

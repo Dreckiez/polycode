@@ -552,7 +552,7 @@ export function ModelPicker({
           openRecentMenu();
         }}
         onClick={() => togglePicker()}
-        className={`flex h-6.5 max-w-40 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-40 cursor-pointer items-center gap-1 rounded-md px-1.5 ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"
@@ -606,7 +606,7 @@ export function ModelPicker({
                       showEntrySubmenu(entry);
                     }}
                     onClick={() => showEntrySubmenu(entry)}
-                    className={`flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
+                    className={`flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
                       highlighted
                         ? "bg-content/10 text-content"
                         : "text-content hover:bg-content/5"
@@ -656,7 +656,7 @@ export function ModelPicker({
                       showEntrySubmenu(entry);
                     }
                   }}
-                  className={`flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
+                  className={`flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
                     highlighted
                       ? "bg-content/10 text-content"
                       : "text-content hover:bg-content/5"
@@ -723,7 +723,7 @@ export function ModelPicker({
                     onMouseDown={(event) => event.preventDefault()}
                     onMouseEnter={() => setActiveSetting(index)}
                     onClick={() => pickSetting(submenu.setting, option.value)}
-                    className={`flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
+                    className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] ${
                       highlighted
                         ? "bg-content/10 text-content"
                         : "text-content hover:bg-content/5"
@@ -798,7 +798,7 @@ export function ModelPicker({
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setRecentActive(index)}
                 onClick={() => pickModel(item)}
-                className={`flex h-10 w-full items-center gap-2 rounded-lg px-2 text-left disabled:cursor-not-allowed ${
+                className={`flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left disabled:cursor-not-allowed ${
                   disabled
                     ? "text-content/30"
                     : highlighted
@@ -887,7 +887,7 @@ export function EffortPicker({
         aria-haspopup="menu"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (open ? dismiss(true) : openPicker())}
-        className={`flex h-6.5 max-w-28 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-28 cursor-pointer items-center gap-1 rounded-md px-1.5 ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"
@@ -944,7 +944,7 @@ export function EffortPicker({
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => pick(option.value)}
-                className={`flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] text-content ${
+                className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] text-content ${
                   highlighted ? "bg-content/10" : "hover:bg-content/5"
                 }`}
               >
@@ -1137,7 +1137,7 @@ function ModelFlyout({
                     }
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onPick(item)}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-1.5 text-left text-[13px] disabled:cursor-not-allowed"
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-1.5 text-left text-[13px] disabled:cursor-not-allowed"
                   >
                     <span className="min-w-0 flex-1 truncate">{item.name}</span>
                   </button>
@@ -1154,7 +1154,7 @@ function ModelFlyout({
                       event.stopPropagation();
                       onToggleFavorite(item.id);
                     }}
-                    className={`grid size-6 shrink-0 place-items-center rounded-md transition-opacity ${
+                    className={`grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-opacity ${
                       favorited
                         ? "text-content/60"
                         : "text-content/35 opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -1208,7 +1208,7 @@ function ProviderTabButton({
       onMouseDown={(event) => event.preventDefault()}
       onMouseEnter={selected ? undefined : onSelect}
       onClick={onSelect}
-      className={`grid size-8 shrink-0 place-items-center rounded-md ${
+      className={`grid size-8 shrink-0 cursor-pointer place-items-center rounded-md ${
         selected
           ? "bg-content/12 text-content"
           : "text-content/45 hover:bg-content/8 hover:text-content"

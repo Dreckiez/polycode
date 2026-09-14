@@ -277,9 +277,9 @@ export function BranchPicker({
           className={
             missingGit
               ? "flex min-w-0 cursor-default items-center gap-1.5 text-content/50"
-              : `flex min-w-0 items-center gap-1.5 ${
+              : `flex min-w-0 cursor-pointer items-center gap-1.5 ${
                   open ? "text-content" : "text-content/50 hover:text-content"
-                } disabled:opacity-40 disabled:hover:text-content/50`
+                } disabled:cursor-default disabled:opacity-40 disabled:hover:text-content/50`
           }
         >
           <GitBranch className="size-3.5 shrink-0" strokeWidth={1.5} />
@@ -436,12 +436,12 @@ function BranchList({
             onClick={() => onPick(row)}
             className={
               row.kind === "create"
-                ? `mb-1 flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left disabled:opacity-60 ${
+                ? `mb-1 flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left disabled:cursor-default disabled:opacity-60 ${
                     highlighted
                       ? "bg-content/15 text-content"
                       : "bg-content/10 text-content hover:bg-content/15"
                   }`
-                : `flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left disabled:opacity-60 ${
+                : `flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left disabled:cursor-default disabled:opacity-60 ${
                     highlighted || selected
                       ? "bg-content/10 text-content"
                       : "text-content hover:bg-content/5"

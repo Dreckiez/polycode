@@ -365,7 +365,7 @@ function AgentTranscriptComponent({
           <div className="flex justify-center px-4 py-3">
             <button
               type="button"
-              className="rounded-md bg-content/8 px-2.5 py-1.5 font-sans text-[12px] text-content/60 hover:bg-content/12 hover:text-content"
+              className="cursor-pointer rounded-md bg-content/8 px-2.5 py-1.5 font-sans text-[12px] text-content/60 hover:bg-content/12 hover:text-content"
               onClick={loadEarlier}
             >
               Load earlier messages
@@ -745,7 +745,7 @@ function CopyTurnButton({ text }: { text: string }) {
       type="button"
       title={copied ? "Copied" : "Copy response"}
       aria-label={copied ? "Copied" : "Copy response"}
-      className="-ml-1 rounded-md p-1 text-content/40 hover:bg-content/8 hover:text-content/70"
+      className="-ml-1 cursor-pointer rounded-md p-1 text-content/40 hover:bg-content/8 hover:text-content/70"
       onClick={() => {
         playCue("copy");
         void copyText(text).then(
@@ -789,7 +789,7 @@ function SaveNoteButton({
       type="button"
       title={saved ? "Saved to Notes" : "Save as note"}
       aria-label={saved ? "Saved to Notes" : "Save as note"}
-      className="rounded-md p-1 text-content/40 hover:bg-content/8 hover:text-content/70"
+      className="cursor-pointer rounded-md p-1 text-content/40 hover:bg-content/8 hover:text-content/70"
       onClick={() => {
         playCue("copy");
         onSave(text);
@@ -2216,14 +2216,14 @@ function ApprovalControls({
     <div className="mt-1.5 flex gap-2">
       <button
         type="button"
-        className="rounded-md bg-content px-2.5 py-0.5 text-[11px] hover:bg-content/80     text-background-base"
+        className="cursor-pointer rounded-md bg-content px-2.5 py-0.5 text-[11px] text-background-base hover:bg-content/80"
         onClick={() => onApproval?.(approval.requestId, "allow")}
       >
         Allow
       </button>
       <button
         type="button"
-        className="rounded-md bg-content/10 px-2.5 py-0.5 text-[11px] text-content/70 hover:bg-content/20"
+        className="cursor-pointer rounded-md bg-content/10 px-2.5 py-0.5 text-[11px] text-content/70 hover:bg-content/20"
         onClick={() => onApproval?.(approval.requestId, "deny")}
       >
         Deny

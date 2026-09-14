@@ -64,7 +64,7 @@ export function HandoffMiniCard({ card, onDismiss }: Props) {
             title="Remove"
             aria-label="Remove handoff"
             onClick={onDismiss}
-            className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content"
+            className="absolute right-1.5 top-1.5 grid size-5 cursor-pointer place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content"
           >
             <X className="size-3" strokeWidth={2} />
           </button>

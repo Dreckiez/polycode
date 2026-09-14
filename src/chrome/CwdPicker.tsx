@@ -207,10 +207,10 @@ export function CwdPicker({
           buttonClassName
             ? `${buttonClassName} ${
                 open ? "bg-content/10 text-content" : "hover:bg-content/5"
-              } disabled:opacity-40`
-            : `flex min-w-0 items-center gap-1.5 ${
+              } cursor-pointer disabled:cursor-default disabled:opacity-40`
+            : `flex min-w-0 cursor-pointer items-center gap-1.5 ${
                 open ? "text-content" : "text-content/50 hover:text-content"
-              } disabled:opacity-40`
+              } disabled:cursor-default disabled:opacity-40`
         }
       >
         {children ?? (
@@ -280,7 +280,7 @@ export function CwdPicker({
                       setActive(index);
                     }}
                     onClick={() => pick({ kind: "recent", path: item.path })}
-                    className={`flex w-full items-center justify-between gap-3 px-2.5 py-2 text-left ${
+                    className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
                       active === index
                         ? "bg-content/10 text-content"
                         : "text-content/80 hover:bg-content/5"
@@ -313,7 +313,7 @@ export function CwdPicker({
                   setActive(moreIndex);
                   openMore();
                 }}
-                className={`flex w-full items-center justify-between gap-3 px-2.5 py-2 text-left ${
+                className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
                   active === moreIndex || moreOpen
                     ? "bg-content/10 text-content"
                     : "text-content/80 hover:bg-content/5"
@@ -338,7 +338,7 @@ export function CwdPicker({
                   setActive(newTerminalIndex);
                 }}
                 onClick={() => pick({ kind: "new-terminal" })}
-                className={`flex w-full items-center justify-between gap-3 px-2.5 py-2 text-left ${
+                className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
                   active === newTerminalIndex
                     ? "bg-content/10 text-content"
                     : "text-content/80 hover:bg-content/5"

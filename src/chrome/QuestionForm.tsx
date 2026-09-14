@@ -173,7 +173,7 @@ export function QuestionForm({ prompt, onReply, onInteraction }: Props) {
           <button
             type="submit"
             disabled={!ready}
-            className="h-6 rounded-md bg-content px-2.5 text-[11px] font-medium text-background-base hover:bg-content/80 disabled:opacity-40"
+            className="h-6 cursor-pointer rounded-md bg-content px-2.5 text-[11px] font-medium text-background-base hover:bg-content/80 disabled:cursor-default disabled:opacity-40"
           >
             Continue
           </button>
@@ -227,7 +227,7 @@ function QuestionFields({
                   type="button"
                   aria-pressed={active}
                   onClick={() => onSelect(option.id)}
-                  className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left ${
+                  className={`flex w-full cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 text-left ${
                     active
                       ? "border-content/35 bg-content/10"
                       : "border-content/10 hover:bg-content/5"

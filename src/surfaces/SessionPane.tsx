@@ -406,7 +406,7 @@ export const SessionPane = memo(function SessionPane({
             title={`Close Pane (${MOD}W)`}
             aria-label="Close pane"
             data-no-drag
-            className="grid size-5 shrink-0 place-items-center rounded text-content/50 hover:bg-content/10 hover:text-content"
+            className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-content/50 hover:bg-content/10 hover:text-content"
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -482,7 +482,7 @@ export const SessionPane = memo(function SessionPane({
                   aria-label="Jump to latest"
                   data-jump-to-bottom
                   onClick={() => jumpToBottomRef.current?.()}
-                  className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-content/10 text-content shadow-md hover:bg-content/5 backdrop-blur-md"
+                  className="pointer-events-auto grid size-6 cursor-pointer place-items-center rounded-md border border-content/15 bg-content/10 text-content shadow-md hover:bg-content/5 backdrop-blur-md"
                 >
                   <ChevronDown className="size-4" strokeWidth={2} />
                 </button>
