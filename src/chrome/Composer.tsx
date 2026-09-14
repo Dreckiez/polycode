@@ -457,6 +457,8 @@ export function Composer({
   const [plusOpen, setPlusOpen] = useState(false);
   const [planSelected, setPlanSelected] = useState(false);
   const [slash, setSlash] = useState<SlashToken | null>(null);
+  const suppressSlashReopenRef = useRef(false);
+  const suppressSlashReopenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [skillActive, setSkillActive] = useState(0);
   const [creatingSkill, setCreatingSkill] = useState(false);
   const [sessionFolderOpen, setSessionFolderOpen] = useState(false);
@@ -728,8 +730,17 @@ export function Composer({
     return () => cancelAnimationFrame(frame);
   }, [draft, syncHighlightScroll]);
 
+  useEffect(() => {
+    return () => {
+      if (suppressSlashReopenTimeoutRef.current) {
+        clearTimeout(suppressSlashReopenTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const syncTokensFromTextarea = (el: HTMLTextAreaElement) => {
     if (creatingSkill) return;
+    if (suppressSlashReopenRef.current) return;
     const cursor = el.selectionStart ?? 0;
     const token = slashTokenAt(el.value, cursor, hasNativeCommands(harness));
     setSlash(token);
@@ -1202,6 +1213,18 @@ export function Composer({
               busy={createBusy}
               onActive={setSkillActive}
               onPick={pickSkill}
+              onDismiss={() => {
+                suppressSlashReopenRef.current = true;
+                if (suppressSlashReopenTimeoutRef.current) {
+                  clearTimeout(suppressSlashReopenTimeoutRef.current);
+                }
+                suppressSlashReopenTimeoutRef.current = setTimeout(() => {
+                  suppressSlashReopenRef.current = false;
+                }, 100);
+                setSlash(null);
+                setCreatingSkill(false);
+                setCreateError(null);
+              }}
               onStartCreate={() => {
                 setCreatingSkill(true);
                 setCreateError(null);
@@ -1370,6 +1393,7 @@ export function Composer({
               onKeyUp={(e) => syncTokensFromTextarea(e.currentTarget)}
               onSelect={(e) => syncTokensFromTextarea(e.currentTarget)}
               onInput={(e) => {
+                suppressSlashReopenRef.current = false;
                 const el = e.currentTarget;
                 resizeComposer(el);
                 setDraft(el.value);

@@ -302,6 +302,14 @@ function startCatalogLoad(
   return promise;
 }
 
+export function isSkillCompatibleWithHarness(
+  skillSource: string,
+  harness: HarnessId,
+): boolean {
+  if (skillSource === "agents" || skillSource === "monocode") return true;
+  return skillSource === harness;
+}
+
 async function loadCatalog(context: SkillCatalogContext): Promise<Skill[]> {
   const provider = getHarness(context.harness)?.commands;
   if (provider) {
@@ -314,7 +322,13 @@ async function loadCatalog(context: SkillCatalogContext): Promise<Skill[]> {
   const disabledPaths = loadDisabledSkillPaths();
   const discovered = await listSkills(context.cwd, disabledPaths);
   const disabled = disabledSkillPathSet();
-  return mergeCatalog(discovered.filter((skill) => !disabled.has(skill.path)));
+  return mergeCatalog(
+    discovered.filter(
+      (skill) =>
+        !disabled.has(skill.path) &&
+        isSkillCompatibleWithHarness(skill.source, context.harness),
+    ),
+  );
 }
 
 export function mergeCatalog(discovered: DiscoveredSkill[]): Skill[] {

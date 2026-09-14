@@ -1,4 +1,3 @@
-import { Plus } from "./icons";
 import {
   useEffect,
   useRef,
@@ -18,37 +17,55 @@ type Props = {
   skills: Skill[];
   query: string;
   active: number;
-  creating: boolean;
+  creating?: boolean;
   cwd: string;
   error?: string | null;
   busy?: boolean;
   onActive: (index: number) => void;
   onPick: (skill: Skill) => void;
-  onStartCreate: () => void;
-  onCancelCreate: () => void;
-  onCreate: (name: string, scope: "project" | "user") => void;
+  onDismiss?: () => void;
+  onStartCreate?: () => void;
+  onCancelCreate?: () => void;
+  onCreate?: (name: string, scope: "project" | "user") => void;
 };
 
 export function SkillPicker({
   skills,
   query,
   active,
-  creating,
+  creating = false,
   cwd,
   error,
   busy,
   onActive,
   onPick,
-  onStartCreate,
+  onDismiss,
   onCancelCreate,
   onCreate,
 }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!onDismiss) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (containerRef.current?.contains(target)) return;
+      onDismiss();
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [onDismiss]);
+
   return (
     <div
+      ref={containerRef}
       data-skill-picker
       className="overflow-hidden rounded-lg border border-content/10 bg-content/5 backdrop-blur-xl"
     >
-      {creating ? (
+      {creating && onCancelCreate && onCreate ? (
         <CreateSkillForm
           query={query}
           cwd={cwd}
@@ -58,24 +75,13 @@ export function SkillPicker({
           onCreate={onCreate}
         />
       ) : (
-        <>
-          <SkillList
-            skills={skills}
-            query={query}
-            active={active}
-            onActive={onActive}
-            onPick={onPick}
-          />
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onStartCreate}
-            className="flex w-full items-center gap-2 border-t border-content/10 px-2.5 py-2 text-left text-[12px] text-content/70 hover:bg-content/10 hover:text-content"
-          >
-            <Plus className="size-3.5 shrink-0" strokeWidth={1.75} />
-            New skill
-          </button>
-        </>
+        <SkillList
+          skills={skills}
+          query={query}
+          active={active}
+          onActive={onActive}
+          onPick={onPick}
+        />
       )}
     </div>
   );
@@ -275,7 +281,7 @@ function scopeLabel(skill: Skill): string {
     return skill.origin ? `${skill.source} · ${skill.origin}` : skill.source;
   }
   if (skill.kind === "builtin") return "monocode";
-  if (skill.scope === "user") return "personal";
   if (skill.source !== "agents" && skill.source !== "monocode") return skill.source;
+  if (skill.scope === "user") return "personal";
   return "project";
 }

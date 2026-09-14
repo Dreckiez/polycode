@@ -46,6 +46,7 @@ import {
   skillCatalogKey,
   subscribeSkills,
   applySkillsToTurn,
+  isSkillCompatibleWithHarness,
 } from "./skills";
 import type { DiscoveredSkill } from "./fs";
 import type { PiSkillCommand } from "./harness/piSkills";
@@ -534,5 +535,72 @@ describe("file skill visibility preferences", () => {
     expect(disabledSkills.find((s) => s.name === "review")).toBeUndefined();
     const disabledTurn = await applySkillsToTurn("/review inspect this", context);
     expect(disabledTurn).toBe("/review inspect this");
+  });
+
+  it("filters agent-specific skills while keeping universal skills visible", async (): Promise<void> => {
+    expect(isSkillCompatibleWithHarness("agents", "antigravity")).toBe(true);
+    expect(isSkillCompatibleWithHarness("agents", "claude")).toBe(true);
+    expect(isSkillCompatibleWithHarness("monocode", "cursor")).toBe(true);
+    expect(isSkillCompatibleWithHarness("antigravity", "antigravity")).toBe(true);
+    expect(isSkillCompatibleWithHarness("antigravity", "claude")).toBe(false);
+    expect(isSkillCompatibleWithHarness("claude", "antigravity")).toBe(false);
+
+    mocks.listSkills.mockResolvedValueOnce([
+      {
+        name: "universal-skill",
+        description: "Universal",
+        path: "/home/.agents/skills/universal/SKILL.md",
+        source: "agents",
+        scope: "user",
+      },
+      {
+        name: "agy-skill",
+        description: "Antigravity only",
+        path: "/home/.gemini/skills/agy/SKILL.md",
+        source: "antigravity",
+        scope: "user",
+      },
+      {
+        name: "claude-skill",
+        description: "Claude only",
+        path: "/home/.claude/skills/claude/SKILL.md",
+        source: "claude",
+        scope: "user",
+      },
+    ]);
+
+    const agySkills = await loadSkills({ harness: "antigravity", cwd: "/repo-agent" });
+    expect(agySkills.some((s) => s.name === "universal-skill")).toBe(true);
+    expect(agySkills.some((s) => s.name === "agy-skill")).toBe(true);
+    expect(agySkills.some((s) => s.name === "claude-skill")).toBe(false);
+
+    mocks.listSkills.mockResolvedValueOnce([
+      {
+        name: "universal-skill",
+        description: "Universal",
+        path: "/home/.agents/skills/universal/SKILL.md",
+        source: "agents",
+        scope: "user",
+      },
+      {
+        name: "agy-skill",
+        description: "Antigravity only",
+        path: "/home/.gemini/skills/agy/SKILL.md",
+        source: "antigravity",
+        scope: "user",
+      },
+      {
+        name: "claude-skill",
+        description: "Claude only",
+        path: "/home/.claude/skills/claude/SKILL.md",
+        source: "claude",
+        scope: "user",
+      },
+    ]);
+
+    const claudeSkills = await loadSkills({ harness: "claude", cwd: "/repo-agent" });
+    expect(claudeSkills.some((s) => s.name === "universal-skill")).toBe(true);
+    expect(claudeSkills.some((s) => s.name === "agy-skill")).toBe(false);
+    expect(claudeSkills.some((s) => s.name === "claude-skill")).toBe(true);
   });
 });

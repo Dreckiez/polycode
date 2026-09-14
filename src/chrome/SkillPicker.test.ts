@@ -1,6 +1,8 @@
-import { createElement } from "react";
+// @vitest-environment happy-dom
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillPicker } from "./SkillPicker";
 import { ompCommandsFromRpcData } from "../lib/harness/piSkills";
 import { PLAN_COMMAND } from "../lib/plan";
@@ -9,7 +11,7 @@ import { SESSION_FOLDER_COMMAND } from "../lib/sessionFolderCommand";
 import type { Skill } from "../lib/skills";
 
 describe("native command picker", () => {
-  it("renders native commands and argument hints alongside MonoCode shortcuts", () => {
+  it("renders native commands and argument hints alongside MonoCode shortcuts, without new skill button", () => {
     const native: Skill[] = ompCommandsFromRpcData({
       commands: [
         { name: "plan", source: "builtin", description: "OMP planning" },
@@ -45,9 +47,6 @@ describe("native command picker", () => {
         cwd: "/repo",
         onActive: vi.fn(),
         onPick: vi.fn(),
-        onStartCreate: vi.fn(),
-        onCancelCreate: vi.fn(),
-        onCreate: vi.fn(),
       }),
     );
     expect(html).toContain("/omp:plan");
@@ -60,5 +59,63 @@ describe("native command picker", () => {
     expect(html).toContain("&lt;reviewer&gt; [path]");
     expect(html).toContain("omp · custom");
     expect(html).toContain("list --all");
+    expect(html).not.toContain("New skill");
+  });
+});
+
+describe("SkillPicker dismissal", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("calls onDismiss when clicking outside the skill picker", () => {
+    const onDismiss = vi.fn();
+    act(() => {
+      root.render(
+        createElement(SkillPicker, {
+          skills: [PLAN_COMMAND],
+          query: "",
+          active: 0,
+          cwd: "/repo",
+          onActive: vi.fn(),
+          onPick: vi.fn(),
+          onDismiss,
+        }),
+      );
+    });
+
+    const picker = container.querySelector("[data-skill-picker]");
+    expect(picker).not.toBeNull();
+
+    // Clicking inside the picker should not dismiss
+    act(() => {
+      picker?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true }),
+      );
+    });
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // Clicking outside the picker (e.g. document body) should dismiss
+    const outside = document.createElement("div");
+    document.body.append(outside);
+    act(() => {
+      outside.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true }),
+      );
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    outside.remove();
   });
 });

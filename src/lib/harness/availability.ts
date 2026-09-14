@@ -34,20 +34,59 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
   fx: { name: "fx CLI", install: "curl -fsSL https://fx.sh/setup.sh | bash" },
 };
 
-let availability: HarnessAvailability = {
-  antigravity: false,
-  claude: false,
-  codex: false,
-  cursor: false,
-  grok: false,
-  opencode: false,
-  pi: false,
-  omp: false,
-  fx: false,
-};
+const AVAILABILITY_STORAGE_KEY = "monocode.harnessAvailability";
+
+function loadCachedAvailability(): {
+  cached: HarnessAvailability;
+  hasCache: boolean;
+} {
+  const defaults: HarnessAvailability = {
+    antigravity: false,
+    claude: false,
+    codex: false,
+    cursor: false,
+    grok: false,
+    opencode: false,
+    pi: false,
+    omp: false,
+    fx: false,
+  };
+  try {
+    if (typeof localStorage === "undefined") {
+      return { cached: defaults, hasCache: false };
+    }
+    const raw = localStorage.getItem(AVAILABILITY_STORAGE_KEY);
+    if (!raw) return { cached: defaults, hasCache: false };
+    const parsed = JSON.parse(raw) as Partial<HarnessAvailability>;
+    const cached = { ...defaults };
+    let hasCache = false;
+    for (const key of HARNESSES) {
+      if (typeof parsed[key] === "boolean") {
+        cached[key] = parsed[key];
+        hasCache = true;
+      }
+    }
+    return { cached, hasCache };
+  } catch {
+    return { cached: defaults, hasCache: false };
+  }
+}
+
+function saveCachedAvailability(data: HarnessAvailability): void {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(data));
+    }
+  } catch {
+    // Private mode / quota
+  }
+}
+
+const initialAvailability = loadCachedAvailability();
+let availability: HarnessAvailability = initialAvailability.cached;
 let version = 0;
 let inflight: Promise<void> | null = null;
-let probedAt = 0;
+let probedAt = initialAvailability.hasCache ? Date.now() : 0;
 const listeners = new Set<() => void>();
 
 /**
@@ -177,10 +216,15 @@ export function probeHarnessAvailability(
       const next = { ...availability };
       for (const [id, ok] of entries) next[id] = ok;
       availability = next;
+      probedAt = Date.now();
+      saveCachedAvailability(next);
+      emit();
+    })
+    .catch(() => {
+      probedAt = Date.now();
       emit();
     })
     .finally(() => {
-      probedAt = Date.now();
       inflight = null;
     });
   return inflight;
