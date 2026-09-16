@@ -1243,6 +1243,12 @@ fn resolve_codex() -> Option<PathBuf> {
     if let Some(home) = &home {
         candidates.push(home.join(".local/bin/codex"));
         candidates.push(home.join(".npm-global/bin/codex"));
+        #[cfg(windows)]
+        {
+            candidates.push(home.join(r"AppData\Roaming\npm\codex"));
+            candidates.push(home.join(r"AppData\Local\Yarn\bin\codex"));
+            candidates.push(home.join(r"scoop\shims\codex"));
+        }
         candidates.push(home.join(".cargo/bin/codex"));
         candidates.push(home.join("n/bin/codex"));
     }
@@ -1275,6 +1281,12 @@ fn resolve_opencode() -> Option<PathBuf> {
         candidates.push(home.join(".opencode/bin/opencode"));
         candidates.push(home.join(".local/bin/opencode"));
         candidates.push(home.join(".npm-global/bin/opencode"));
+        #[cfg(windows)]
+        {
+            candidates.push(home.join(r"AppData\Roaming\npm\opencode"));
+            candidates.push(home.join(r"AppData\Local\Yarn\bin\opencode"));
+            candidates.push(home.join(r"scoop\shims\opencode"));
+        }
         candidates.push(home.join(".cargo/bin/opencode"));
         candidates.push(home.join("n/bin/opencode"));
     }
@@ -1298,6 +1310,12 @@ fn resolve_claude() -> Option<PathBuf> {
         candidates.push(home.join(".claude/local/claude"));
         candidates.push(home.join(".local/share/claude/claude"));
         candidates.push(home.join(".npm-global/bin/claude"));
+        #[cfg(windows)]
+        {
+            candidates.push(home.join(r"AppData\Roaming\npm\claude"));
+            candidates.push(home.join(r"AppData\Local\Yarn\bin\claude"));
+            candidates.push(home.join(r"scoop\shims\claude"));
+        }
         candidates.push(home.join(".cargo/bin/claude"));
         candidates.push(home.join("n/bin/claude"));
     }
@@ -1320,6 +1338,12 @@ fn resolve_pi() -> Option<PathBuf> {
         for name in ["pi-coding-agent", "pi"] {
             candidates.push(home.join(".local/bin").join(name));
             candidates.push(home.join(".npm-global/bin").join(name));
+            #[cfg(windows)]
+            {
+                candidates.push(home.join(r"AppData\Roaming\npm").join(name));
+                candidates.push(home.join(r"AppData\Local\Yarn\bin").join(name));
+                candidates.push(home.join(r"scoop\shims").join(name));
+            }
             candidates.push(home.join(".cargo/bin").join(name));
             candidates.push(home.join("n/bin").join(name));
         }
@@ -1350,6 +1374,12 @@ fn resolve_omp() -> Option<PathBuf> {
         candidates.push(home.join(".local/bin/omp"));
         candidates.push(home.join(".bun/bin/omp"));
         candidates.push(home.join(".npm-global/bin/omp"));
+        #[cfg(windows)]
+        {
+            candidates.push(home.join(r"AppData\Roaming\npm\omp"));
+            candidates.push(home.join(r"AppData\Local\Yarn\bin\omp"));
+            candidates.push(home.join(r"scoop\shims\omp"));
+        }
         candidates.push(home.join(".cargo/bin/omp"));
         candidates.push(home.join("n/bin/omp"));
     }

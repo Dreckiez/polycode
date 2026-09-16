@@ -116,7 +116,7 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
   }
 }
 
-export const COMPOSER_EFFORT_VISIBLE_DEFAULT = false;
+export const COMPOSER_EFFORT_VISIBLE_DEFAULT = true;
 
 /** Fired on `window` when the standalone composer effort control setting flips. */
 export const COMPOSER_EFFORT_VISIBLE_CHANGE_EVENT =

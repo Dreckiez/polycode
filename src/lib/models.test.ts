@@ -4,6 +4,8 @@ import {
   coerceModelPickerTab,
   defaultModelId,
   defaultSessionChoice,
+  findModel,
+  getModelEffortBadge,
   hasLiveCatalog,
   isPickerProviderVisible,
   loadDefaultModels,
@@ -324,5 +326,34 @@ describe("live catalog overlays", () => {
     ]);
     expect(hasLiveCatalog("pi")).toBe(true);
     expect(hasLiveCatalog("omp")).toBe(false);
+  });
+});
+
+describe("getModelEffortBadge", () => {
+  it("resolves effort badge for models and validates against allowed options", () => {
+    const flash38 = findModel("antigravity:gemini-3.8-flash")!;
+    const pro31 = findModel("antigravity:gemini-3.1-pro")!;
+    expect(flash38).toBeDefined();
+    expect(pro31).toBeDefined();
+
+    // Default badge without overrides
+    expect(getModelEffortBadge(flash38)).toBe("HIGH");
+    expect(getModelEffortBadge(pro31)).toBe("HIGH");
+
+    // When effort is medium, flash 3.8 supports it -> MED
+    expect(getModelEffortBadge(flash38, { effort: "medium" })).toBe("MED");
+
+    // When effort is medium, pro 3.1 does NOT support it -> falls back to HIGH, not MED
+    expect(getModelEffortBadge(pro31, { effort: "medium" })).toBe("HIGH");
+
+    // Valid option for both
+    expect(getModelEffortBadge(flash38, { effort: "low" })).toBe("LOW");
+    expect(getModelEffortBadge(pro31, { effort: "low" })).toBe("LOW");
+  });
+
+  it("returns THINK for thinking models without settings", () => {
+    const sonnetThinking = findModel("antigravity:claude-sonnet-4-6")!;
+    expect(sonnetThinking).toBeDefined();
+    expect(getModelEffortBadge(sonnetThinking)).toBe("THINK");
   });
 });

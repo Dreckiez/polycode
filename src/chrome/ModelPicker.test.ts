@@ -139,19 +139,10 @@ describe("model picker", () => {
     expect(trigger.querySelector("svg")).not.toBeNull();
 
     act(() => trigger.click());
-    const modelRow = [
-      ...container.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent?.startsWith("Model"))!;
-    expect(modelRow.textContent).toContain("Grok 4.6");
-    expect(modelRow.querySelectorAll("svg")).toHaveLength(2);
-
-    hover(modelRow);
     const modelFlyout = container.querySelector<HTMLElement>(
       '[role="dialog"][aria-label="Models"]',
     )!;
-    expect(modelFlyout.style.height).toBe("368px");
-    expect(modelFlyout.dataset.minHeight).toBe("370");
-    expect(modelFlyout.dataset.maxHeight).toBe("370");
+    expect(modelFlyout).not.toBeNull();
     expect(
       container.querySelector('[role="tablist"][aria-orientation="vertical"]'),
     ).not.toBeNull();
@@ -162,46 +153,120 @@ describe("model picker", () => {
       '[role="tab"][aria-label="Grok Build"]',
     )!;
     expect(grokTab.className).toContain("rounded-md");
-    expect(grokTab.className).not.toContain("transition");
     hover(grokTab);
     expect(grokTab.getAttribute("aria-selected")).toBe("true");
     expect(
-      [...container.querySelectorAll('[role="option"]')].some(
-        (option) => option.textContent === "Grok 4.6",
+      [...container.querySelectorAll('[role="option"]')].some((option) =>
+        option.textContent?.includes("Grok 4.6"),
       ),
     ).toBe(true);
     const selectedOption = container.querySelector<HTMLButtonElement>(
       '[role="option"][aria-selected="true"]',
     )!;
-    const selectedRow = selectedOption.parentElement!;
-    const favoriteButton = selectedRow.querySelector<HTMLButtonElement>(
+    const favoriteButton = modelFlyout.querySelector<HTMLButtonElement>(
       'button[aria-label="Add to favorites"]',
     )!;
-    expect(favoriteButton.className).toContain("opacity-0");
-    expect(favoriteButton.className).toContain("group-hover:opacity-100");
-    expect(selectedRow.lastElementChild?.querySelector("svg")).not.toBeNull();
-    const unselectedOption = container.querySelector<HTMLButtonElement>(
-      '[role="option"][aria-selected="false"]',
-    )!;
-    const unselectedRow = unselectedOption.parentElement!;
-    expect(unselectedRow.lastElementChild?.getAttribute("aria-label")).toBe(
-      "Add to favorites",
+    expect(favoriteButton).not.toBeNull();
+    act(() => favoriteButton.click());
+    expect(favoriteButton.getAttribute("aria-label")).toBe(
+      "Remove from favorites",
     );
     expect(
       container.querySelector('input[aria-label="Search models"]'),
     ).not.toBeNull();
 
-    const effortRow = [
-      ...container.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent?.startsWith("Effort"))!;
-    hover(effortRow);
-    const extraHigh = [
-      ...container.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent === "Extra High")!;
-    act(() => extraHigh.click());
+    const badgeButton = [
+      ...modelFlyout.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((button) => button.textContent === "HIGH")!;
+    expect(badgeButton).not.toBeUndefined();
+    act(() => badgeButton.click());
+    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "medium" });
 
-    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "xhigh" });
-    expect(onChange).not.toHaveBeenCalled();
+    const grok45 = [
+      ...modelFlyout.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ].find((button) => button.textContent?.includes("Grok 4.5"))!;
+    expect(grok45).not.toBeUndefined();
+    act(() => grok45.click());
+
+    expect(onChange).toHaveBeenCalledWith("grok", "grok:grok-4.5");
+  });
+
+  it("validates effort settings per model and normalizes invalid options", () => {
+    const onChange = vi.fn();
+    const onSettingsChange = vi.fn();
+    act(() =>
+      root.render(
+        createElement(ModelPicker, {
+          harness: "antigravity",
+          model: "antigravity:gemini-3.8-flash",
+          values: { effort: "medium" },
+          onChange,
+          onSettingsChange,
+        }),
+      ),
+    );
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-haspopup="menu"]',
+    )!;
+    act(() => trigger.click());
+    const modelFlyout = container.querySelector<HTMLElement>(
+      '[role="dialog"][aria-label="Models"]',
+    )!;
+
+    const flash38 = [
+      ...modelFlyout.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ].find((button) => button.textContent?.includes("Gemini 3.8 Flash"))!;
+    expect(flash38).not.toBeUndefined();
+    const flash38Row = flash38.closest("div")!;
+    expect(flash38Row.textContent).toContain("MED");
+
+    // Selected model has left indicator bar and no tick checkmark
+    expect(
+      flash38Row.querySelector('[data-indicator="active"]'),
+    ).not.toBeNull();
+    expect(flash38Row.querySelector('svg.text-accent')).toBeNull();
+
+    // Segmented effort tab contains Low, Med, High for 3.8 Flash
+    const flashGroup = flash38Row.querySelector('[role="group"]')!;
+    expect(flashGroup).not.toBeNull();
+    const flashOptionLabels = [
+      ...flashGroup.querySelectorAll<HTMLButtonElement>("button"),
+    ].map((b) => b.textContent);
+    expect(flashOptionLabels).toEqual(["Low", "Med", "High"]);
+
+    // Clicking Low in the segmented tab updates settings
+    const lowBtn = [
+      ...flashGroup.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((b) => b.textContent === "Low")!;
+    act(() => lowBtn.click());
+    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "low" });
+
+    const pro31 = [
+      ...modelFlyout.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ].find((button) => button.textContent?.includes("Gemini 3.1 Pro"))!;
+    expect(pro31).not.toBeUndefined();
+    const pro31Row = pro31.closest("div")!;
+    expect(pro31Row.textContent).not.toContain("MED");
+    expect(pro31Row.textContent).toContain("HIGH");
+
+    // Unselected model does NOT have active indicator
+    expect(pro31Row.querySelector('[data-indicator="active"]')).toBeNull();
+
+    // Gemini 3.1 Pro segmented tab only has Low and High
+    const proGroup = pro31Row.querySelector('[role="group"]')!;
+    expect(proGroup).not.toBeNull();
+    const proOptionLabels = [
+      ...proGroup.querySelectorAll<HTMLButtonElement>("button"),
+    ].map((b) => b.textContent);
+    expect(proOptionLabels).toEqual(["Low", "High"]);
+
+    act(() => pro31.click());
+    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "high" });
+    expect(onChange).toHaveBeenCalledWith(
+      "antigravity",
+      "antigravity:gemini-3.1-pro",
+    );
   });
 
   it("can move effort into a dedicated composer control", () => {
@@ -272,11 +337,6 @@ describe("model picker", () => {
       'button[aria-haspopup="menu"]',
     )!;
     act(() => trigger.click());
-    let modelRow = [
-      ...container.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent?.startsWith("Model"))!;
-    hover(modelRow);
-
     const openCodeTab = container.querySelector<HTMLButtonElement>(
       '[role="tab"][aria-label="OpenCode"]',
     )!;
@@ -285,11 +345,6 @@ describe("model picker", () => {
 
     act(() => trigger.click());
     act(() => trigger.click());
-    modelRow = [
-      ...container.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent?.startsWith("Model"))!;
-    hover(modelRow);
-
     expect(
       container
         .querySelector('[role="tab"][aria-label="Grok Build"]')

@@ -100,17 +100,17 @@ describe("composer effort control setting", () => {
     localStorage.removeItem(COMPOSER_EFFORT_VISIBLE_KEY);
   });
 
-  it("keeps effort in the model picker by default", () => {
-    expect(COMPOSER_EFFORT_VISIBLE_DEFAULT).toBe(false);
-    expect(loadComposerEffortVisible()).toBe(false);
+  it("shows the standalone effort control in the composer by default", () => {
+    expect(COMPOSER_EFFORT_VISIBLE_DEFAULT).toBe(true);
+    expect(loadComposerEffortVisible()).toBe(true);
   });
 
   it("persists the standalone effort control preference", () => {
-    saveComposerEffortVisible(true);
-    expect(localStorage.getItem(COMPOSER_EFFORT_VISIBLE_KEY)).toBe("1");
-    expect(loadComposerEffortVisible()).toBe(true);
     saveComposerEffortVisible(false);
+    expect(localStorage.getItem(COMPOSER_EFFORT_VISIBLE_KEY)).toBe("0");
     expect(loadComposerEffortVisible()).toBe(false);
+    saveComposerEffortVisible(true);
+    expect(loadComposerEffortVisible()).toBe(true);
   });
 });
 

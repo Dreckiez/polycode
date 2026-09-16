@@ -863,3 +863,36 @@ function pickDefaultId(harness: HarnessId, models: AgentModel[]): string {
     DEFAULT_MODEL_ID[harness]
   );
 }
+
+export function getModelEffortBadge(
+  model: AgentModel,
+  values?: Record<string, string>,
+): string | null {
+  const effort = model.settings?.find(
+    (s) =>
+      s.kind === "select" &&
+      (s.id === "effort" ||
+        s.id === "reasoning" ||
+        s.id === "reasoningEffort"),
+  );
+  if (effort) {
+    const rawValue = values?.[effort.id];
+    const isValid = rawValue
+      ? effort.options.some((opt) => opt.value === rawValue)
+      : false;
+    const raw = isValid ? rawValue! : effort.value;
+    const norm = raw.toLowerCase();
+    if (norm === "xhigh" || norm === "extra-high" || norm === "extra_high")
+      return "XHIGH";
+    if (norm === "high") return "HIGH";
+    if (norm === "medium" || norm === "med") return "MED";
+    if (norm === "low") return "LOW";
+    if (norm === "none" || norm === "off" || norm === "false") return "NONE";
+    return norm.toUpperCase();
+  }
+  if (/thinking/i.test(model.name)) {
+    return "THINK";
+  }
+  return null;
+}
+
