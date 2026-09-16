@@ -8,6 +8,7 @@ export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.8 Flash",
     nativeId: "gemini-3.8-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -27,6 +28,7 @@ export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.7 Flash",
     nativeId: "gemini-3.7-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -46,6 +48,7 @@ export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.6 Flash",
     nativeId: "gemini-3.6-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -65,6 +68,7 @@ export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.1 Pro",
     nativeId: "gemini-3.1-pro",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -83,18 +87,21 @@ export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
     harness: "antigravity",
     name: "Claude Sonnet 4.6 (Thinking)",
     nativeId: "claude-sonnet-4-6",
+    contextWindow: 200_000,
   },
   {
     id: "antigravity:claude-opus-4-6-thinking",
     harness: "antigravity",
     name: "Claude Opus 4.6 (Thinking)",
     nativeId: "claude-opus-4-6-thinking",
+    contextWindow: 200_000,
   },
   {
     id: "antigravity:gpt-oss-120b-medium",
     harness: "antigravity",
     name: "GPT-OSS 120B (Medium)",
     nativeId: "gpt-oss-120b-medium",
+    contextWindow: 128_000,
   },
 ];
 
@@ -129,6 +136,12 @@ export async function discoverAntigravityModels(): Promise<AgentModel[]> {
 }
 
 const EFFORT_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2 };
+
+function inferAntigravityContextWindow(id: string): number {
+  if (/claude/i.test(id)) return 200_000;
+  if (/gpt-oss/i.test(id)) return 128_000;
+  return 1_000_000;
+}
 
 export function parseModelsOutput(output: string): AgentModel[] {
   const lines = output.split(/\r?\n/);
@@ -184,6 +197,7 @@ export function parseModelsOutput(output: string): AgentModel[] {
           harness: "antigravity",
           name: name || nativeId,
           nativeId,
+          contextWindow: inferAntigravityContextWindow(nativeId),
         });
       }
     }
@@ -199,6 +213,7 @@ export function parseModelsOutput(output: string): AgentModel[] {
           harness: "antigravity",
           name: item.name || item.nativeId,
           nativeId: item.nativeId,
+          contextWindow: inferAntigravityContextWindow(item.nativeId),
         });
       }
       continue;
@@ -217,6 +232,7 @@ export function parseModelsOutput(output: string): AgentModel[] {
       harness: "antigravity",
       name: group.baseName,
       nativeId: baseId,
+      contextWindow: inferAntigravityContextWindow(baseId),
       settings: [
         {
           id: "effort",

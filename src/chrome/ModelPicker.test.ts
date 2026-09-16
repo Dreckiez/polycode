@@ -111,7 +111,7 @@ function keyDown(target: EventTarget, key: string) {
 }
 
 describe("model picker", () => {
-  it("shows the model name and effort in the combined picker", () => {
+  it("shows the model name in the picker trigger", () => {
     const onChange = vi.fn();
     const onSettingsChange = vi.fn();
     act(() =>
@@ -129,13 +129,8 @@ describe("model picker", () => {
     const trigger = container.querySelector<HTMLButtonElement>(
       'button[aria-haspopup="menu"]',
     )!;
-    expect(trigger.textContent).toBe("Grok 4.6High");
-    expect(trigger.getAttribute("aria-label")).toBe(
-      "Grok Build Grok 4.6, effort High",
-    );
-    expect(trigger.querySelector(".text-content\\/50")?.textContent).toBe(
-      "High",
-    );
+    expect(trigger.textContent).toBe("Grok 4.6");
+    expect(trigger.getAttribute("aria-label")).toBe("Grok Build Grok 4.6");
     expect(trigger.querySelector("svg")).not.toBeNull();
 
     act(() => trigger.click());
@@ -160,9 +155,6 @@ describe("model picker", () => {
         option.textContent?.includes("Grok 4.6"),
       ),
     ).toBe(true);
-    const selectedOption = container.querySelector<HTMLButtonElement>(
-      '[role="option"][aria-selected="true"]',
-    )!;
     const favoriteButton = modelFlyout.querySelector<HTMLButtonElement>(
       'button[aria-label="Add to favorites"]',
     )!;
@@ -175,12 +167,12 @@ describe("model picker", () => {
       container.querySelector('input[aria-label="Search models"]'),
     ).not.toBeNull();
 
-    const badgeButton = [
-      ...modelFlyout.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((button) => button.textContent === "HIGH")!;
-    expect(badgeButton).not.toBeUndefined();
-    act(() => badgeButton.click());
-    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "medium" });
+    // Model rows don't display in-menu effort badges
+    expect(
+      [...modelFlyout.querySelectorAll("button")].some(
+        (btn) => btn.textContent === "HIGH",
+      ),
+    ).toBe(false);
 
     const grok45 = [
       ...modelFlyout.querySelectorAll<HTMLButtonElement>('[role="option"]'),
@@ -219,7 +211,6 @@ describe("model picker", () => {
     ].find((button) => button.textContent?.includes("Gemini 3.8 Flash"))!;
     expect(flash38).not.toBeUndefined();
     const flash38Row = flash38.closest("div")!;
-    expect(flash38Row.textContent).toContain("MED");
 
     // Selected model has left indicator bar and no tick checkmark
     expect(
@@ -227,40 +218,19 @@ describe("model picker", () => {
     ).not.toBeNull();
     expect(flash38Row.querySelector('svg.text-accent')).toBeNull();
 
-    // Segmented effort tab contains Low, Med, High for 3.8 Flash
-    const flashGroup = flash38Row.querySelector('[role="group"]')!;
-    expect(flashGroup).not.toBeNull();
-    const flashOptionLabels = [
-      ...flashGroup.querySelectorAll<HTMLButtonElement>("button"),
-    ].map((b) => b.textContent);
-    expect(flashOptionLabels).toEqual(["Low", "Med", "High"]);
-
-    // Clicking Low in the segmented tab updates settings
-    const lowBtn = [
-      ...flashGroup.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((b) => b.textContent === "Low")!;
-    act(() => lowBtn.click());
-    expect(onSettingsChange).toHaveBeenCalledWith({ effort: "low" });
+    // Model rows do not contain effort badges or tabs
+    expect(flash38Row.querySelector('[role="group"]')).toBeNull();
 
     const pro31 = [
       ...modelFlyout.querySelectorAll<HTMLButtonElement>('[role="option"]'),
     ].find((button) => button.textContent?.includes("Gemini 3.1 Pro"))!;
     expect(pro31).not.toBeUndefined();
     const pro31Row = pro31.closest("div")!;
-    expect(pro31Row.textContent).not.toContain("MED");
-    expect(pro31Row.textContent).toContain("HIGH");
 
     // Unselected model does NOT have active indicator
     expect(pro31Row.querySelector('[data-indicator="active"]')).toBeNull();
 
-    // Gemini 3.1 Pro segmented tab only has Low and High
-    const proGroup = pro31Row.querySelector('[role="group"]')!;
-    expect(proGroup).not.toBeNull();
-    const proOptionLabels = [
-      ...proGroup.querySelectorAll<HTMLButtonElement>("button"),
-    ].map((b) => b.textContent);
-    expect(proOptionLabels).toEqual(["Low", "High"]);
-
+    // Selecting Gemini 3.1 Pro normalizes effort from medium to high
     act(() => pro31.click());
     expect(onSettingsChange).toHaveBeenCalledWith({ effort: "high" });
     expect(onChange).toHaveBeenCalledWith(
@@ -269,7 +239,7 @@ describe("model picker", () => {
     );
   });
 
-  it("can move effort into a dedicated composer control", () => {
+  it("controls effort via the dedicated EffortPicker control", () => {
     const onSettingsChange = vi.fn();
     act(() =>
       root.render(
@@ -280,7 +250,6 @@ describe("model picker", () => {
             harness: "grok",
             model: "grok:grok-4.6",
             values: { effort: "high" },
-            hideEffort: true,
             onChange: vi.fn(),
             onSettingsChange,
           }),

@@ -175,6 +175,7 @@ export const MODELS: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.8 Flash",
     nativeId: "gemini-3.8-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -194,6 +195,7 @@ export const MODELS: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.7 Flash",
     nativeId: "gemini-3.7-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -213,6 +215,7 @@ export const MODELS: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.6 Flash",
     nativeId: "gemini-3.6-flash",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -232,6 +235,7 @@ export const MODELS: AgentModel[] = [
     harness: "antigravity",
     name: "Gemini 3.1 Pro",
     nativeId: "gemini-3.1-pro",
+    contextWindow: 1_000_000,
     settings: [
       {
         id: "effort",
@@ -250,18 +254,21 @@ export const MODELS: AgentModel[] = [
     harness: "antigravity",
     name: "Claude Sonnet 4.6 (Thinking)",
     nativeId: "claude-sonnet-4-6",
+    contextWindow: 200_000,
   },
   {
     id: "antigravity:claude-opus-4-6-thinking",
     harness: "antigravity",
     name: "Claude Opus 4.6 (Thinking)",
     nativeId: "claude-opus-4-6-thinking",
+    contextWindow: 200_000,
   },
   {
     id: "antigravity:gpt-oss-120b-medium",
     harness: "antigravity",
     name: "GPT-OSS 120B (Medium)",
     nativeId: "gpt-oss-120b-medium",
+    contextWindow: 128_000,
   },
 ];
 
@@ -420,10 +427,48 @@ export function resolveModel(harness: HarnessId, id?: string): AgentModel {
   );
 }
 
+export function defaultContextWindowForHarness(
+  harness?: HarnessId,
+): number | undefined {
+  if (!harness) return undefined;
+  switch (harness) {
+    case "antigravity":
+      return 1_000_000;
+    case "grok":
+      return 500_000;
+    case "codex":
+      return 272_000;
+    case "fx":
+      return 202_752;
+    case "claude":
+    case "cursor":
+      return 200_000;
+    case "opencode":
+    case "pi":
+    case "omp":
+      return 128_000;
+    default:
+      return undefined;
+  }
+}
+
+export function harnessFromModelId(id: string): HarnessId | undefined {
+  const index = id.indexOf(":");
+  if (index <= 0) return undefined;
+  const prefix = id.slice(0, index) as HarnessId;
+  return HARNESS_ORDER.includes(prefix) ? prefix : undefined;
+}
+
 /** Catalog-reported context window for a model id, when known. */
 export function modelContextWindow(id: string): number | undefined {
-  const window = findModel(id)?.contextWindow;
-  return window && window > 0 ? window : undefined;
+  const model = findModel(id);
+  const window = model?.contextWindow;
+  if (window && window > 0) return window;
+  const harness = model?.harness ?? harnessFromModelId(id);
+  if (harness) {
+    return defaultContextWindowForHarness(harness);
+  }
+  return undefined;
 }
 
 export function nativeModelId(model: AgentModel | string): string {

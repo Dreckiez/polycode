@@ -61,18 +61,6 @@ export function HarnessIcon({
   className?: string;
   monochrome?: boolean;
 }) {
-  if (harness === "antigravity" && monochrome) {
-    return (
-      <MonoIcon className={className}>
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M14.5 0C14.5 8.008 8.008 14.5 0 14.5C8.008 14.5 14.5 20.992 14.5 29C14.5 20.992 20.992 14.5 29 14.5C20.992 14.5 14.5 8.008 14.5 0Z"
-          fill="currentColor"
-        />
-      </MonoIcon>
-    );
-  }
   if (harness === "claude" && monochrome) {
     return (
       <MonoIcon className={className} viewBox="-4 -4 37 37">

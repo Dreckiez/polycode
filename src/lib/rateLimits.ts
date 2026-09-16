@@ -1,6 +1,6 @@
 import { asRecord } from "./harness/codexProtocol";
 
-export type RateLimitProvider = "claude" | "codex";
+export type RateLimitProvider = "claude" | "codex" | "antigravity";
 
 export type RateLimitStatus =
   "idle" | "fetching" | "ok" | "error" | "unavailable";
@@ -8,6 +8,8 @@ export type RateLimitStatus =
 export type RateLimitWindow = {
   /** Percentage of the window consumed (0–100). */
   usedPercent: number;
+  /** Percentage of the window remaining (0–100), if tracked directly. */
+  remainingPercent?: number;
   /** Window duration in minutes: 300 (5h) or 10080 (7d). */
   windowMinutes: number;
   /** Unix ms timestamp when the window resets, if known. */
@@ -57,11 +59,13 @@ export function shouldFetchRateLimits(input: {
   visible: boolean;
   claude: ProviderRateLimits;
   codex: ProviderRateLimits;
+  antigravity?: ProviderRateLimits;
   now?: number;
 }): boolean {
   return (
     shouldFetchProvider(input.claude, input) ||
-    shouldFetchProvider(input.codex, input)
+    shouldFetchProvider(input.codex, input) ||
+    (input.antigravity ? shouldFetchProvider(input.antigravity, input) : false)
   );
 }
 
@@ -203,11 +207,14 @@ export function rateLimitWindowTooltip(
   window: RateLimitWindow,
   now = Date.now(),
 ): string {
-  const used = `${formatUsagePercent(window.usedPercent)} used`;
+  const percentLabel =
+    window.remainingPercent != null
+      ? `${formatUsagePercent(window.remainingPercent)} remaining`
+      : `${formatUsagePercent(window.usedPercent)} used`;
   if (window.resetsAt == null) {
-    return `${used} · ${formatWindowLabel(window.windowMinutes)} window`;
+    return `${percentLabel} · ${formatWindowLabel(window.windowMinutes)} window`;
   }
-  return `${used} · ${formatResetCountdown(window.resetsAt - now)}`;
+  return `${percentLabel} · ${formatResetCountdown(window.resetsAt - now)}`;
 }
 
 export function parseResetTimestamp(value: unknown): number | null {
@@ -390,4 +397,92 @@ function numberField(rec: Record<string, unknown>, key: string): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+export function parseAntigravityUsage(
+  stdout: string,
+  modelId?: string,
+): ProviderRateLimits {
+  const clean = stdout.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, "").trim();
+  if (!clean) {
+    return errorRateLimits("antigravity", "Antigravity usage output was empty");
+  }
+
+  const lines = clean
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  type ParsedRow = {
+    group: string;
+    windowLabel: string;
+    remainingPct: number;
+    resetsAt: number | null;
+  };
+
+  const rows: ParsedRow[] = [];
+  for (const line of lines) {
+    const parts = line.includes("\t")
+      ? line.split("\t")
+      : line.split(/\s{2,}/);
+    if (parts.length < 3) continue;
+    const group = (parts[0] ?? "").trim();
+    const windowLabel = (parts[1] ?? "").trim();
+    const pctStr = (parts[2] ?? "").replace("%", "").trim();
+    const remainingPct = parseFloat(pctStr);
+    if (!Number.isFinite(remainingPct)) continue;
+    const resetsAt = parts[3] ? parseResetTimestamp(parts[3].trim()) : null;
+    rows.push({ group, windowLabel, remainingPct, resetsAt });
+  }
+
+  if (rows.length === 0) {
+    return errorRateLimits("antigravity", "Could not parse Antigravity usage");
+  }
+
+  const wantsClaudeGpt = modelId != null && /claude|gpt/i.test(modelId);
+  const preferredFilter = (row: ParsedRow) =>
+    wantsClaudeGpt
+      ? /claude|gpt/i.test(row.group)
+      : /gemini/i.test(row.group);
+
+  let matchingRows = rows.filter(preferredFilter);
+  if (matchingRows.length === 0) {
+    const firstGroup = rows[0]?.group;
+    matchingRows = rows.filter((row) => row.group === firstGroup);
+  }
+
+  let session: RateLimitWindow | null = null;
+  let weekly: RateLimitWindow | null = null;
+
+  for (const row of matchingRows) {
+    const isFiveHour = /five hour|5h|session/i.test(row.windowLabel);
+    const isWeekly = /weekly|7d|seven day|week/i.test(row.windowLabel);
+    const usedPercent = clampUsedPercent(100 - row.remainingPct);
+    const remainingPercent = clampUsedPercent(row.remainingPct);
+
+    if (isFiveHour && !session) {
+      session = {
+        usedPercent,
+        remainingPercent,
+        windowMinutes: SESSION_WINDOW_MINUTES,
+        resetsAt: row.resetsAt,
+      };
+    } else if (isWeekly && !weekly) {
+      weekly = {
+        usedPercent,
+        remainingPercent,
+        windowMinutes: WEEKLY_WINDOW_MINUTES,
+        resetsAt: row.resetsAt,
+      };
+    }
+  }
+
+  return {
+    provider: "antigravity",
+    session,
+    weekly,
+    updatedAt: Date.now(),
+    error: null,
+    status: "ok",
+  };
 }

@@ -98,10 +98,8 @@ import { consumeQuoteRequest, type QuoteRequest } from "../lib/quoteDraft";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import {
   COMPOSER_RUNNER_CHANGE_EVENT,
-  loadComposerEffortVisible,
   loadComposerRunner,
   loadNotesEnabled,
-  subscribeComposerEffortVisible,
   subscribeNotesEnabled,
 } from "../lib/settings";
 import {
@@ -474,11 +472,6 @@ export function Composer({
     loadNotesEnabled,
     () => true,
   );
-  const composerEffortVisible = useSyncExternalStore(
-    subscribeComposerEffortVisible,
-    loadComposerEffortVisible,
-    () => false,
-  );
   const [notes, setNotes] = useState<Note[]>(() => peekNotes() ?? []);
   const [mention, setMention] = useState<MentionToken | null>(null);
   const [mentionActive, setMentionActive] = useState(0);
@@ -493,6 +486,7 @@ export function Composer({
   mentionRef.current = mention;
 
   attachmentsRef.current = attachments;
+
 
   const mentionOpen =
     mention !== null && (looksLikeProject(cwd) || notesEnabled);
@@ -1513,7 +1507,6 @@ export function Composer({
                   harness={harness}
                   model={model}
                   values={modelSettings}
-                  hideEffort={composerEffortVisible}
                   hotkeys={hotkeys && enabled}
                   onChange={onModelChange}
                   onSettingsChange={(settings) =>
@@ -1521,17 +1514,15 @@ export function Composer({
                   }
                   onClose={() => ref.current?.focus()}
                 />
-                {composerEffortVisible ? (
-                  <EffortPicker
-                    harness={harness}
-                    model={model}
-                    values={modelSettings}
-                    onSettingsChange={(settings) =>
-                      onModelSettingsChange?.(settings)
-                    }
-                    onClose={() => ref.current?.focus()}
-                  />
-                ) : null}
+                <EffortPicker
+                  harness={harness}
+                  model={model}
+                  values={modelSettings}
+                  onSettingsChange={(settings) =>
+                    onModelSettingsChange?.(settings)
+                  }
+                  onClose={() => ref.current?.focus()}
+                />
                 {harness !== "fx" ? (
                   <AccessPicker
                     value={runtimeMode}

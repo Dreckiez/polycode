@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { HarnessId } from "./session";
 import {
   coerceModelPickerTab,
+  defaultContextWindowForHarness,
   defaultModelId,
   defaultSessionChoice,
   findModel,
@@ -14,6 +15,7 @@ import {
   loadLastModelSettings,
   loadRecentModelChoices,
   mergeModelSettings,
+  modelContextWindow,
   modelPickerTabs,
   preferredModelId,
   preferredModelSettings,
@@ -355,5 +357,30 @@ describe("getModelEffortBadge", () => {
     const sonnetThinking = findModel("antigravity:claude-sonnet-4-6")!;
     expect(sonnetThinking).toBeDefined();
     expect(getModelEffortBadge(sonnetThinking)).toBe("THINK");
+  });
+});
+
+describe("defaultContextWindowForHarness", () => {
+  it("returns expected context windows for known harnesses", () => {
+    expect(defaultContextWindowForHarness("antigravity")).toBe(1_000_000);
+    expect(defaultContextWindowForHarness("grok")).toBe(500_000);
+    expect(defaultContextWindowForHarness("codex")).toBe(272_000);
+    expect(defaultContextWindowForHarness("fx")).toBe(202_752);
+    expect(defaultContextWindowForHarness("claude")).toBe(200_000);
+    expect(defaultContextWindowForHarness("cursor")).toBe(200_000);
+    expect(defaultContextWindowForHarness("opencode")).toBe(128_000);
+    expect(defaultContextWindowForHarness("pi")).toBe(128_000);
+    expect(defaultContextWindowForHarness("omp")).toBe(128_000);
+    expect(defaultContextWindowForHarness(undefined)).toBeUndefined();
+  });
+});
+
+describe("modelContextWindow", () => {
+  it("resolves context window for models with explicit or harness-level windows", () => {
+    expect(modelContextWindow("antigravity:gemini-3.8-flash")).toBe(1_000_000);
+    expect(modelContextWindow("antigravity:claude-sonnet-4-6")).toBe(200_000);
+    expect(modelContextWindow("grok:grok-4.6")).toBe(500_000);
+    expect(modelContextWindow("claude:sonnet-5")).toBe(200_000);
+    expect(modelContextWindow("antigravity:unknown-model")).toBe(1_000_000);
   });
 });

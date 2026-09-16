@@ -955,16 +955,30 @@ export default function App({
   }
   const busySessionIds = busySessionIdsRef.current;
 
+  const currentHarness = active?.harness ?? sessionDefaults?.harness;
   const usageProviders = useMemo(() => {
-    if (active?.harness === "claude" || active?.harness === "codex") {
-      return [active.harness];
+    if (
+      currentHarness === "claude" ||
+      currentHarness === "codex" ||
+      currentHarness === "antigravity"
+    ) {
+      return [currentHarness];
     }
     return [];
-  }, [active?.harness]);
+  }, [currentHarness]);
   const usageSession = useMemo(() => {
-    if (!active) return undefined;
-    return { harness: active.harness };
-  }, [active?.harness]);
+    const s = active ?? sessionDefaults;
+    if (!s) return undefined;
+    return {
+      harness: s.harness,
+      model: s.model,
+    };
+  }, [
+    active?.harness,
+    active?.model,
+    sessionDefaults?.harness,
+    sessionDefaults?.model,
+  ]);
   const runningTerminals = useMemo(() => {
     const files: FilePaneTab[] = [];
     const dock = findProjectTerminal(projectTerminals, projectCwd);

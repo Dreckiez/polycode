@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { HarnessIcon } from "./HarnessIcon";
 import { Popover } from "./Popover";
 import {
+  fetchAntigravityRateLimits,
   fetchClaudeRateLimits,
   fetchCodexRateLimits,
 } from "../lib/rateLimitsFetch";
@@ -29,6 +30,7 @@ const CLOCK_MS = 30_000;
 
 export type UsageFooterSession = {
   harness: HarnessId;
+  model?: string;
 };
 
 export function UsageFooter({
@@ -46,20 +48,27 @@ export function UsageFooter({
 }) {
   const wantClaude = providers.includes("claude");
   const wantCodex = providers.includes("codex");
+  const wantAntigravity = providers.includes("antigravity");
   const [claude, setClaude] = useState<ProviderRateLimits>(() =>
     idleRateLimits("claude"),
   );
   const [codex, setCodex] = useState<ProviderRateLimits>(() =>
     idleRateLimits("codex"),
   );
+  const [antigravity, setAntigravity] = useState<ProviderRateLimits>(() =>
+    idleRateLimits("antigravity"),
+  );
   const [now, setNow] = useState(() => Date.now());
   const [refreshing, setRefreshing] = useState(false);
   const inflight = useRef<Promise<void> | null>(null);
   const claudeRef = useRef(claude);
   const codexRef = useRef(codex);
+  const antigravityRef = useRef(antigravity);
   claudeRef.current = claude;
   codexRef.current = codex;
+  antigravityRef.current = antigravity;
 
+  const model = session?.model;
   const refresh = useCallback((force = false) => {
     if (inflight.current) return inflight.current;
     const visible = document.visibilityState === "visible";
@@ -69,7 +78,10 @@ export function UsageFooter({
     const fetchCodex =
       wantCodex &&
       shouldFetchProvider(codexRef.current, { force, visible });
-    if (!fetchClaude && !fetchCodex) return;
+    const fetchAntigravity =
+      wantAntigravity &&
+      shouldFetchProvider(antigravityRef.current, { force, visible });
+    if (!fetchClaude && !fetchCodex && !fetchAntigravity) return;
     if (force) setRefreshing(true);
     const jobs: Promise<void>[] = [];
     if (fetchClaude) {
@@ -88,6 +100,14 @@ export function UsageFooter({
         }),
       );
     }
+    if (fetchAntigravity) {
+      setAntigravity((current) => fetchingRateLimits("antigravity", current));
+      jobs.push(
+        fetchAntigravityRateLimits(model).then((value) => {
+          setAntigravity(value);
+        }),
+      );
+    }
     const run = Promise.allSettled(jobs)
       .then(() => undefined)
       .finally(() => {
@@ -96,7 +116,7 @@ export function UsageFooter({
       });
     inflight.current = run;
     return run;
-  }, [wantClaude, wantCodex]);
+  }, [wantClaude, wantCodex, wantAntigravity, model]);
 
   useEffect(() => {
     void refresh();
@@ -112,11 +132,17 @@ export function UsageFooter({
   }, [refresh]);
 
   useEffect(() => {
+    if (wantAntigravity) {
+      void refresh(true);
+    }
+  }, [model, wantAntigravity]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), CLOCK_MS);
     return () => window.clearInterval(timer);
   }, []);
 
-  const showUsage = wantClaude || wantCodex;
+  const showUsage = wantClaude || wantCodex || wantAntigravity;
   const showTerminals = terminals.length > 0;
   const showRight = showUsage || showTerminals;
   const ariaLabel = showUsage
@@ -136,6 +162,7 @@ export function UsageFooter({
         <>
           {wantClaude ? <ProviderChip limits={claude} now={now} /> : null}
           {wantCodex ? <ProviderChip limits={codex} now={now} /> : null}
+          {wantAntigravity ? <ProviderChip limits={antigravity} now={now} /> : null}
         </>
       ) : session ? (
         <SessionChip session={session} />
@@ -297,11 +324,20 @@ function ProviderChip({
   ].filter((entry): entry is { key: string; window: RateLimitWindow } => {
     return entry != null;
   });
+  const showsRemaining = windows.some(
+    (entry) => entry.window.remainingPercent != null,
+  );
   const tightest = windows.reduce<RateLimitWindow | null>((best, entry) => {
-    if (!best || entry.window.usedPercent > best.usedPercent) {
-      return entry.window;
+    if (!best) return entry.window;
+    if (showsRemaining) {
+      const bestRem =
+        best.remainingPercent ?? clampUsedPercent(100 - best.usedPercent);
+      const entryRem =
+        entry.window.remainingPercent ??
+        clampUsedPercent(100 - entry.window.usedPercent);
+      return entryRem < bestRem ? entry.window : best;
     }
-    return best;
+    return entry.window.usedPercent > best.usedPercent ? entry.window : best;
   }, null);
   const tooltip = windows
     .map((entry) => rateLimitWindowTooltip(entry.window, now))
@@ -329,17 +365,38 @@ function ProviderChip({
         <span className="text-content/35">{emptyUsageLabel(limits)}</span>
       ) : (
         <>
-          {tightest ? <MiniBar usedPct={tightest.usedPercent} /> : null}
+          {tightest ? (
+            <MiniBar
+              pct={
+                showsRemaining
+                  ? (tightest.remainingPercent ??
+                    clampUsedPercent(100 - tightest.usedPercent))
+                  : tightest.usedPercent
+              }
+              mode={showsRemaining ? "remaining" : "used"}
+            />
+          ) : null}
           <span className="flex min-w-0 items-center gap-1 tabular-nums">
-            {windows.map((entry, index) => (
-              <span key={entry.key} className="inline-flex items-center gap-1">
-                {index > 0 ? <span className="text-content/25">·</span> : null}
-                <span>
-                  {formatUsagePercent(entry.window.usedPercent)}{" "}
-                  {formatRateLimitWindowChipLabel(entry.window, now)}
+            {windows.map((entry, index) => {
+              const displayPct =
+                entry.window.remainingPercent != null
+                  ? entry.window.remainingPercent
+                  : entry.window.usedPercent;
+              return (
+                <span
+                  key={entry.key}
+                  className="inline-flex items-center gap-1"
+                >
+                  {index > 0 ? (
+                    <span className="text-content/25">·</span>
+                  ) : null}
+                  <span>
+                    {formatUsagePercent(displayPct)}{" "}
+                    {formatRateLimitWindowChipLabel(entry.window, now)}
+                  </span>
                 </span>
-              </span>
-            ))}
+              );
+            })}
           </span>
         </>
       )}
@@ -354,22 +411,36 @@ function emptyUsageLabel(limits: ProviderRateLimits): string {
   return "—";
 }
 
-function MiniBar({ usedPct }: { usedPct: number }) {
-  const pct = clampUsedPercent(usedPct);
+function MiniBar({
+  pct: rawPct,
+  mode = "used",
+}: {
+  pct: number;
+  mode?: "used" | "remaining";
+}) {
+  const pct = clampUsedPercent(rawPct);
   return (
     <span
       className="h-1 w-8 shrink-0 overflow-hidden rounded-full bg-content/10"
       aria-hidden
     >
       <span
-        className={`block h-full rounded-full ${barClass(pct)}`}
+        className={`block h-full rounded-full ${
+          mode === "remaining" ? remainingBarClass(pct) : usedBarClass(pct)
+        }`}
         style={{ width: `${pct}%` }}
       />
     </span>
   );
 }
 
-function barClass(pct: number): string {
+function remainingBarClass(pct: number): string {
+  if (pct <= 10) return "bg-red-400";
+  if (pct <= 20) return "bg-amber-400";
+  return "bg-content/45";
+}
+
+function usedBarClass(pct: number): string {
   if (pct >= 90) return "bg-red-400";
   if (pct >= 80) return "bg-amber-400";
   return "bg-content/45";

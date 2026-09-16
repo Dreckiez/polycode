@@ -2,13 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "./fs";
 import {
   errorRateLimits,
+  parseAntigravityUsage,
   parseClaudeOAuthUsage,
   parseCodexRateLimits,
   unavailableRateLimits,
   type ProviderRateLimits,
 } from "./rateLimits";
 import {
+  execChild,
   killChild,
+  resolveAntigravityBinary,
   resolveCodexBinary,
   spawnChild,
   unwatchChild,
@@ -54,6 +57,34 @@ export async function fetchClaudeRateLimits(): Promise<ProviderRateLimits> {
       "claude",
       error instanceof Error ? error.message : "Claude usage unavailable",
     );
+  }
+}
+
+export async function fetchAntigravityRateLimits(
+  modelId?: string,
+): Promise<ProviderRateLimits> {
+  let path: string;
+  try {
+    path = (await resolveAntigravityBinary()).path;
+  } catch {
+    return unavailableRateLimits("antigravity", "Antigravity CLI not found");
+  }
+
+  try {
+    const cwd = await homeDir();
+    const output = await execChild(path, ["-p", "/usage"], cwd);
+    return parseAntigravityUsage(output, modelId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      /not signed in|authentication required|not authenticated/i.test(message)
+    ) {
+      return unavailableRateLimits("antigravity", "Antigravity not signed in");
+    }
+    if (/ENOENT|not found|could not run/i.test(message)) {
+      return unavailableRateLimits("antigravity", "Antigravity CLI not found");
+    }
+    return errorRateLimits("antigravity", message);
   }
 }
 

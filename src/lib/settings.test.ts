@@ -1,20 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   COMPOSER_RUNNER_DEFAULT,
-  COMPOSER_EFFORT_VISIBLE_DEFAULT,
   DIFF_VIEWER_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
   loadComposerRunner,
-  loadComposerEffortVisible,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   NOTES_ENABLED_DEFAULT,
   saveComposerRunner,
-  saveComposerEffortVisible,
   saveDiffViewer,
   saveFollowUpBehavior,
   saveLiveAgentsEnabled,
@@ -22,7 +19,6 @@ import {
 } from "./settings";
 
 const KEY = "monocode.composerRunner";
-const COMPOSER_EFFORT_VISIBLE_KEY = "monocode.composerEffortVisible";
 const NOTES_KEY = "monocode.notesEnabled";
 const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
@@ -91,26 +87,6 @@ describe("composer runner setting", () => {
     expect(loadComposerRunner()).toBe(false);
     saveComposerRunner(true);
     expect(loadComposerRunner()).toBe(true);
-  });
-});
-
-describe("composer effort control setting", () => {
-  beforeEach(mockLocalStorage);
-  afterEach(() => {
-    localStorage.removeItem(COMPOSER_EFFORT_VISIBLE_KEY);
-  });
-
-  it("shows the standalone effort control in the composer by default", () => {
-    expect(COMPOSER_EFFORT_VISIBLE_DEFAULT).toBe(true);
-    expect(loadComposerEffortVisible()).toBe(true);
-  });
-
-  it("persists the standalone effort control preference", () => {
-    saveComposerEffortVisible(false);
-    expect(localStorage.getItem(COMPOSER_EFFORT_VISIBLE_KEY)).toBe("0");
-    expect(loadComposerEffortVisible()).toBe(false);
-    saveComposerEffortVisible(true);
-    expect(loadComposerEffortVisible()).toBe(true);
   });
 });
 

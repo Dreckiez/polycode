@@ -12,7 +12,6 @@ import {
 import {
   coerceModelPickerTab,
   findModel,
-  getModelEffortBadge,
   getModelSnapshot,
   getPickerVisibilitySnapshot,
   loadFavoriteModels,
@@ -47,7 +46,6 @@ type Props = {
   harness: HarnessId;
   model: string;
   values: Record<string, string>;
-  hideEffort?: boolean;
   hotkeys?: boolean;
   onChange: (harness: HarnessId, model: string) => void;
   onSettingsChange: (settings: Record<string, string>) => void;
@@ -60,12 +58,6 @@ const POPUP_WIDTH = 390;
 const POPUP_HEIGHT = 380;
 const SETTING_MENU_WIDTH = 210;
 const SELF = "[data-model-picker]";
-
-function shortEffortLabel(label: string): string {
-  if (/^medium$/i.test(label)) return "Med";
-  if (/^extra[- ]?high$/i.test(label)) return "XHigh";
-  return label;
-}
 
 const EFFORT_SETTING_IDS = new Set(["effort", "reasoning", "reasoningEffort"]);
 
@@ -113,7 +105,6 @@ export function ModelPicker({
   harness,
   model,
   values,
-  hideEffort = false,
   hotkeys = false,
   onChange,
   onSettingsChange,
@@ -157,19 +148,7 @@ export function ModelPicker({
 
   const current = resolveModel(harness, model);
   currentRef.current = current;
-  const currentEffort = effortSetting(current);
-
-  const triggerEffortSetting = hideEffort ? undefined : effortSetting(current);
-  const triggerEffortLabel = triggerEffortSetting
-    ? settingValueLabel(triggerEffortSetting, values)
-    : undefined;
-  const triggerTitle = [
-    HARNESS_TITLE[current.harness],
-    current.name,
-    triggerEffortLabel,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const triggerTitle = `${HARNESS_TITLE[current.harness]} · ${current.name}`;
 
   const pickerHarnesses = useMemo(() => {
     void availabilityVersion;
@@ -362,22 +341,6 @@ export function ModelPicker({
     dismiss(true);
   };
 
-  const onEffortBadgeClick = (event: React.MouseEvent, item: AgentModel) => {
-    event.stopPropagation();
-    const setting = effortSetting(item);
-    if (!setting || setting.options.length === 0) return;
-    if (item.id !== current.id) {
-      onChange(item.harness, item.id);
-    }
-    const currentVal = settingValue(setting, values);
-    const idx = setting.options.findIndex((opt) => opt.value === currentVal);
-    const nextIndex = idx >= 0 ? (idx + 1) % setting.options.length : 0;
-    const nextVal = setting.options[nextIndex]?.value;
-    if (nextVal) {
-      onSettingsChange({ ...values, [setting.id]: nextVal });
-    }
-  };
-
   useEffect(() => {
     if (!recentMenu) return;
     const onKey = (event: KeyboardEvent) => {
@@ -445,9 +408,7 @@ export function ModelPicker({
         ref={button}
         type="button"
         title={`${triggerTitle} · Recent models: right-click or ${MOD}.`}
-        aria-label={`${HARNESS_TITLE[current.harness]} ${current.name}${
-          triggerEffortLabel ? `, effort ${triggerEffortLabel}` : ""
-        }`}
+        aria-label={`${HARNESS_TITLE[current.harness]} ${current.name}`}
         aria-keyshortcuts={`${MOD}.`}
         aria-expanded={open || recentMenu != null}
         aria-haspopup="menu"
@@ -470,11 +431,6 @@ export function ModelPicker({
           className="size-3.5 shrink-0 transition-transform group-hover:scale-105"
         />
         <span className="min-w-0 truncate">{current.name}</span>
-        {triggerEffortLabel && !hideEffort ? (
-          <span className="shrink-0 text-[11px] font-normal text-content/50">
-            {triggerEffortLabel}
-          </span>
-        ) : null}
         <ChevronDown
           className={`size-3 shrink-0 text-accent/70 transition-transform duration-150 ${
             open ? "rotate-180" : ""
@@ -587,11 +543,6 @@ export function ModelPicker({
                   const highlighted = index === activeModel;
                   const favorited = favorites.includes(item.id);
                   const disabled = !isHarnessAvailable(item.harness);
-                  const effort = effortSetting(item);
-                  const effortBadge = getModelEffortBadge(item, values);
-                  const activeEffort = effort
-                    ? settingValue(effort, values)
-                    : undefined;
 
                   return (
                     <div
@@ -638,117 +589,37 @@ export function ModelPicker({
                         <span className="truncate font-medium">
                           {item.name}
                         </span>
-                        {selected ? (
-                          <span className="size-1.5 shrink-0 rounded-full bg-accent" />
-                        ) : null}
                       </button>
 
-                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                        {effort && effort.options.length > 0 ? (
-                          <div className="group/effort relative flex items-center py-0.5">
-                            {/* Compact badge shown when NOT hovering near the effort area */}
-                            <div className="flex items-center group-hover/effort:hidden">
-                              <button
-                                type="button"
-                                disabled={disabled}
-                                title={`Reasoning effort: ${effortBadge} (hover to select)`}
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={(event) =>
-                                  onEffortBadgeClick(event, item)
-                                }
-                                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors ${
-                                  disabled
-                                    ? "cursor-not-allowed"
-                                    : "cursor-pointer"
-                                } ${
-                                  effortBadge === "HIGH" ||
-                                  effortBadge === "XHIGH"
-                                    ? "bg-accent/15 text-accent hover:bg-accent/25"
-                                    : effortBadge === "MED"
-                                      ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25"
-                                      : "bg-content/10 text-content/50 hover:bg-content/15"
-                                }`}
-                              >
-                                {effortBadge}
-                              </button>
-                            </div>
-
-                            {/* Segmented control tab shown when hovering near the effort badge */}
-                            <div className="hidden items-center group-hover/effort:flex">
-                              <div
-                                role="group"
-                                aria-label={`${item.name} effort options`}
-                                className="flex items-center gap-0.5 rounded-lg border border-content/10 bg-content/5 p-0.5 shadow-xs"
-                              >
-                                {effort.options.map((opt) => {
-                                  const isOptActive =
-                                    activeEffort === opt.value;
-                                  return (
-                                    <button
-                                      key={opt.value}
-                                      type="button"
-                                      disabled={disabled}
-                                      title={`Set effort to ${opt.label}`}
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (item.id !== current.id) {
-                                          onChange(item.harness, item.id);
-                                        }
-                                        onSettingsChange({
-                                          ...values,
-                                          [effort.id]: opt.value,
-                                        });
-                                      }}
-                                      className={`cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                                        isOptActive
-                                          ? "border border-accent/40 bg-accent/20 text-accent font-semibold shadow-xs"
-                                          : "text-content/50 hover:bg-content/8 hover:text-content"
-                                      }`}
-                                    >
-                                      {shortEffortLabel(opt.label)}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        ) : effortBadge ? (
-                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-content/10 text-content/50">
-                            {effortBadge}
-                          </span>
-                        ) : null}
-
-                        <button
-                          type="button"
-                          title={
-                            favorited
-                              ? "Remove from favorites"
-                              : "Add to favorites"
-                          }
-                          aria-label={
-                            favorited
-                              ? "Remove from favorites"
-                              : "Add to favorites"
-                          }
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleFavorite(item.id);
-                          }}
-                          className={`grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-all ${
-                            favorited
-                              ? "text-amber-400 hover:text-amber-300"
-                              : "text-content/35 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-content"
-                          }`}
-                        >
-                          <Star
-                            className="size-3.5"
-                            strokeWidth={1.75}
-                            fill={favorited ? "currentColor" : "none"}
-                          />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        title={
+                          favorited
+                            ? "Remove from favorites"
+                            : "Add to favorites"
+                        }
+                        aria-label={
+                          favorited
+                            ? "Remove from favorites"
+                            : "Add to favorites"
+                        }
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleFavorite(item.id);
+                        }}
+                        className={`grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-all ${
+                          favorited
+                            ? "text-amber-400 hover:text-amber-300"
+                            : "text-content/35 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-content"
+                        }`}
+                      >
+                        <Star
+                          className="size-3.5"
+                          strokeWidth={1.75}
+                          fill={favorited ? "currentColor" : "none"}
+                        />
+                      </button>
                     </div>
                   );
                 })

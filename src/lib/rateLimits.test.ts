@@ -9,6 +9,7 @@ import {
   idleRateLimits,
   isRateLimitSnapshotStale,
   mapUsageWindow,
+  parseAntigravityUsage,
   parseClaudeOAuthUsage,
   parseCodexRateLimits,
   parseResetTimestamp,
@@ -311,3 +312,64 @@ describe("shouldFetchRateLimits", () => {
     ).toBe(true);
   });
 });
+
+describe("parseAntigravityUsage", () => {
+  const SAMPLE_OUTPUT = [
+    "Gemini Models\tWeekly Limit Remaining\t86%\t2026-09-23T04:43:16Z",
+    "Gemini Models\tFive Hour Limit Remaining\t42%\t2026-09-17T00:07:35Z",
+    "Claude and GPT models\tWeekly Limit Remaining\t66%\t2026-09-20T20:48:03Z",
+    "Claude and GPT models\tFive Hour Limit Remaining\t100%\t2026-09-17T03:40:59Z",
+  ].join("\n");
+
+  it("parses Gemini limits by default", () => {
+    const limits = parseAntigravityUsage(SAMPLE_OUTPUT);
+    expect(limits.status).toBe("ok");
+    expect(limits.provider).toBe("antigravity");
+    expect(limits.session).toEqual({
+      usedPercent: 58,
+      remainingPercent: 42,
+      windowMinutes: 300,
+      resetsAt: Date.parse("2026-09-17T00:07:35Z"),
+    });
+    expect(limits.weekly).toEqual({
+      usedPercent: 14,
+      remainingPercent: 86,
+      windowMinutes: 10_080,
+      resetsAt: Date.parse("2026-09-23T04:43:16Z"),
+    });
+  });
+
+  it("parses Claude and GPT limits when modelId is a claude model", () => {
+    const limits = parseAntigravityUsage(SAMPLE_OUTPUT, "antigravity:claude-3-7-sonnet");
+    expect(limits.status).toBe("ok");
+    expect(limits.session).toEqual({
+      usedPercent: 0,
+      remainingPercent: 100,
+      windowMinutes: 300,
+      resetsAt: Date.parse("2026-09-17T03:40:59Z"),
+    });
+    expect(limits.weekly).toEqual({
+      usedPercent: 34,
+      remainingPercent: 66,
+      windowMinutes: 10_080,
+      resetsAt: Date.parse("2026-09-20T20:48:03Z"),
+    });
+  });
+
+  it("parses Claude and GPT limits when modelId is a gpt model", () => {
+    const limits = parseAntigravityUsage(SAMPLE_OUTPUT, "antigravity:gpt-oss-120b-medium");
+    expect(limits.status).toBe("ok");
+    expect(limits.session?.remainingPercent).toBe(100);
+    expect(limits.weekly?.remainingPercent).toBe(66);
+  });
+
+  it("handles malformed or empty output gracefully", () => {
+    const empty = parseAntigravityUsage("");
+    expect(empty.status).toBe("error");
+    expect(empty.session).toBeNull();
+
+    const garbage = parseAntigravityUsage("random error from cli");
+    expect(garbage.status).toBe("error");
+  });
+});
+

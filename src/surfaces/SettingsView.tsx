@@ -139,14 +139,12 @@ import {
   filterKeybindings,
   KEYBINDINGS,
   loadClaudeHooks,
-  loadComposerEffortVisible,
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   saveClaudeHooks,
-  saveComposerEffortVisible,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
@@ -302,9 +300,6 @@ function GeneralPage({
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
-  const [composerEffortVisible, setComposerEffortVisible] = useState(
-    loadComposerEffortVisible,
-  );
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
   const [notesEnabled, setNotesEnabled] = useState(loadNotesEnabled);
   const [liveAgentsEnabled, setLiveAgentsEnabled] = useState(
@@ -358,11 +353,6 @@ function GeneralPage({
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
     saveFollowUpBehavior(next);
     setFollowUpBehavior(next);
-  };
-
-  const onComposerEffortVisible = (next: boolean) => {
-    saveComposerEffortVisible(next);
-    setComposerEffortVisible(next);
   };
 
   const onComposerRunner = (next: boolean) => {
@@ -449,16 +439,6 @@ function GeneralPage({
           label="Anchor prompts to top"
           on={transcriptAnchor}
           onChange={onTranscriptAnchor}
-        />
-      </Row>
-      <Row
-        label="Effort control"
-        description="Show the current effort as a separate control beside the model picker for quicker changes. When off, effort stays inside the model menu."
-      >
-        <Toggle
-          label="Show effort beside model picker"
-          on={composerEffortVisible}
-          onChange={onComposerEffortVisible}
         />
       </Row>
       <Row
