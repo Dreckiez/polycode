@@ -208,9 +208,9 @@ function ToolButton({
       onClick={onClick}
       className={`grid size-6.5 shrink-0 cursor-pointer place-items-center rounded-md ${
         active
-          ? "bg-content/20 text-content"
-          : "bg-content/10 text-content/50 hover:bg-content/15 hover:text-content"
-      } disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content/50`}
+          ? "bg-content/10 text-content"
+          : "text-content/50 hover:bg-content/10 hover:text-content"
+      } disabled:cursor-default disabled:opacity-40 disabled:hover:text-content/50`}
     >
       {children}
     </button>

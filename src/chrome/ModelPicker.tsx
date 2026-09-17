@@ -419,10 +419,10 @@ export function ModelPicker({
           openRecentMenu();
         }}
         onClick={() => togglePicker()}
-        className={`group flex h-7 max-w-56 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-all duration-150 ${
+        className={`group flex h-7 max-w-56 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 text-[12px] font-medium transition-all duration-150 ${
           open
-            ? "bg-accent/15 text-accent ring-1 ring-accent/30 shadow-xs"
-            : "bg-accent/10 text-accent hover:bg-accent/15 hover:shadow-xs"
+            ? "bg-content/10 text-accent"
+            : "text-accent hover:bg-content/10"
         }`}
       >
         <HarnessIcon
@@ -756,10 +756,10 @@ export function EffortPicker({
         aria-haspopup="menu"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (open ? dismiss(true) : openPicker())}
-        className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2 text-[12px] font-normal transition-all duration-150 ${
+        className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-1.5 text-[12px] font-normal transition-all duration-150 ${
           open
-            ? "bg-content/15 text-content ring-1 ring-content/20"
-            : "bg-content/5 text-content/75 hover:bg-content/10 hover:text-content"
+            ? "bg-content/10 text-content"
+            : "text-content/75 hover:bg-content/10 hover:text-content"
         }`}
       >
         <Gauge className="size-3.5 shrink-0 text-content/50" strokeWidth={1.75} />

@@ -327,6 +327,7 @@ function ProviderChip({
   const showsRemaining = windows.some(
     (entry) => entry.window.remainingPercent != null,
   );
+  const primaryWindow = limits.session ?? windows[0]?.window;
   const tightest = windows.reduce<RateLimitWindow | null>((best, entry) => {
     if (!best) return entry.window;
     if (showsRemaining) {
@@ -365,13 +366,21 @@ function ProviderChip({
         <span className="text-content/35">{emptyUsageLabel(limits)}</span>
       ) : (
         <>
-          {tightest ? (
+          {primaryWindow ? (
             <MiniBar
               pct={
                 showsRemaining
-                  ? (tightest.remainingPercent ??
-                    clampUsedPercent(100 - tightest.usedPercent))
-                  : tightest.usedPercent
+                  ? (primaryWindow.remainingPercent ??
+                    clampUsedPercent(100 - primaryWindow.usedPercent))
+                  : primaryWindow.usedPercent
+              }
+              warnPct={
+                tightest
+                  ? showsRemaining
+                    ? (tightest.remainingPercent ??
+                      clampUsedPercent(100 - tightest.usedPercent))
+                    : tightest.usedPercent
+                  : undefined
               }
               mode={showsRemaining ? "remaining" : "used"}
             />
@@ -413,12 +422,15 @@ function emptyUsageLabel(limits: ProviderRateLimits): string {
 
 function MiniBar({
   pct: rawPct,
+  warnPct: rawWarnPct,
   mode = "used",
 }: {
   pct: number;
+  warnPct?: number;
   mode?: "used" | "remaining";
 }) {
   const pct = clampUsedPercent(rawPct);
+  const colorPct = clampUsedPercent(rawWarnPct ?? rawPct);
   return (
     <span
       className="h-1 w-8 shrink-0 overflow-hidden rounded-full bg-content/10"
@@ -426,7 +438,7 @@ function MiniBar({
     >
       <span
         className={`block h-full rounded-full ${
-          mode === "remaining" ? remainingBarClass(pct) : usedBarClass(pct)
+          mode === "remaining" ? remainingBarClass(colorPct) : usedBarClass(colorPct)
         }`}
         style={{ width: `${pct}%` }}
       />

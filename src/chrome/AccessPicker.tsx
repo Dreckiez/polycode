@@ -93,10 +93,8 @@ export function AccessPicker({
           }
           setOpen(true);
         }}
-        className={`flex h-6.5 max-w-52 cursor-pointer items-center gap-1 rounded-md px-1.5 ${
-          open
-            ? "bg-content/10 text-content"
-            : "bg-content/10 text-content hover:bg-content/15"
+        className={`flex h-6.5 max-w-52 cursor-pointer items-center gap-1 rounded-md px-1 text-content/70 hover:bg-content/10 hover:text-content ${
+          open ? "bg-content/10 text-content" : ""
         }`}
       >
         <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
