@@ -3,7 +3,6 @@ import {
   ChevronRight,
   PanelLeft,
   Plus,
-  Search,
   Settings,
   StickyNote,
   Terminal,
@@ -545,14 +544,14 @@ function TitleBarComponent({
   onSelect,
   onNew,
   onNewTerminal,
-  onShowTerminal,
-  projectTerminalActive = false,
+  onShowTerminal: _onShowTerminal,
+  projectTerminalActive: _projectTerminalActive = false,
   onOpenSettings,
   onOpenNotes,
   onClose,
   onCloseMany,
   onReorder,
-  onGoToFile,
+  onGoToFile: _onGoToFile,
   recents = [],
   onSelectProject,
 }: Props) {
@@ -713,31 +712,6 @@ function TitleBarComponent({
             <StickyNote className="size-3.5" strokeWidth={1.75} />
           </IconButton>
         ) : null}
-        {railClosed && !projectless ? (
-          <>
-            <IconButton label={`Go to File (${MOD}P)`} onClick={onGoToFile}>
-              <Search className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-            <IconButton label={`New session (${MOD}T)`} onClick={onNew}>
-              <Plus className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-          </>
-        ) : null}
-        {!projectless && (onShowTerminal || onNewTerminal) ? (
-          <IconButton
-            label={
-              projectTerminalActive ? "Terminal" : `New Terminal (${MOD}\`)`
-            }
-            accent={projectTerminalActive}
-            onClick={
-              projectTerminalActive
-                ? (onShowTerminal ?? onNewTerminal)
-                : onNewTerminal
-            }
-          >
-            <Terminal className="size-3.5" strokeWidth={1.75} />
-          </IconButton>
-        ) : null}
         {!projectRailOpen && !showCurrentProject && onOpenSettings ? (
           <IconButton label={`Settings (${MOD},)`} onClick={onOpenSettings}>
             <Settings className="size-3.5" strokeWidth={1.75} />
@@ -841,6 +815,18 @@ function TitleBarComponent({
                 />
               </div>
             ))}
+            {onNew ? (
+              <button
+                type="button"
+                onClick={onNew}
+                aria-label={`New session (${MOD}T)`}
+                title={`New session (${MOD}T)`}
+                className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-content/40 hover:bg-content/10 hover:text-content ml-0.5 transition-colors"
+                data-tauri-drag-region="false"
+              >
+                <Plus className="size-3.5" strokeWidth={1.75} />
+              </button>
+            ) : null}
           </div>
         </div>
 

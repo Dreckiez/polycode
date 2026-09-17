@@ -5688,6 +5688,9 @@ export default function App({
             terminals={runningTerminals}
             terminalOpen={runningTerminalOpen}
             onToggleTerminal={onToggleRunningTerminal}
+            onShowTerminal={onToggleProjectTerminal}
+            onNewTerminal={onNewTerminal}
+            projectTerminalActive={!!currentProjectDock?.open}
           />
         )}
       </div>

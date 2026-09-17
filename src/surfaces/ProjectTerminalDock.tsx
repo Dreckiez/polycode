@@ -212,14 +212,19 @@ export function ProjectTerminalDock({
         onCloseFile={onCloseTerminal}
         onCloseOtherFiles={onCloseOtherTerminals}
         onReorder={onReorderTerminals}
+        afterTabs={
+          <button
+            type="button"
+            onClick={onAddTerminal}
+            aria-label={`New Terminal (${MOD}\`)`}
+            title={`New Terminal (${MOD}\`)`}
+            className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content ml-1 self-center transition-colors"
+          >
+            <Plus className="size-3.5" strokeWidth={1.75} />
+          </button>
+        }
         trailing={
           <div className="flex shrink-0 items-center gap-0.5 border-l border-content/10 px-1">
-            <IconButton
-              label={`New Terminal (${MOD}\`)`}
-              onClick={onAddTerminal}
-            >
-              <Plus className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
             <div ref={sideButton}>
             <IconButton
               label="Move Terminal"

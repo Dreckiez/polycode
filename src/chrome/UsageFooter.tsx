@@ -445,13 +445,14 @@ export function UsageFooter({
               open={terminalOpen}
               onToggle={onToggleTerminal}
             />
-          ) : showTerminalButton ? (
+          ) : null}
+          {showTerminalButton ? (
             <button
               type="button"
-              className={`inline-flex h-5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-1.5 hover:bg-content/10 ${
+              className={`inline-flex h-5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-1.5 transition-colors hover:bg-content/10 ${
                 projectTerminalActive
-                  ? "text-accent"
-                  : "text-content/40 hover:text-content"
+                  ? "bg-accent/10 font-medium text-accent"
+                  : "text-content/50 hover:text-content"
               }`}
               aria-label={terminalLabel}
               aria-pressed={projectTerminalActive}

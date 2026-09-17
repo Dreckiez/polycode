@@ -36,6 +36,7 @@ type Props = {
   onPaneDragStart?: (event: ReactPointerEvent<HTMLElement>) => void;
   label?: string;
   trailing?: ReactNode;
+  afterTabs?: ReactNode;
 };
 
 export type SurfaceTabPresentation = {
@@ -173,6 +174,7 @@ export function SurfaceTabs({
   onPaneDragStart,
   label = "Open files",
   trailing,
+  afterTabs,
 }: Props) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const activeTabRef = useRef<HTMLDivElement | null>(null);
@@ -383,6 +385,7 @@ export function SurfaceTabs({
           </div>
         );
       })}
+      {afterTabs}
       {onPaneDragStart ? (
         <div
           className="min-w-4 flex-1 cursor-grab active:cursor-grabbing"
