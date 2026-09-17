@@ -275,6 +275,7 @@ pub fn run() {
             harness::harness_sse_close,
             harness::harness_exec,
             rate_limits::fetch_claude_usage,
+            rate_limits::fetch_opencode_go_usage,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,

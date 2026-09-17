@@ -190,6 +190,11 @@ export type Block = {
   secondOpinion?: SecondOpinionMeta;
   /** Note chip shown on this user turn. Body is not stored; the harness already received it. */
   noteCard?: NoteCardMeta;
+  /**
+   * A system row the reader must not miss — an error or an interruption —
+   * rather than turn chrome like a status ping. Never folds into the trail.
+   */
+  notice?: "error" | "interrupt";
 };
 
 export type RuntimeMode =
@@ -246,6 +251,8 @@ export type Session = {
   editingQueuedMessageId?: string;
   /** Provider-side conversation id (Cursor ACP session id). */
   providerSessionId?: string;
+  /** Named local credential profile used by Claude or Codex. */
+  providerAccountId?: string;
   /** Context-window level reported by the harness. Absent until it reports. */
   context?: ContextUsage;
   /**
@@ -278,6 +285,7 @@ export type PendingHarnessSwitch = {
   fromModel: string;
   fromSettings: Record<string, string>;
   fromProviderSessionId?: string;
+  fromProviderAccountId?: string;
 };
 
 export const HARNESS_LABEL: Record<HarnessId, string> = {

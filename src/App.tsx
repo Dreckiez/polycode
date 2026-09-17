@@ -18,6 +18,7 @@ import { TitleBar, type Tab as TitleTab } from "./chrome/TitleBar";
 import { MenuBar } from "./chrome/MenuBar";
 import { FilePicker } from "./chrome/FilePicker";
 import { UsageFooter } from "./chrome/UsageFooter";
+import { ProviderSignInDialog } from "./chrome/ProviderSignInDialog";
 import { useProjectBranches } from "./hooks/useProjectBranches";
 import {
   loadProjectRailOpen,
@@ -228,6 +229,15 @@ import {
   focusedWorkspaceTabCwd,
 } from "./lib/workspaceTabGroups";
 import { runSessionRemoval } from "./lib/sessionRemoval";
+import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  selectedProviderAccountId,
+} from "./lib/providerAccounts";
+import {
+  supportsHarnessLogin,
+  latestTurnNeedsHarnessLogin,
+} from "./lib/harness/auth";
+import type { RateLimitProvider } from "./lib/rateLimits";
 import {
   HARNESS_LABEL,
   HARNESS_TITLE,
@@ -471,7 +481,9 @@ function withHarnessChoice(
     ...(session.model === model
       ? {}
       : { context: dropContextWindow(session.context) }),
-    ...(session.harness === harness ? {} : { providerSessionId: undefined }),
+    ...(session.harness === harness
+      ? {}
+      : { providerSessionId: undefined, providerAccountId: undefined }),
   };
 }
 
@@ -499,6 +511,9 @@ function withPlanBuildTarget(
       ...(plan.restoreProviderSessionId
         ? { providerSessionId: plan.restoreProviderSessionId }
         : { providerSessionId: undefined }),
+      ...(plan.restoreProviderAccountId
+        ? { providerAccountId: plan.restoreProviderAccountId }
+        : { providerAccountId: undefined }),
     };
   }
   if (plan.kind === "empty") {
@@ -645,6 +660,25 @@ export default function App({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateNotice, setUpdateNotice] = useState(installedUpdate);
   const [whatsNewVersion, setWhatsNewVersion] = useState<string | null>(null);
+  const [providerSignInRequest, setProviderSignInRequest] = useState<{
+    key: string;
+    sessionId: string;
+    harness: HarnessId;
+  } | null>(null);
+  const seenProviderSignInRequestsRef = useRef<Set<string> | null>(null);
+  const seenProviderSignInRequests =
+    seenProviderSignInRequestsRef.current ??
+    (seenProviderSignInRequestsRef.current = new Set(
+      sessions.flatMap((session) => {
+        if (
+          !supportsHarnessLogin(session.harness) ||
+          !latestTurnNeedsHarnessLogin(session.blocks)
+        ) {
+          return [];
+        }
+        return [providerSignInRequestKey(session)];
+      }),
+    ));
   const [settingsSection, setSettingsSection] =
     useState<SettingsSectionId>(loadSettingsSection);
   const [editorNavigation, setEditorNavigation] =
@@ -960,6 +994,7 @@ export default function App({
     if (
       currentHarness === "claude" ||
       currentHarness === "codex" ||
+      currentHarness === "opencode" ||
       currentHarness === "antigravity"
     ) {
       return [currentHarness];
@@ -970,15 +1005,55 @@ export default function App({
     const s = active ?? sessionDefaults;
     if (!s) return undefined;
     return {
+      id: "id" in s ? s.id : undefined,
       harness: s.harness,
       model: s.model,
+      authRequired: active ? latestTurnNeedsHarnessLogin(active.blocks) : false,
+      providerAccountId:
+        active?.providerAccountId ??
+        (active?.blocks.some((block) => block.role === "user")
+          ? DEFAULT_PROVIDER_ACCOUNT_ID
+          : undefined),
     };
   }, [
+    active?.id,
     active?.harness,
     active?.model,
+    active?.blocks,
+    active?.providerAccountId,
     sessionDefaults?.harness,
     sessionDefaults?.model,
   ]);
+  const activeProviderSignInRequest = useMemo(() => {
+    if (
+      !active ||
+      !supportsHarnessLogin(active.harness) ||
+      !latestTurnNeedsHarnessLogin(active.blocks)
+    ) {
+      return null;
+    }
+    return {
+      key: providerSignInRequestKey(active),
+      sessionId: active.id,
+      harness: active.harness,
+    };
+  }, [active]);
+  useEffect(() => {
+    if (!activeProviderSignInRequest) return;
+    if (seenProviderSignInRequests.has(activeProviderSignInRequest.key)) {
+      return;
+    }
+    seenProviderSignInRequests.add(activeProviderSignInRequest.key);
+    setProviderSignInRequest(activeProviderSignInRequest);
+  }, [activeProviderSignInRequest, seenProviderSignInRequests]);
+  useEffect(() => {
+    if (
+      providerSignInRequest &&
+      active?.id !== providerSignInRequest.sessionId
+    ) {
+      setProviderSignInRequest(null);
+    }
+  }, [active?.id, providerSignInRequest]);
   const runningTerminals = useMemo(() => {
     const files: FilePaneTab[] = [];
     const dock = findProjectTerminal(projectTerminals, projectCwd);
@@ -1435,6 +1510,44 @@ export default function App({
       );
     },
     [projectOfTab],
+  );
+
+  const onSelectProviderAccount = useCallback(
+    (provider: RateLimitProvider, accountId: string) => {
+      if (!active || active.harness !== provider) return;
+      const currentId = active.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+      if (currentId === accountId) return;
+
+      if (active.blocks.length === 0 && !active.busy) {
+        setSessions((current) =>
+          current.map((session) =>
+            session.id === active.id
+              ? { ...session, providerAccountId: accountId }
+              : session,
+          ),
+        );
+        return;
+      }
+
+      // Provider thread ids are account-owned. Keep the current conversation
+      // pinned to its account and open a clean one for the selected profile.
+      const session = {
+        ...newSession(
+          active.harness,
+          active.cwd,
+          active.model,
+          active.runtimeMode,
+          active.modelSettings,
+        ),
+        providerAccountId: accountId,
+      };
+      const tab = newTab(session.id);
+      setSessions((current) => [...current, session]);
+      appendTab(tab, active.cwd);
+      setActiveTabId(tab.id);
+      setComposerFocused(true);
+    },
+    [active, appendTab],
   );
 
   const onOpenWhatsNew = useCallback((version: string) => {
@@ -2626,6 +2739,7 @@ export default function App({
           restored.id,
           restored.providerSessionId,
           sessionWorkCwd(restored),
+          restored.providerAccountId,
         );
       }
       lastPersisted.current.set(restored.id, persistFingerprint(restored));
@@ -3554,6 +3668,9 @@ export default function App({
               ...(plan.restoreProviderSessionId
                 ? { providerSessionId: plan.restoreProviderSessionId }
                 : { providerSessionId: undefined }),
+              ...(plan.restoreProviderAccountId
+                ? { providerAccountId: plan.restoreProviderAccountId }
+                : { providerAccountId: undefined }),
             };
           }
           if (plan.kind === "empty") {
@@ -3639,6 +3756,11 @@ export default function App({
       if (isPreparingHandoff(current)) return;
       saveRecentModelChoice(current.harness, current.model);
       const workCwd = sessionWorkCwd(current);
+      const providerAccountId =
+        current.harness === "claude" || current.harness === "codex"
+          ? (current.providerAccountId ??
+            selectedProviderAccountId(current.harness, current.cwd))
+          : undefined;
       const submittedText = intent === "build" ? "Build approved plan" : text;
       const rawCommand = isNativeCommandPrompt(submittedText, current.harness);
       const harnessText = rawCommand
@@ -3785,6 +3907,7 @@ export default function App({
           const titled = isFirstTurn ? titleSeed : selected.title;
           let next: Session = {
             ...selected,
+            providerAccountId,
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
           };
@@ -3860,6 +3983,7 @@ export default function App({
           sessionId,
           cwd: workCwd,
           message: titleMessage,
+          providerAccountId,
         })
           .then(async (generated) => {
             const linkedWorkItem = await resolveLinkedWorkItem(
@@ -3919,6 +4043,7 @@ export default function App({
                 cwd: workCwd,
                 model: pendingSwitch.fromModel,
                 modelSettings: pendingSwitch.fromSettings,
+                providerAccountId: pendingSwitch.fromProviderAccountId,
                 userRequest: text,
               });
             } catch {
@@ -3985,6 +4110,7 @@ export default function App({
             cwd: workCwd,
             model: current.model,
             modelSettings: current.modelSettings,
+            providerAccountId,
             runtimeMode: current.runtimeMode,
             intent,
             text:
@@ -4487,6 +4613,11 @@ export default function App({
             cwd: workCwd,
             model: current.model,
             modelSettings: current.modelSettings,
+            providerAccountId:
+              current.harness === "claude" || current.harness === "codex"
+                ? (current.providerAccountId ??
+                  selectedProviderAccountId(current.harness, current.cwd))
+                : undefined,
             runtimeMode: current.runtimeMode,
             onEvent: (event) => {
               if (turnGen.current.get(sessionId) !== gen) return;
@@ -5552,6 +5683,8 @@ export default function App({
           <UsageFooter
             providers={usageProviders}
             session={usageSession}
+            project={active?.cwd ?? projectCwd}
+            onSelectAccount={onSelectProviderAccount}
             terminals={runningTerminals}
             terminalOpen={runningTerminalOpen}
             onToggleTerminal={onToggleRunningTerminal}
@@ -5591,6 +5724,13 @@ export default function App({
           onClose={() => setWhatsNewVersion(null)}
         />
       ) : null}
+      {providerSignInRequest ? (
+        <ProviderSignInDialog
+          key={providerSignInRequest.key}
+          harness={providerSignInRequest.harness}
+          onClose={() => setProviderSignInRequest(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -5605,6 +5745,11 @@ function lastUserBlockId(session: Session): string | undefined {
     if (session.blocks[i]?.role === "user") return session.blocks[i]?.id;
   }
   return undefined;
+}
+
+function providerSignInRequestKey(session: Session): string {
+  const lastBlockId = session.blocks[session.blocks.length - 1]?.id;
+  return `${session.id}:${lastUserBlockId(session) ?? lastBlockId ?? "auth"}`;
 }
 
 function selectedChangePath(

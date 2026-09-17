@@ -81,6 +81,8 @@ pub struct SessionUpsert {
     pub title: String,
     #[serde(default)]
     pub provider_session_id: Option<String>,
+    #[serde(default)]
+    pub provider_account_id: Option<String>,
     pub blocks: Value,
     /// Last context-window reading reported by the harness, if any.
     #[serde(default)]
@@ -134,6 +136,8 @@ pub struct SessionRecord {
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_account_id: Option<String>,
     pub blocks: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_used: Option<i64>,
@@ -161,6 +165,11 @@ pub fn session_upsert(
     if let Some(provider_session_id) = &session.provider_session_id {
         if !provider_session_id.is_empty() {
             validate_id(provider_session_id, "provider session")?;
+        }
+    }
+    if let Some(provider_account_id) = &session.provider_account_id {
+        if !provider_account_id.is_empty() {
+            validate_id(provider_account_id, "provider account")?;
         }
     }
     if !session.model_settings.is_object() {
@@ -501,6 +510,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ("has_user_message", "INTEGER NOT NULL DEFAULT 0"),
         ("pinned", "INTEGER NOT NULL DEFAULT 0"),
         ("linked_work_item_json", "TEXT"),
+        ("provider_account_id", "TEXT"),
     ] {
         ensure_session_column(conn, column, decl)?;
     }
@@ -578,6 +588,13 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
             params![now_millis()],
         )?;
     }
+    if current < 14 {
+        ensure_session_column(conn, "provider_account_id", "TEXT")?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (14, ?1)",
+            params![now_millis()],
+        )?;
+    }
     // Create even when a version row already exists (another build may have
     // used the same numbers, or a previous run recorded the version without
     // the table). Restore writes into these; missing tables look like a
@@ -620,6 +637,11 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let provider_session_id = session
         .provider_session_id
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty());
+    let provider_account_id = session
+        .provider_account_id
         .as_ref()
         .map(|value| value.trim())
         .filter(|value| !value.is_empty());
@@ -669,8 +691,8 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
            id, cwd, harness, model, model_settings, runtime_mode, title,
            provider_session_id, blocks_json, created_at, updated_at, branch,
            context_used, context_window, worktree_cwd, has_user_message,
-           linked_work_item_json
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+           linked_work_item_json, provider_account_id
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
          ON CONFLICT(id) DO UPDATE SET
            cwd = excluded.cwd,
            harness = excluded.harness,
@@ -686,7 +708,8 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
            context_window = excluded.context_window,
            worktree_cwd = excluded.worktree_cwd,
            has_user_message = excluded.has_user_message,
-           linked_work_item_json = excluded.linked_work_item_json",
+           linked_work_item_json = excluded.linked_work_item_json,
+           provider_account_id = excluded.provider_account_id",
         params![
             session.id,
             session.cwd,
@@ -705,6 +728,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
             worktree_cwd,
             i64::from(has_user_message),
             linked_work_item_json,
+            provider_account_id,
         ],
     )?;
 
@@ -1100,7 +1124,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
         "SELECT id, cwd, harness, model, model_settings, runtime_mode, title,
                 provider_session_id, blocks_json, created_at, updated_at,
                 context_used, context_window, branch, worktree_cwd,
-                linked_work_item_json
+                linked_work_item_json, provider_account_id
          FROM sessions
          WHERE id = ?1 AND inbox_ask IS NULL",
         params![session_id],
@@ -1130,6 +1154,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
                 runtime_mode: row.get(5)?,
                 title: row.get(6)?,
                 provider_session_id: row.get(7)?,
+                provider_account_id: row.get(16)?,
                 blocks,
                 context_used: row.get(11)?,
                 context_window: row.get(12)?,
@@ -1246,6 +1271,7 @@ mod tests {
             runtime_mode: "supervised".into(),
             title: title.into(),
             provider_session_id: Some("acp-session-1".into()),
+            provider_account_id: None,
             blocks: json!([{ "id": "b1", "role": "user", "text": "hello" }]),
             context_used: None,
             context_window: None,
@@ -1642,13 +1668,16 @@ mod tests {
     }
 
     #[test]
-    fn get_round_trips_blocks_and_provider_session_id() {
+    fn get_round_trips_blocks_provider_session_and_account() {
         let store = SessionStore::open_in_memory().unwrap();
         let conn = store.conn.lock().unwrap();
-        upsert_session(&conn, &sample("s1", "/tmp/a", "First")).unwrap();
+        let mut session = sample("s1", "/tmp/a", "First");
+        session.provider_account_id = Some("account-work".into());
+        upsert_session(&conn, &session).unwrap();
         let record = get_session(&conn, "s1").unwrap().unwrap();
         assert_eq!(record.id, "s1");
         assert_eq!(record.provider_session_id.as_deref(), Some("acp-session-1"));
+        assert_eq!(record.provider_account_id.as_deref(), Some("account-work"));
         assert_eq!(record.model_settings["thinking"], "high");
         assert_eq!(record.blocks.as_array().unwrap().len(), 1);
         assert_eq!(record.blocks[0]["text"], "hello");

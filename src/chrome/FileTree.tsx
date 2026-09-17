@@ -14,6 +14,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -52,6 +53,11 @@ import { displayPath, parentPath, rebasePath } from "../lib/paths";
 import { IS_MAC, IS_WIN, MOD } from "../lib/platform";
 import type { OpenFileFn } from "../lib/search";
 import type { GitStatusMap } from "../hooks/useGitFileStatuses";
+import {
+  emitExplorerFilePointerDrag,
+  setGrabbing,
+  suppressTextSelection,
+} from "../lib/drag";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import { FileTypeIcon } from "./FileTypeIcon";
 
@@ -93,6 +99,11 @@ type TreeCtxValue = {
   gitStatuses?: GitStatusMap;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
+  onFilePointerDown: (
+    path: string,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => void;
+  consumeFileClick: () => boolean;
   onOpenFile: OpenFileFn;
   onCreateCommit: (id: number, raw: string) => Promise<void>;
   onCreateCancel: (id: number) => void;
@@ -253,6 +264,158 @@ export const FileTree = memo(function FileTree({
     setSelectedPath(path);
     saveSelected(cwd, path);
   };
+
+  const fileDragCleanup = useRef<(() => void) | null>(null);
+  const suppressFileClickUntil = useRef(0);
+
+  const onFilePointerDown = (
+    path: string,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    if (event.button !== 0 || fileDragCleanup.current) return;
+    const handle = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let lastX = startX;
+    let lastY = startY;
+    let active = false;
+    let restoreSelection: (() => void) | undefined;
+    let preview: HTMLDivElement | null = null;
+
+    const movePreview = () => {
+      if (!preview) return;
+      const edge = 8;
+      const grabX = 12;
+      const grabY = 13;
+      const width = preview.offsetWidth;
+      const height = preview.offsetHeight;
+      const x = Math.min(
+        Math.max(edge, lastX - grabX),
+        Math.max(edge, window.innerWidth - width - edge),
+      );
+      const y = Math.min(
+        Math.max(edge, lastY - grabY),
+        Math.max(edge, window.innerHeight - height - edge),
+      );
+      preview.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(
+        y,
+      )}px, 0)`;
+    };
+
+    const createPreview = () => {
+      preview = document.createElement("div");
+      preview.setAttribute("aria-hidden", "true");
+      preview.classList.add("explorer-file-drag-preview");
+
+      // Keep the useful identity of the row without dragging its full-width
+      // layout, indentation spacer, selection state, or button behavior.
+      const icon = handle.children.item(1)?.cloneNode(true);
+      const label = handle.children.item(2)?.cloneNode(true);
+      if (icon) preview.append(icon);
+      if (label) preview.append(label);
+
+      document.body.append(preview);
+      movePreview();
+    };
+
+    const release = () => {
+      delete handle.dataset.explorerDragging;
+      preview?.remove();
+      preview = null;
+      document.documentElement.classList.remove("is-explorer-file-dragging");
+      if (restoreSelection) {
+        restoreSelection();
+        restoreSelection = undefined;
+        setGrabbing(false);
+      }
+      try {
+        if (handle.hasPointerCapture(pointerId))
+          handle.releasePointerCapture(pointerId);
+      } catch {
+        /* already released */
+      }
+    };
+
+    const reset = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onCancel);
+      release();
+      if (active) emitExplorerFilePointerDrag({ type: "end", path });
+      fileDragCleanup.current = null;
+    };
+
+    const activate = () => {
+      active = true;
+      onSelect(path);
+      restoreSelection = suppressTextSelection();
+      setGrabbing(true);
+      createPreview();
+      document.documentElement.classList.add("is-explorer-file-dragging");
+      handle.dataset.explorerDragging = "true";
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch {
+        /* window listeners still track the gesture */
+      }
+    };
+
+    function onMove(moveEvent: PointerEvent) {
+      if (moveEvent.pointerId !== pointerId) return;
+      lastX = moveEvent.clientX;
+      lastY = moveEvent.clientY;
+      if (!active) {
+        if (Math.hypot(lastX - startX, lastY - startY) < 5) return;
+        activate();
+      }
+      moveEvent.preventDefault();
+      movePreview();
+      emitExplorerFilePointerDrag({ type: "move", path, x: lastX, y: lastY });
+    }
+
+    function finish(commit: boolean, upEvent?: PointerEvent) {
+      if (commit && upEvent) onMove(upEvent);
+      if (active) {
+        suppressFileClickUntil.current = performance.now() + 400;
+        if (commit) {
+          emitExplorerFilePointerDrag({
+            type: "drop",
+            path,
+            x: lastX,
+            y: lastY,
+          });
+        }
+      }
+      reset();
+    }
+
+    function onUp(upEvent: PointerEvent) {
+      if (upEvent.pointerId === pointerId) finish(true, upEvent);
+    }
+    function onCancel() {
+      finish(false);
+    }
+    function onKey(keyEvent: KeyboardEvent) {
+      if (keyEvent.key !== "Escape") return;
+      keyEvent.preventDefault();
+      finish(false);
+    }
+
+    fileDragCleanup.current = onCancel;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("blur", onCancel);
+  };
+
+  const consumeFileClick = () =>
+    performance.now() < suppressFileClickUntil.current;
+
+  useEffect(() => () => fileDragCleanup.current?.(), []);
 
   const expandDirs = (dirs: string[]) => {
     setExpanded((prev) => {
@@ -598,6 +761,8 @@ export const FileTree = memo(function FileTree({
         gitStatuses,
         onToggle: toggle,
         onSelect,
+        onFilePointerDown,
+        consumeFileClick,
         onOpenFile,
         onCreateCommit,
         onCreateCancel,
@@ -798,6 +963,8 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
     gitStatuses,
     onToggle,
     onSelect,
+    onFilePointerDown,
+    consumeFileClick,
     onOpenFile,
     onRenameCommit,
     onRenameCancel,
@@ -843,6 +1010,7 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
   }, [entry.isDir, entry.path, open, epoch]);
 
   const onClick = () => {
+    if (consumeFileClick()) return;
     onSelect(entry.path);
     if (entry.isDir) onToggle(entry.path);
     else onOpenFile(entry.path, undefined, { exact: true });
@@ -871,9 +1039,12 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
           title={entry.path}
           aria-expanded={entry.isDir ? open : undefined}
           onClick={onClick}
+          onPointerDown={(event) => {
+            if (!entry.isDir) onFilePointerDown(entry.path, event);
+          }}
           onContextMenu={(e) => onItemContextMenu(entry, e)}
           style={{ paddingLeft: 8 + depth * 12 }}
-          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal ${
+          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal data-[explorer-dragging]:opacity-50 ${
             selected
               ? "bg-content/10 text-content"
               : "text-content hover:bg-content/5"
