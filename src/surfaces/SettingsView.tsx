@@ -257,7 +257,7 @@ export function SettingsView({
         ref={lockOverscroll}
         className="min-h-0 flex-1 overflow-y-auto overscroll-none"
       >
-        <div className="mx-auto w-full max-w-5xl px-8 py-8">
+        <div className="mx-auto w-full max-w-5xl px-10 py-10">
           <PageHeader
             title={settingsSectionLabel(section)}
             description={settingsSectionDescription(section)}
@@ -863,7 +863,7 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
           display={`${Math.round(appearance.uiScale * 100)}%`}
           min={Math.round(UI_SCALE_MIN * 100)}
           max={Math.round(UI_SCALE_MAX * 100)}
-          step={10}
+          step={5}
           onChange={appearance.onUiScale}
         />
       </Row>
@@ -882,18 +882,18 @@ function ChatBackgroundCard({
   const busy = appearance.chatBackgroundBusy;
 
   return (
-    <div className="border-b border-content/5 py-4 last:border-b-0">
-      <div className="flex items-start gap-6">
+    <div className="border-b border-content/6 py-4.5 last:border-b-0">
+      <div className="flex items-start gap-8">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-medium text-content">
+          <div className="text-[14px] font-medium text-content">
             Chat background
           </div>
-          <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+          <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-content/50">
             An image behind your chat panes. It stays on this device.
           </p>
         </div>
         {hasImage ? (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2.5">
             <SecondaryButton
               onClick={() => void appearance.onChooseChatBackground()}
               disabled={busy}
@@ -914,9 +914,9 @@ function ChatBackgroundCard({
         ) : null}
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-content/10">
+      <div className="mt-3.5 overflow-hidden rounded-xl border border-content/10">
         {hasImage ? (
-          <div className="relative h-36">
+          <div className="relative h-40">
             <img
               src={src ?? undefined}
               alt=""
@@ -924,7 +924,7 @@ function ChatBackgroundCard({
               className="size-full object-cover"
               style={{ opacity: appearance.chatBackgroundOpacity }}
             />
-            <span className="pointer-events-none absolute bottom-2 left-2 text-[11px] text-content/40">
+            <span className="pointer-events-none absolute bottom-2.5 left-2.5 text-[12px] text-content/50">
               Preview at {visibility}%
             </span>
           </div>
@@ -940,15 +940,15 @@ function ChatBackgroundCard({
             ) : (
               <ImagePlus className="size-5" aria-hidden />
             )}
-            <span className="text-[12px]">Choose an image</span>
+            <span className="text-[13px] font-medium">Choose an image</span>
           </button>
         )}
         {hasImage ? (
           <div className="border-t border-content/8">
-            <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="min-w-0">
-                <div className="text-[12px] text-content">Show on</div>
-                <p className="text-[11px] text-content/40">
+                <div className="text-[13px] font-medium text-content">Show on</div>
+                <p className="text-[12px] text-content/45">
                   Empty sessions only, or every conversation.
                 </p>
               </div>
@@ -962,10 +962,10 @@ function ChatBackgroundCard({
                 onChange={appearance.onChatBackgroundScope}
               />
             </div>
-            <div className="flex items-center justify-between gap-4 border-t border-content/5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-4 border-t border-content/5 px-4 py-3">
               <div className="min-w-0">
-                <div className="text-[12px] text-content">Visibility</div>
-                <p className="text-[11px] text-content/40">
+                <div className="text-[13px] font-medium text-content">Visibility</div>
+                <p className="text-[12px] text-content/45">
                   Keep it subtle so long conversations stay readable.
                 </p>
               </div>
@@ -996,45 +996,47 @@ function KeybindingsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-end gap-3 pb-3">
-        <span className="shrink-0 text-[12px] text-content/40 tabular-nums">
+      <div className="flex items-center justify-end gap-3 pb-3.5">
+        <span className="shrink-0 text-[13px] text-content/45 tabular-nums">
           {rows.length} {rows.length === 1 ? "binding" : "bindings"}
         </span>
-        <label className="flex h-7 w-52 shrink-0 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
-          <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
+        <label className="flex h-8 w-60 shrink-0 items-center gap-2 rounded-lg border border-content/10 bg-content/3 px-2.5 text-content/45 focus-within:border-content/20">
+          <Search className="size-4 shrink-0" strokeWidth={1.75} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter"
+            placeholder="Filter shortcuts…"
             aria-label="Filter keybindings"
             spellCheck={false}
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-content outline-none placeholder:text-content/35"
           />
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-content/10">
-        <div className="flex items-center border-b border-content/10 bg-content/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-content/40">
+      <div className="overflow-hidden rounded-xl border border-content/10">
+        <div className="flex items-center border-b border-content/10 bg-content/5 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-content/45">
           <span className="min-w-0 flex-1">Command</span>
-          <span className="w-40 shrink-0">Keybinding</span>
-          <span className="w-28 shrink-0">When</span>
+          <span className="w-44 shrink-0">Keybinding</span>
+          <span className="w-32 shrink-0">When</span>
         </div>
         {rows.length === 0 ? (
-          <p className="px-3 py-3 text-[12px] text-content/45">
+          <p className="px-4 py-4 text-[13px] text-content/45">
             No matching bindings
           </p>
         ) : (
           rows.map((row) => (
             <div
               key={`${row.command}-${row.keys}`}
-              className="flex items-center border-b border-content/5 px-3 py-2 text-[12px] last:border-b-0"
+              className="flex items-center border-b border-content/5 px-4 py-2.5 text-[13px] last:border-b-0"
             >
-              <span className="min-w-0 flex-1 truncate">{row.command}</span>
-              <span className="w-40 shrink-0 font-mono text-[12px] text-content/80">
+              <span className="min-w-0 flex-1 truncate font-medium text-content">
+                {row.command}
+              </span>
+              <span className="w-44 shrink-0 font-mono text-[13px] text-content/85">
                 {row.keys}
               </span>
-              <span className="w-28 shrink-0 font-mono text-[11px] text-content/40">
+              <span className="w-32 shrink-0 font-mono text-[12px] text-content/45">
                 {row.when}
               </span>
             </div>
@@ -1042,7 +1044,7 @@ function KeybindingsPage() {
         )}
       </div>
 
-      <p className="pt-3 text-[12px] text-content/40">
+      <p className="pt-3 text-[13px] text-content/45">
         Bindings come from the app menu and the workspace key handler; they
         aren’t customizable yet.
       </p>
@@ -1081,7 +1083,7 @@ function ProvidersPage() {
 
   return (
     <>
-      <p className="pb-2 text-[12px] leading-relaxed text-content/45">
+      <p className="pb-3 text-[13px] leading-relaxed text-content/50">
         A provider is listed as installed once its CLI is found on your PATH.
         Uninstalled CLIs stay listed here but are omitted from the model picker.
         Turn off Show in picker to hide an installed provider from those tabs.
@@ -1165,11 +1167,11 @@ function ProviderRow({
   return (
     <Row
       label={
-        <span className="flex items-center gap-2">
-          <HarnessIcon harness={harness} className="size-4 shrink-0" />
-          {HARNESS_TITLE[harness]}
+        <span className="flex items-center gap-2.5">
+          <HarnessIcon harness={harness} className="size-4.5 shrink-0" />
+          <span className="font-semibold text-content">{HARNESS_TITLE[harness]}</span>
           {isDefault ? (
-            <span className="rounded-full bg-content/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-content/60">
+            <span className="rounded-full bg-content/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-content/60">
               Default
             </span>
           ) : null}
@@ -1178,8 +1180,8 @@ function ProviderRow({
       description={description}
     >
       {refreshing ? (
-        <div className="flex items-center gap-1.5 text-[12px] text-content/40">
-          <Loader className="size-3.5 animate-spin" aria-hidden />
+        <div className="flex items-center gap-2 text-[13px] text-content/45">
+          <Loader className="size-4 animate-spin" aria-hidden />
           <span>Checking…</span>
         </div>
       ) : null}
@@ -1209,8 +1211,8 @@ function ProviderRow({
         </SecondaryButton>
       ) : null}
       {available && live ? (
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-content/50">Show in picker</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[13px] text-content/55">Show in picker</span>
           <Toggle
             label={`Show ${HARNESS_TITLE[harness]} in the model picker`}
             on={inPicker}
@@ -1277,22 +1279,22 @@ function ArchivePage({
     <>
       <Heading title="Archived projects" first />
       {archivedProjects.length === 0 ? (
-        <p className="py-3 text-[12px] text-content/45">
+        <p className="py-3.5 text-[13px] text-content/45">
           Archive a project from the rail to keep its chats without listing it
           in the sidebar.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-content/10">
+        <div className="overflow-hidden rounded-xl border border-content/10">
           {archivedProjects.map((project) => (
             <div
               key={project.path}
-              className="flex items-center gap-3 border-b border-content/5 px-3 py-2 last:border-b-0"
+              className="flex items-center gap-3.5 border-b border-content/5 px-4 py-2.5 last:border-b-0"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px]">
+                <div className="truncate text-[13.5px] font-medium text-content">
                   {archivedProjectLabel(project.path)}
                 </div>
-                <div className="truncate text-[11px] text-content/40">
+                <div className="truncate text-[12px] text-content/40">
                   {prettyCwd(project.path)}
                 </div>
               </div>
@@ -1331,32 +1333,32 @@ function ArchivePage({
       />
 
       {!looksLikeProject(cwd) ? (
-        <p className="py-3 text-[12px] text-content/45">
+        <p className="py-3.5 text-[13px] text-content/45">
           Open a project to see its archived conversations.
         </p>
       ) : archived.length === 0 ? (
-        <p className="py-3 text-[12px] text-content/45">
+        <p className="py-3.5 text-[13px] text-content/45">
           No archived conversations in this project.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-content/10">
+        <div className="overflow-hidden rounded-xl border border-content/10">
           {archived.map((session) => (
             <div
               key={session.id}
-              className="flex items-center gap-3 border-b border-content/5 px-3 py-2 last:border-b-0"
+              className="flex items-center gap-3.5 border-b border-content/5 px-4 py-2.5 last:border-b-0"
             >
               <HarnessIcon
                 harness={session.harness}
-                className="size-3.5 shrink-0"
+                className="size-4 shrink-0"
               />
               <button
                 type="button"
                 onClick={() => onOpenSession(session.id)}
-                className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px] hover:text-content"
+                className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13.5px] text-content/85 hover:text-content"
               >
                 {sessionDisplayTitle(session.title, session.harness)}
               </button>
-              <span className="shrink-0 text-[11px] text-content/35 tabular-nums">
+              <span className="shrink-0 text-[12px] text-content/40 tabular-nums">
                 {formatDate(session.updatedAt)}
               </span>
               <SecondaryButton
@@ -1410,12 +1412,12 @@ function PageHeader({
   description: string;
 }) {
   return (
-    <header className="pb-4">
-      <h1 className="text-[20px] font-semibold leading-tight text-content">
+    <header className="pb-6">
+      <h1 className="text-[24px] font-bold tracking-tight text-content">
         {title}
       </h1>
       {description ? (
-        <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-content/45">
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-content/50">
           {description}
         </p>
       ) : null}
@@ -1435,8 +1437,8 @@ function Heading({
   return (
     <h2
       id={id}
-      className={`pb-1 text-[15px] font-semibold text-content ${
-        first ? "" : "pt-8"
+      className={`pb-2 text-[17px] font-semibold text-content ${
+        first ? "" : "pt-10"
       }`}
     >
       {title}
@@ -1454,16 +1456,16 @@ function Row({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-6 border-b border-content/5 py-4 last:border-b-0">
+    <div className="flex items-start gap-8 border-b border-content/6 py-4.5 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-content">{label}</div>
+        <div className="text-[14.5px] font-medium text-content">{label}</div>
         {description ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+          <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-content/50">
             {description}
           </p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5">
         {children}
       </div>
     </div>
@@ -1485,7 +1487,7 @@ function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-grid shrink-0 gap-0.5 rounded-md border border-content/10 p-0.5 text-[12px]"
+      className="inline-grid shrink-0 gap-1 rounded-lg border border-content/10 bg-content/3 p-1 text-[13px]"
       style={{
         gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
       }}
@@ -1497,9 +1499,9 @@ function Segmented<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`min-w-0 cursor-pointer whitespace-nowrap rounded-[5px] px-2.5 py-1 ${
+          className={`min-w-0 cursor-pointer whitespace-nowrap rounded-md px-3.5 py-1.5 font-medium transition-colors ${
             value === option.value
-              ? "bg-content/10 text-content"
+              ? "bg-content/12 text-content shadow-xs"
               : "text-content/50 hover:text-content"
           }`}
         >
@@ -1531,7 +1533,7 @@ function Slider({
 }) {
   return (
     <div
-      className={`flex w-56 items-center gap-3 ${disabled ? "opacity-40" : ""}`}
+      className={`flex w-64 items-center gap-3.5 ${disabled ? "opacity-40" : ""}`}
     >
       <input
         type="range"
@@ -1547,7 +1549,7 @@ function Slider({
         className="sidebar-opacity-slider min-w-0 flex-1 cursor-pointer disabled:cursor-not-allowed"
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      <span className="w-10 shrink-0 text-right text-[12px] text-content tabular-nums">
+      <span className="w-12 shrink-0 text-right font-mono text-[13px] text-content tabular-nums">
         {display}
       </span>
     </div>
@@ -1557,7 +1559,7 @@ function Slider({
 /** macOS keeps the decision after the first prompt; only System Settings can flip it. */
 function NotificationsBlocked() {
   return (
-    <span className="flex items-center gap-2 text-[12px] text-content/45">
+    <span className="flex items-center gap-2 text-[13px] text-content/50">
       Permission needed
       {IS_MAC ? (
         <button
@@ -1565,7 +1567,7 @@ function NotificationsBlocked() {
           onClick={() => {
             void openNotificationSettings().catch(() => {});
           }}
-          className="cursor-pointer rounded-md border border-content/10 px-2 py-1 text-content/70 hover:bg-content/10 hover:text-content"
+          className="cursor-pointer rounded-lg border border-content/10 px-2.5 py-1 text-content/75 hover:bg-content/10 hover:text-content"
         >
           Open System Settings
         </button>
@@ -1596,13 +1598,13 @@ function Toggle({
         onChange(!on);
         playCue("switch");
       }}
-      className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         on ? "bg-accent" : "bg-content/20"
       }`}
     >
       <span
-        className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${
-          on ? "left-4.5" : "left-0.5"
+        className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-xs transition-transform ${
+          on ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>
@@ -1693,7 +1695,7 @@ function Select({
   };
 
   return (
-    <div ref={root} className="relative max-w-52">
+    <div ref={root} className="relative max-w-60">
       <button
         type="button"
         ref={trigger}
@@ -1701,13 +1703,13 @@ function Select({
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-content/10 bg-content/5 px-2 py-1 text-left text-[12px] text-content outline-none hover:border-content/20"
+        className="flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-lg border border-content/10 bg-content/5 px-3 py-1.5 text-left text-[13px] text-content outline-none hover:border-content/20"
       >
         <span className="min-w-0 flex-1 truncate">
           {selected ? selected.label : value}
         </span>
         <ChevronDown
-          className={`size-3.5 shrink-0 text-content/50 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-4 shrink-0 text-content/50 transition-transform ${open ? "rotate-180" : ""}`}
           strokeWidth={1.75}
         />
       </button>
@@ -1728,7 +1730,7 @@ function Select({
           aria-activedescendant={activeId}
           tabIndex={-1}
           onKeyDown={onMenuKey}
-          className="overflow-y-auto overscroll-contain p-1"
+          className="overflow-y-auto overscroll-contain p-1.5"
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
@@ -1745,15 +1747,15 @@ function Select({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => pick(option.value)}
-                className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
+                className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] ${
                   highlighted || isSelected
-                    ? "bg-content/10 text-content"
+                    ? "bg-content/10 font-medium text-content"
                     : "text-content hover:bg-content/5"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
                 {isSelected ? (
-                  <Check className="size-3.5 shrink-0" strokeWidth={2.25} />
+                  <Check className="size-4 shrink-0" strokeWidth={2.25} />
                 ) : null}
               </button>
             );
@@ -1780,10 +1782,10 @@ function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1 text-[12px] ${
+      className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-content/10 px-3 py-1.5 text-[13px] font-medium transition-colors ${
         danger
           ? "text-red-400 hover:border-red-400/40 hover:bg-red-400/10"
-          : "text-content/70 hover:bg-content/10 hover:text-content"
+          : "text-content/75 hover:bg-content/10 hover:text-content"
       } disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent`}
     >
       {children}

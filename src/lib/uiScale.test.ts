@@ -10,9 +10,10 @@ import {
 } from "./uiScale";
 
 describe("ui scale", () => {
-  it("clamps to the supported range and rounds to one decimal", () => {
+  it("clamps to the supported range and rounds to two decimals", () => {
     expect(normalizeUiScale(1)).toBe(1);
-    expect(normalizeUiScale(1.05)).toBe(1.1);
+    expect(normalizeUiScale(1.05)).toBe(1.05);
+    expect(normalizeUiScale(1.054)).toBe(1.05);
     expect(normalizeUiScale(0)).toBe(UI_SCALE_MIN);
     expect(normalizeUiScale(99)).toBe(UI_SCALE_MAX);
     expect(normalizeUiScale(Number.NaN)).toBe(UI_SCALE_DEFAULT);
@@ -20,11 +21,11 @@ describe("ui scale", () => {
   });
 
   it("steps in and out without float drift", () => {
-    expect(zoomInUiScale(1)).toBe(1.1);
-    expect(zoomOutUiScale(1.1)).toBe(1);
-    // 10 steps up from 1 lands exactly on 2, not 1.9999999
+    expect(zoomInUiScale(1)).toBe(1.05);
+    expect(zoomOutUiScale(1.05)).toBe(1);
+    // 20 steps up from 1 lands exactly on 2, not 1.9999999
     let scale = 1;
-    for (let i = 0; i < 10; i += 1) scale = zoomInUiScale(scale);
+    for (let i = 0; i < 20; i += 1) scale = zoomInUiScale(scale);
     expect(scale).toBe(UI_SCALE_MAX);
     expect(zoomInUiScale(UI_SCALE_MAX)).toBe(UI_SCALE_MAX);
     expect(zoomOutUiScale(UI_SCALE_MIN)).toBe(UI_SCALE_MIN);

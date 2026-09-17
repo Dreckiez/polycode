@@ -472,14 +472,21 @@ export function ProjectRail({
             onOpenWhatsNew={onOpenWhatsNew}
             onDismissUpdate={onDismissUpdate}
           />
-          <div className="flex shrink-0 flex-col gap-px p-2">
-            <RailAction
-              label="Settings"
-              icon={Settings}
+          <div className="flex shrink-0 flex-col gap-1 border-t border-content/10 p-2.5">
+            <button
+              type="button"
               onClick={onOpenSettings}
-              shortcut={`${MOD},`}
-              ariaLabel={`Settings (${MOD},)`}
-            />
+              aria-label={`Settings (${MOD},)`}
+              className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-left text-content/60 transition-colors hover:bg-content/6 hover:text-content"
+            >
+              <div className="flex items-center gap-2.5">
+                <Settings className="size-4.5 shrink-0 opacity-70" strokeWidth={1.75} />
+                <span className="text-[13.5px] font-medium">Settings</span>
+              </div>
+              <kbd className="rounded border border-content/15 bg-content/5 px-1.5 py-0.5 font-mono text-[10px] text-content/40 shadow-xs">
+                {MOD},
+              </kbd>
+            </button>
           </div>
         </>
       )}
