@@ -20,6 +20,7 @@ import {
 import { FileTypeIcon } from "../chrome/FileTypeIcon";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useColorScheme } from "../hooks/useColorScheme";
+import { useThemePreset } from "../hooks/useThemePreset";
 import type { ColorScheme } from "../lib/appearance";
 import { basename } from "../lib/fs";
 import { highlightDiffFile, type SyntaxToken } from "./syntaxTokens";
@@ -311,17 +312,18 @@ const FileSection = memo(function FileSection({
   const [tokens, setTokens] = useState<Map<UnifiedLine, SyntaxToken[]> | null>(
     null,
   );
+  const themePreset = useThemePreset();
 
   useEffect(() => {
     if (!expanded || !near) return;
     let cancelled = false;
-    void highlightDiffFile(file, colorScheme).then((next) => {
+    void highlightDiffFile(file, colorScheme, themePreset.id).then((next) => {
       if (!cancelled) setTokens(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [colorScheme, expanded, file, near]);
+  }, [colorScheme, expanded, file, near, themePreset.id]);
 
   const setSection = useCallback(
     (node: HTMLElement | null) => {

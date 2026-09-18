@@ -93,16 +93,16 @@ export function AccessPicker({
           }
           setOpen(true);
         }}
-        className={`flex h-6.5 max-w-52 cursor-pointer items-center gap-1 rounded-md px-1 text-content/70 hover:bg-content/10 hover:text-content ${
+        className={`flex h-7.5 max-w-56 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-content/70 hover:bg-content/10 hover:text-content ${
           open ? "bg-content/10 text-content" : ""
         }`}
       >
-        <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
-        <span className="min-w-0 truncate text-[11px]">
+        <Icon className="size-4 shrink-0" strokeWidth={1.75} />
+        <span className="min-w-0 truncate text-[12px]">
           {RUNTIME_MODE_LABEL[value]}
         </span>
         <ChevronDown
-          className={`size-3 shrink-0 text-content/50 ${open ? "rotate-180" : ""}`}
+          className={`size-3.5 shrink-0 text-content/50 ${open ? "rotate-180" : ""}`}
           strokeWidth={1.75}
         />
       </button>

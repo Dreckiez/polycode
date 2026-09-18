@@ -15,6 +15,11 @@ import {
 } from "../lib/terminalTab";
 import { isLightScheme, SCHEME_CHANGE_EVENT } from "../lib/appearance";
 import {
+  getThemePreset,
+  loadThemePresetId,
+  THEME_PRESET_CHANGE_EVENT,
+} from "../lib/themePresets";
+import {
   applyTerminalChrome,
   fitTerminal,
   resetGridStretch,
@@ -78,17 +83,22 @@ const ANSI_LIGHT = {
   brightWhite: "#ffffff",
 };
 
-function terminalTheme(light: boolean) {
+function terminalTheme(light: boolean, presetId?: string) {
+  const preset = getThemePreset(presetId ?? loadThemePresetId());
+  const ansi =
+    preset.id === "default"
+      ? (light ? ANSI_LIGHT : ANSI_DARK)
+      : preset.terminalPalette;
   return {
     background: "#00000000",
     foreground: cssColor("var(--color-content)", light ? "#2e2e2e" : "#e8eef2"),
-    cursor: cssColor("var(--color-accent)", light ? "#4078f2" : "#4da3f5"),
+    cursor: cssColor("var(--color-accent)", preset.accentColor),
     cursorAccent: light ? "#ffffff" : "#000000",
     selectionBackground: light ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.18)",
     selectionInactiveBackground: light
       ? "rgba(0,0,0,0.08)"
       : "rgba(255,255,255,0.08)",
-    ...(light ? ANSI_LIGHT : ANSI_DARK),
+    ...ansi,
   };
 }
 
@@ -235,10 +245,11 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       isOscColorQuery(data) ? replyOsc(12, oscColors().cursor) : false,
     );
 
-    const onSchemeChange = () => {
+    const onThemeOrSchemeChange = () => {
       term.options.theme = terminalTheme(isLightScheme());
     };
-    window.addEventListener(SCHEME_CHANGE_EVENT, onSchemeChange);
+    window.addEventListener(SCHEME_CHANGE_EVENT, onThemeOrSchemeChange);
+    window.addEventListener(THEME_PRESET_CHANGE_EVENT, onThemeOrSchemeChange);
 
     term.attachCustomWheelEventHandler(() => {
       if (term.element?.classList.contains("enable-mouse-events")) return true;
@@ -307,7 +318,8 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       applySizeRef.current = () => {};
       host.removeEventListener("copy", onCopy);
       host.removeEventListener("paste", onPaste);
-      window.removeEventListener(SCHEME_CHANGE_EVENT, onSchemeChange);
+      window.removeEventListener(SCHEME_CHANGE_EVENT, onThemeOrSchemeChange);
+      window.removeEventListener(THEME_PRESET_CHANGE_EVENT, onThemeOrSchemeChange);
       dataSub.dispose();
       oscFg.dispose();
       oscBg.dispose();

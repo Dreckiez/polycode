@@ -31,6 +31,7 @@ import {
   applyChatBackgroundScope,
   applyBodyGlass,
   applyThemePreference,
+  applyThemePreset,
   applySidebarBlur,
   applySidebarOpacity,
   applyThemeTint,
@@ -39,8 +40,11 @@ import {
   CHAT_BACKGROUND_OPACITY_MAX,
   CHAT_BACKGROUND_OPACITY_MIN,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
+  DEFAULT_THEME_ID,
   THEME_PREFERENCE_DEFAULT,
+  THEME_PRESETS,
   chatBackgroundSrc,
+  isLightScheme,
   loadBodyGlass,
   loadChatBackgroundOpacity,
   loadChatBackgroundPath,
@@ -49,6 +53,7 @@ import {
   loadSidebarBlur,
   loadSidebarOpacity,
   loadThemeHue,
+  loadThemePresetId,
   loadThemeSaturation,
   loadTranscriptLayout,
   loadTranscriptAnchor,
@@ -57,6 +62,7 @@ import {
   saveChatBackgroundPath,
   saveChatBackgroundScope,
   saveThemePreference,
+  saveThemePresetId,
   saveSidebarBlur,
   saveSidebarOpacity,
   saveThemeHue,
@@ -603,6 +609,7 @@ function useAppearanceSettings() {
   const [blur, setBlur] = useState(loadSidebarBlur);
   const [themeHue, setThemeHue] = useState(loadThemeHue);
   const [themeSaturation, setThemeSaturation] = useState(loadThemeSaturation);
+  const [themePresetId, setThemePresetId] = useState(loadThemePresetId);
   const [bodyGlass, setBodyGlass] = useState(loadBodyGlass);
   const [chatBackgroundPath, setChatBackgroundPath] = useState(
     loadChatBackgroundPath,
@@ -626,6 +633,27 @@ function useAppearanceSettings() {
     setThemePreference(next);
   }, []);
 
+  const onThemePreset = useCallback((nextId: string) => {
+    if (nextId === "custom") {
+      saveThemePresetId("custom");
+      setThemePresetId("custom");
+      return;
+    }
+    const preset = applyThemePreset(nextId);
+    setThemePresetId(preset.id);
+    setThemeHue(preset.hue);
+    setThemeSaturation(preset.saturation);
+    if (preset.scheme === "light" && !isLightScheme()) {
+      applyThemePreference("light");
+      saveThemePreference("light");
+      setThemePreference("light");
+    } else if (preset.scheme === "dark" && isLightScheme()) {
+      applyThemePreference("dark");
+      saveThemePreference("dark");
+      setThemePreference("dark");
+    }
+  }, []);
+
   const onOpacity = useCallback((percent: number) => {
     const next = applySidebarOpacity(percent / 100);
     saveSidebarOpacity(next);
@@ -644,6 +672,8 @@ function useAppearanceSettings() {
     saveThemeSaturation(next.saturation);
     setThemeHue(next.hue);
     setThemeSaturation(next.saturation);
+    saveThemePresetId("custom");
+    setThemePresetId("custom");
   }, []);
 
   const onBodyGlass = useCallback((next: boolean) => {
@@ -706,6 +736,7 @@ function useAppearanceSettings() {
   }, []);
 
   const restoreDefaults = useCallback(() => {
+    onThemePreset(DEFAULT_THEME_ID);
     onThemePreference(THEME_PREFERENCE_DEFAULT);
     onOpacity(Math.round(SIDEBAR_OPACITY_DEFAULT * 100));
     onBlur(SIDEBAR_BLUR_DEFAULT);
@@ -723,6 +754,7 @@ function useAppearanceSettings() {
     onChatBackgroundScope,
     onClearChatBackground,
     onThemePreference,
+    onThemePreset,
     onOpacity,
     onTint,
     onUiScale,
@@ -730,6 +762,7 @@ function useAppearanceSettings() {
 
   return {
     themePreference,
+    themePresetId,
     opacity,
     blur,
     themeHue,
@@ -742,6 +775,7 @@ function useAppearanceSettings() {
     chatBackgroundError,
     uiScale,
     onThemePreference,
+    onThemePreset,
     onOpacity,
     onBlur,
     onTint,
@@ -755,12 +789,31 @@ function useAppearanceSettings() {
   };
 }
 
+const THEME_PRESET_OPTIONS = [
+  ...THEME_PRESETS.map((p) => ({
+    value: p.id,
+    label: `${p.name} (${p.scheme === "dark" ? "Dark" : "Light"})`,
+  })),
+  { value: "custom", label: "Custom (Manual Tint)" },
+];
+
 function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
   const percent = Math.round(appearance.opacity * 100);
   const glassDisabled = useColorScheme() === "light";
 
   return (
     <>
+      <Row
+        label="Theme preset"
+        description="Curated color theme for the UI chrome, code editor syntax, and terminal."
+      >
+        <Select
+          label="Theme preset"
+          value={appearance.themePresetId}
+          options={THEME_PRESET_OPTIONS}
+          onChange={appearance.onThemePreset}
+        />
+      </Row>
       <Row
         label="Theme"
         description="System follows the OS appearance. Dark and light share the same tint, so the hue below applies to both."

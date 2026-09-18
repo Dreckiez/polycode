@@ -1,6 +1,37 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { HAS_NATIVE_GLASS, IS_MAC } from "./platform";
 import { applyUiScale, loadUiScale } from "./uiScale";
+import {
+  applyThemePreset,
+  applyThemePresetToDom,
+  DEFAULT_THEME_ID,
+  getThemePreset,
+  loadThemePresetId,
+  saveThemePresetId,
+  THEME_PRESET_CHANGE_EVENT,
+  THEME_PRESET_KEY,
+  THEME_PRESETS,
+  type HighlightPalette,
+  type TerminalAnsiPalette,
+  type ThemePreset,
+  type ThemePresetId,
+} from "./themePresets";
+
+export {
+  applyThemePreset,
+  applyThemePresetToDom,
+  DEFAULT_THEME_ID,
+  getThemePreset,
+  loadThemePresetId,
+  saveThemePresetId,
+  THEME_PRESET_CHANGE_EVENT,
+  THEME_PRESET_KEY,
+  THEME_PRESETS,
+  type HighlightPalette,
+  type TerminalAnsiPalette,
+  type ThemePreset,
+  type ThemePresetId,
+};
 
 const THEME_HUE_KEY = "monocode.themeHue";
 const THEME_SATURATION_KEY = "monocode.themeSaturation";
@@ -64,7 +95,7 @@ export const THEME_SATURATION_DEFAULT = 0;
 
 export const SIDEBAR_OPACITY_MIN = 0.15;
 export const SIDEBAR_OPACITY_MAX = 1;
-export const SIDEBAR_OPACITY_DEFAULT = 0.85;
+export const SIDEBAR_OPACITY_DEFAULT = 1;
 
 export const SIDEBAR_BLUR_MIN = 1;
 export const SIDEBAR_BLUR_MAX = 64;
@@ -74,10 +105,10 @@ export const PROJECT_RAIL_WIDTH_MIN = 180;
 export const PROJECT_RAIL_WIDTH_MAX = 360;
 export const PROJECT_RAIL_WIDTH_DEFAULT = 200;
 
-export const BODY_GLASS_DEFAULT = true;
+export const BODY_GLASS_DEFAULT = false;
 
 export const CHAT_BACKGROUND_OPACITY_MIN = 0.05;
-export const CHAT_BACKGROUND_OPACITY_MAX = 0.65;
+export const CHAT_BACKGROUND_OPACITY_MAX = 1;
 export const CHAT_BACKGROUND_OPACITY_DEFAULT = 0.24;
 export const CHAT_BACKGROUND_SCOPE_DEFAULT: ChatBackgroundScope = "all";
 
@@ -168,13 +199,21 @@ export function applyThemeTint(hue: number, saturation: number) {
     "--theme-saturation",
     `${nextSaturation}%`,
   );
+  const customAccent = `hsl(${nextHue} ${Math.max(65, nextSaturation || 85)}% 62%)`;
+  document.documentElement.style.setProperty("--accent-color", customAccent);
+  document.documentElement.style.setProperty("--color-accent", customAccent);
   return { hue: nextHue, saturation: nextSaturation };
 }
 
 export function initAppearance() {
   document.documentElement.classList.toggle("is-mac", IS_MAC);
   document.documentElement.classList.toggle("has-native-glass", HAS_NATIVE_GLASS);
-  applyThemeTint(loadThemeHue(), loadThemeSaturation());
+  const presetId = loadThemePresetId();
+  if (presetId && presetId !== "custom") {
+    applyThemePreset(presetId);
+  } else {
+    applyThemeTint(loadThemeHue(), loadThemeSaturation());
+  }
   applyThemePreference(loadThemePreference());
   watchSystemColorScheme();
   applySidebarOpacity(loadSidebarOpacity());

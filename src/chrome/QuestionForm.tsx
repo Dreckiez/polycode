@@ -95,7 +95,7 @@ export function QuestionForm({ prompt, onReply, onInteraction }: Props) {
       onChangeCapture={interact}
     >
       <form
-        className="rounded-lg border border-content/10 bg-content/3 px-3 py-2.5"
+        className="rounded-lg border border-content/12 bg-background-base px-3 py-2.5 shadow-md"
         onSubmit={(event) => {
           event.preventDefault();
           continueCurrent();

@@ -134,10 +134,13 @@ export function editorThemeFor(scheme: ColorScheme): Extension {
   ];
 }
 
-export function schemeExtensions(scheme: ColorScheme): Extension[] {
+export function schemeExtensions(
+  scheme: ColorScheme,
+  presetId?: string,
+): Extension[] {
   return [
     editorThemeFor(scheme),
-    syntaxHighlighting(editorHighlightStyleFor(scheme)),
+    syntaxHighlighting(editorHighlightStyleFor(scheme, presetId)),
   ];
 }
 

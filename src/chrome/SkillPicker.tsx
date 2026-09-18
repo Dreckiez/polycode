@@ -63,7 +63,7 @@ export function SkillPicker({
     <div
       ref={containerRef}
       data-skill-picker
-      className="overflow-hidden rounded-lg border border-content/10 bg-content/5 backdrop-blur-xl"
+      className="overflow-hidden rounded-lg border border-content/15 bg-background-base shadow-xl"
     >
       {creating && onCancelCreate && onCreate ? (
         <CreateSkillForm

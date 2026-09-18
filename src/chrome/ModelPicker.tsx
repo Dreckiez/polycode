@@ -419,20 +419,19 @@ export function ModelPicker({
           openRecentMenu();
         }}
         onClick={() => togglePicker()}
-        className={`group flex h-7 max-w-56 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 text-[12px] font-medium transition-all duration-150 ${
+        className={`group flex h-7.5 max-w-64 cursor-pointer items-center gap-2 rounded-lg px-2 text-[12.5px] font-medium transition-all duration-150 ${
           open
-            ? "bg-content/10 text-accent"
-            : "text-accent hover:bg-content/10"
+            ? "bg-content/10 text-content"
+            : "text-content/85 hover:bg-content/10 hover:text-content"
         }`}
       >
         <HarnessIcon
           harness={current.harness}
-          monochrome
-          className="size-3.5 shrink-0 transition-transform group-hover:scale-105"
+          className="size-4 shrink-0 transition-transform group-hover:scale-105"
         />
         <span className="min-w-0 truncate">{current.name}</span>
         <ChevronDown
-          className={`size-3 shrink-0 text-accent/70 transition-transform duration-150 ${
+          className={`size-3.5 shrink-0 text-content/50 transition-transform duration-150 ${
             open ? "rotate-180" : ""
           }`}
           strokeWidth={2}
@@ -563,7 +562,7 @@ export function ModelPicker({
                       <div
                         data-indicator={selected ? "active" : undefined}
                         className={`mr-1.5 h-4.5 w-1 shrink-0 rounded-full transition-all ${
-                          selected ? "bg-accent opacity-100" : "opacity-0"
+                          selected ? "bg-accent/75 opacity-90" : "opacity-0"
                         }`}
                       />
 
@@ -580,7 +579,7 @@ export function ModelPicker({
                         }
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => pickModel(item)}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-[13px] disabled:cursor-not-allowed"
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-[13px] text-content disabled:cursor-not-allowed"
                       >
                         <HarnessIcon
                           harness={item.harness}
@@ -756,16 +755,16 @@ export function EffortPicker({
         aria-haspopup="menu"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (open ? dismiss(true) : openPicker())}
-        className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-1.5 text-[12px] font-normal transition-all duration-150 ${
+        className={`flex h-7.5 max-w-48 cursor-pointer items-center gap-2 rounded-lg px-2 text-[12.5px] font-normal transition-all duration-150 ${
           open
             ? "bg-content/10 text-content"
             : "text-content/75 hover:bg-content/10 hover:text-content"
         }`}
       >
-        <Gauge className="size-3.5 shrink-0 text-content/50" strokeWidth={1.75} />
+        <Gauge className="size-4 shrink-0 text-content/50" strokeWidth={1.75} />
         <span className="min-w-0 truncate">{valueLabel}</span>
         <ChevronDown
-          className={`size-3 shrink-0 text-content/40 transition-transform duration-150 ${
+          className={`size-3.5 shrink-0 text-content/40 transition-transform duration-150 ${
             open ? "rotate-180" : ""
           }`}
           strokeWidth={1.75}
@@ -858,7 +857,7 @@ function ProviderTabButton({
       onClick={onSelect}
       className={`grid size-8 shrink-0 cursor-pointer place-items-center rounded-md transition-colors ${
         selected
-          ? "bg-content/12 text-content"
+          ? "border border-accent/25 bg-accent/10 text-content shadow-xs"
           : "text-content/45 hover:bg-content/8 hover:text-content"
       }`}
     >

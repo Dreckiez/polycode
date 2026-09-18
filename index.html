@@ -12,16 +12,41 @@
           var hue = localStorage.getItem("monocode.themeHue");
           var sat = localStorage.getItem("monocode.themeSaturation");
           var opacity = localStorage.getItem("monocode.sidebarOpacity");
-          if (hue != null) {
-            var h = Math.max(0, Math.min(360, Number(hue) || 0));
-            root.style.setProperty("--theme-hue", String(h));
-          }
-          if (sat != null) {
-            var s = Math.max(0, Math.min(100, Number(sat) || 0));
-            root.style.setProperty("--theme-saturation", s + "%");
+          var presetMap = {
+            "catppuccin-mocha": { h: 240, s: "21%", bg: "15%", fg: "88%", accent: "#cba6f7" },
+            "catppuccin-latte": { h: 220, s: "23%", bg: "95%", fg: "35%", accent: "#ea76cb", light: true },
+            "dracula": { h: 231, s: "15%", bg: "18%", fg: "96%", accent: "#bd93f9" },
+            "tokyo-night": { h: 235, s: "19%", bg: "13%", fg: "75%", accent: "#bb9af7" },
+            "nord": { h: 220, s: "16%", bg: "22%", fg: "88%", accent: "#88c0d0" },
+            "gruvbox-dark": { h: 30, s: "4%", bg: "16%", fg: "81%", accent: "#fe8019" },
+            "one-dark": { h: 220, s: "13%", bg: "18%", fg: "71%", accent: "#56b6c2" },
+            "github-dark": { h: 216, s: "28%", bg: "7%", fg: "93%", accent: "#2f81f7" },
+            "github-light": { h: 212, s: "12%", bg: "98%", fg: "18%", accent: "#0969da", light: true },
+            "solarized-dark": { h: 192, s: "100%", bg: "11%", fg: "55%", accent: "#2aa198" },
+            "solarized-light": { h: 44, s: "87%", bg: "94%", fg: "45%", accent: "#b58900", light: true }
+          };
+          var presetId = localStorage.getItem("monocode.themePreset");
+          var p = presetMap[presetId];
+          if (p) {
+            root.style.setProperty("--theme-hue", String(p.h));
+            root.style.setProperty("--theme-saturation", p.s);
+            root.style.setProperty("--background-lightness", p.bg);
+            root.style.setProperty("--content-lightness", p.fg);
+            root.style.setProperty("--color-accent", p.accent);
+            root.style.setProperty("--accent-color", p.accent);
+            if (p.light) root.classList.add("theme-light");
+          } else {
+            if (hue != null) {
+              var h = Math.max(0, Math.min(360, Number(hue) || 0));
+              root.style.setProperty("--theme-hue", String(h));
+            }
+            if (sat != null) {
+              var s = Math.max(0, Math.min(100, Number(sat) || 0));
+              root.style.setProperty("--theme-saturation", s + "%");
+            }
           }
           if (opacity != null) {
-            var o = Math.max(0.15, Math.min(1, Number(opacity) || 0.85));
+            var o = Math.max(0.15, Math.min(1, Number(opacity) || 1));
             root.style.setProperty("--sidebar-opacity", String(o));
           }
           var scheme = localStorage.getItem("monocode.colorScheme");
@@ -34,7 +59,7 @@
             root.classList.add("theme-light");
           }
           var bodyGlass = localStorage.getItem("monocode.bodyGlass");
-          if (bodyGlass == null || bodyGlass === "1" || bodyGlass === "true") {
+          if (bodyGlass === "1" || bodyGlass === "true") {
             root.classList.add("glass-body");
           }
           var isMac =
@@ -50,7 +75,7 @@
       :root {
         --theme-hue: 240;
         --theme-saturation: 0%;
-        --sidebar-opacity: 0.85;
+        --sidebar-opacity: 1;
         --background-lightness: 9%;
         --color-background-base: hsl(
           var(--theme-hue) var(--theme-saturation) var(--background-lightness)

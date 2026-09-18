@@ -39,6 +39,7 @@ import {
   useMarkdownMode,
 } from "../chrome/MarkdownModeToggle";
 import { useColorScheme } from "../hooks/useColorScheme";
+import { useThemePreset } from "../hooks/useThemePreset";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { isLightScheme } from "../lib/appearance";
 import { formatText } from "../lib/format";
@@ -513,6 +514,7 @@ function CodeMirrorEditor({
   const chunkNavPinnedRef = useRef<number | null>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const colorScheme = useColorScheme();
+  const themePreset = useThemePreset();
   const [chunkNav, setChunkNav] = useState<{
     positions: number[];
     index: number;
@@ -674,7 +676,7 @@ function CodeMirrorEditor({
         EditorView.lineWrapping,
         wrappedLineIndent,
         language.of([]),
-        editorScheme.of(schemeExtensions(isLightScheme() ? "light" : "dark")),
+        editorScheme.of(schemeExtensions(isLightScheme() ? "light" : "dark", themePreset.id)),
         editorMatching,
         editorTyping(path),
         editorAutocomplete,
@@ -778,9 +780,9 @@ function CodeMirrorEditor({
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: editorScheme.reconfigure(schemeExtensions(colorScheme)),
+      effects: editorScheme.reconfigure(schemeExtensions(colorScheme, themePreset.id)),
     });
-  }, [colorScheme]);
+  }, [colorScheme, themePreset.id]);
 
   useEffect(() => {
     const view = viewRef.current;

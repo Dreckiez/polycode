@@ -282,8 +282,8 @@ export function BranchPicker({
                 } disabled:cursor-default disabled:opacity-40 disabled:hover:text-content/50`
           }
         >
-          <GitBranch className="size-3.5 shrink-0" strokeWidth={1.5} />
-          <span className="relative truncate font-mono text-[12px]">
+          <GitBranch className="size-4 shrink-0" strokeWidth={1.5} />
+          <span className="relative truncate font-mono text-[12.5px]">
             {awaitingBranch ? (
               <>
                 {/*

@@ -1,5 +1,5 @@
-/** Matches the composer's `max-h-40`, so the field stops growing where it clips. */
-export const COMPOSER_MAX_HEIGHT = 160;
+/** Matches the composer's max height, so the field stops growing where it clips. */
+export const COMPOSER_MAX_HEIGHT = 168;
 
 type Resizable = {
   style: { height: string };

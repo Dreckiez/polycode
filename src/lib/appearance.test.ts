@@ -18,6 +18,12 @@ import {
   saveThemePreference,
   resolveColorScheme,
   THEME_PREFERENCE_DEFAULT,
+  SIDEBAR_OPACITY_DEFAULT,
+  loadSidebarOpacity,
+  saveSidebarOpacity,
+  BODY_GLASS_DEFAULT,
+  loadBodyGlass,
+  saveBodyGlass,
 } from "./appearance";
 
 const KEY = "monocode.transcriptLayout";
@@ -115,8 +121,8 @@ describe("chat background setting", () => {
 
   it("defaults and clamps background visibility", () => {
     expect(loadChatBackgroundOpacity()).toBe(CHAT_BACKGROUND_OPACITY_DEFAULT);
-    saveChatBackgroundOpacity(1);
-    expect(loadChatBackgroundOpacity()).toBe(0.65);
+    saveChatBackgroundOpacity(1.5);
+    expect(loadChatBackgroundOpacity()).toBe(1);
     saveChatBackgroundOpacity(0);
     expect(loadChatBackgroundOpacity()).toBe(0.05);
   });
@@ -129,6 +135,28 @@ describe("chat background setting", () => {
     expect(loadChatBackgroundScope()).toBe("all");
     localStorage.setItem(CHAT_BACKGROUND_SCOPE_KEY, "transcript");
     expect(loadChatBackgroundScope()).toBe(CHAT_BACKGROUND_SCOPE_DEFAULT);
+  });
+});
+
+describe("sidebar opacity and body glass defaults", () => {
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    localStorage.removeItem("monocode.sidebarOpacity");
+    localStorage.removeItem("monocode.bodyGlass");
+  });
+
+  it("defaults sidebar opacity to 100% and body glass to off", () => {
+    expect(SIDEBAR_OPACITY_DEFAULT).toBe(1);
+    expect(loadSidebarOpacity()).toBe(1);
+    expect(BODY_GLASS_DEFAULT).toBe(false);
+    expect(loadBodyGlass()).toBe(false);
+  });
+
+  it("persists sidebar opacity and body glass", () => {
+    saveSidebarOpacity(0.5);
+    expect(loadSidebarOpacity()).toBe(0.5);
+    saveBodyGlass(true);
+    expect(loadBodyGlass()).toBe(true);
   });
 });
 

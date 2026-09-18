@@ -219,12 +219,12 @@ export function CwdPicker({
               path={projectLogoPath}
               fallbackStrokeWidth={1.5}
             />
-            <span className="truncate font-mono text-[12px]">{label}</span>
+            <span className="truncate font-mono text-[12.5px]">{label}</span>
           </>
         )}
         {chevron ? (
           <ChevronDown
-            className={`size-3 shrink-0 text-content/50 ${
+            className={`size-3.5 shrink-0 text-content/50 ${
               open ? "rotate-180" : ""
             }`}
             strokeWidth={1.75}

@@ -35,7 +35,7 @@ export function EmptySession({ cwd, composer }: Props) {
       className="relative flex h-full min-h-0 overflow-y-auto overscroll-none"
     >
       {composer ? (
-        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-12">
+        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[50.5rem] flex-1 flex-col justify-center px-6 py-12">
           <div className="pointer-events-auto mb-4 px-2.5">
             <h1
               className="truncate text-lg text-content"

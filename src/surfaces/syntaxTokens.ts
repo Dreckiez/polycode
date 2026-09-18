@@ -30,6 +30,7 @@ export function highlightSource(
   text: string,
   language: Extension | null,
   scheme: ColorScheme,
+  presetId?: string,
 ): SyntaxToken[][] {
   if (!text) return [[]];
   if (!language) return unstyledLines(text);
@@ -42,7 +43,7 @@ export function highlightSource(
   const tree =
     ensureSyntaxTree(state, state.doc.length, SYNTAX_TREE_BUDGET_MS) ??
     syntaxTree(state);
-  const highlighter = syntaxTagHighlighter(scheme);
+  const highlighter = syntaxTagHighlighter(scheme, presetId);
   const lines: SyntaxToken[][] = [[]];
   highlightCode(
     code,
@@ -65,6 +66,7 @@ export function highlightSource(
 export async function highlightDiffFile(
   file: DiffFile,
   scheme: ColorScheme,
+  presetId?: string,
 ): Promise<Map<UnifiedLine, SyntaxToken[]>> {
   const map = new Map<UnifiedLine, SyntaxToken[]>();
   if (file.binary || file.tooLarge) return map;
@@ -100,11 +102,13 @@ export async function highlightDiffFile(
     original.map((line) => line.text).join("\n"),
     language,
     scheme,
+    presetId,
   );
   const currentTokens = highlightSource(
     current.map((line) => line.text).join("\n"),
     language,
     scheme,
+    presetId,
   );
   assignLineTokens(
     map,

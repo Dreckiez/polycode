@@ -58,7 +58,7 @@ describe("project chat background settings", () => {
   it("clamps visibility to the supported range", () => {
     saveProjectChatBackground("/work/alpha", {
       path: "/backgrounds/alpha.webp",
-      opacity: 1,
+      opacity: 1.5,
       scope: "all",
     });
     saveProjectChatBackground("/work/beta", {
@@ -67,7 +67,7 @@ describe("project chat background settings", () => {
       scope: "all",
     });
 
-    expect(loadProjectChatBackground("/work/alpha")?.opacity).toBe(0.65);
+    expect(loadProjectChatBackground("/work/alpha")?.opacity).toBe(1);
     expect(loadProjectChatBackground("/work/beta")?.opacity).toBe(0.05);
   });
 

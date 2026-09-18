@@ -210,7 +210,7 @@ function ToolButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className={`grid size-6.5 shrink-0 cursor-pointer place-items-center rounded-md ${
+      className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg ${
         active
           ? "bg-content/10 text-content"
           : "text-content/50 hover:bg-content/10 hover:text-content"
@@ -272,7 +272,7 @@ function MessageQueue({
   return (
     <div className="px-2 text-content/55" data-message-queue>
       <div
-        className="relative z-0 rounded-t-[10px] border border-b-0 border-content/10 bg-content/3 px-2 py-1"
+        className="relative z-0 rounded-t-[10px] border border-b-0 border-content/12 bg-background-base px-2 py-1 shadow-md"
         data-message-queue-card
       >
         {paused ? (
@@ -1175,7 +1175,7 @@ export function Composer({
   return (
     <div
       data-composer
-      className={`relative shrink-0 ${shell ? "" : "p-1.5 pt-0"}`}
+      className={`relative shrink-0 ${shell ? "" : "p-2 pt-0"}`}
       onMouseDown={onFocus}
     >
       {question && onQuestionReply ? (
@@ -1310,19 +1310,19 @@ export function Composer({
         <div
           ref={boxRef}
           data-composer-box
-          className={`relative z-10 rounded-lg border bg-content/3 backdrop-blur-sm ${
+          className={`relative z-10 rounded-xl border bg-background-base shadow-lg ${
             fileDrag
               ? "border-accent/60"
-              : "border-content/10 has-focus:border-content/20"
+              : "border-content/12 has-focus:border-content/25"
           }`}
         >
           {fileDrag ? (
-            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-lg bg-accent/8 text-[12px] text-content/70">
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-xl bg-accent/8 text-[12px] text-content/70">
               Drop files to attach
             </div>
           ) : null}
           {hideTopBar ? null : (
-            <div className="flex min-w-0 items-center gap-2.5 px-3 pt-2.5">
+            <div className="flex min-w-0 items-center gap-3 px-3.5 pt-3">
               {hideProjectPicker ? null : (
                 <CwdPicker
                   cwd={cwd}
@@ -1354,7 +1354,7 @@ export function Composer({
           )}
 
           {attachments.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+            <div className="flex flex-wrap gap-2 px-3.5 pt-2.5">
               {attachments.map((file) => (
                 <AttachmentChip
                   key={file.id}
@@ -1380,8 +1380,8 @@ export function Composer({
             <div
               ref={highlightRef}
               aria-hidden
-              className={`composer-highlight pointer-events-none absolute inset-0 max-h-40 overflow-hidden whitespace-pre-wrap break-words px-3 text-sm leading-5.5 text-content font-sans ${
-                shell ? "py-4" : "py-3"
+              className={`composer-highlight pointer-events-none absolute inset-0 max-h-[168px] overflow-hidden whitespace-pre-wrap break-words px-3.5 text-[14.75px] leading-6 text-content font-sans ${
+                shell ? "py-4.5" : "py-3.5"
               }`}
             >
               <ComposerHighlight
@@ -1405,8 +1405,8 @@ export function Composer({
                       ? "Ask, build, / for commands, @ for references... "
                       : "Ask, build, / for commands, @ for references... "
               }
-              className={`composer-field scrollbar-none relative max-h-40 w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent px-3 text-sm leading-5.5 outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap font-sans ${
-                shell ? "py-4" : "py-3"
+              className={`composer-field scrollbar-none relative max-h-[168px] w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent px-3.5 text-[14.75px] leading-6 outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap font-sans ${
+                shell ? "py-4.5" : "py-3.5"
               }`}
               onFocus={onFocus}
               onKeyDown={onKeyDown}
@@ -1432,14 +1432,14 @@ export function Composer({
             />
           </div>
 
-          <div className="flex items-center gap-1 px-2 pb-2">
+          <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
             <div ref={plusRef} className="relative shrink-0">
               <ToolButton
                 label="Add files or choose a mode"
                 active={plusOpen}
                 onClick={() => setPlusOpen((open) => !open)}
               >
-                <Plus className="size-3.5" strokeWidth={1.5} />
+                <Plus className="size-4" strokeWidth={1.75} />
               </ToolButton>
               {plusOpen ? (
                 <Popover
@@ -1508,11 +1508,11 @@ export function Composer({
                   setPlanSelected(false);
                   ref.current?.focus();
                 }}
-                className="flex h-6.5 shrink-0 cursor-pointer items-center gap-1 rounded-md bg-yellow-300/12 px-1.5 text-[11px] text-yellow-200/90 hover:bg-yellow-300/18"
+                className="flex h-7.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-yellow-300/12 px-2 text-[12px] text-yellow-200/90 hover:bg-yellow-300/18"
               >
-                <AiIdea className="size-3.5" />
+                <AiIdea className="size-4" />
                 Plan
-                <X className="size-3" />
+                <X className="size-3.5" />
               </button>
             ) : null}
             <div
@@ -1674,9 +1674,9 @@ function ComposerAction({
             title="Send"
             aria-label="Send"
             onClick={onSend}
-            className="composer-send grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90"
+            className="composer-send grid size-7.5 cursor-pointer place-items-center rounded-lg bg-white text-black hover:bg-white/90"
           >
-            <ArrowUp className="size-3.5" strokeWidth={2.25} />
+            <ArrowUp className="size-4" strokeWidth={2.25} />
           </button>
         ) : null}
         <button
@@ -1684,9 +1684,9 @@ function ComposerAction({
           title="Stop"
           aria-label="Stop"
           onClick={onStop}
-          className="grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90"
+          className="grid size-7.5 cursor-pointer place-items-center rounded-lg bg-white text-black hover:bg-white/90"
         >
-          <Square className="size-2.5 fill-current" strokeWidth={0} />
+          <Square className="size-3 fill-current" strokeWidth={0} />
         </button>
       </>
     );
@@ -1699,9 +1699,9 @@ function ComposerAction({
       aria-label="Send"
       disabled={!hasValue}
       onClick={onSend}
-      className="composer-send grid size-6.5 cursor-pointer place-items-center rounded-md bg-white text-black hover:bg-white/90 disabled:cursor-default disabled:bg-white/30 disabled:text-black/40 disabled:hover:bg-white/30"
+      className="composer-send grid size-7.5 cursor-pointer place-items-center rounded-lg bg-white text-black hover:bg-white/90 disabled:cursor-default disabled:bg-white/30 disabled:text-black/40 disabled:hover:bg-white/30"
     >
-      <ArrowUp className="size-3.5" strokeWidth={2.25} />
+      <ArrowUp className="size-4" strokeWidth={2.25} />
     </button>
   );
 }

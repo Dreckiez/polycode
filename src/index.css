@@ -14,7 +14,7 @@
   --color-content: hsl(
     var(--theme-hue) var(--theme-saturation) var(--content-lightness)
   );
-  --color-accent: hsl(211 92% 62%);
+  --color-accent: var(--accent-color, hsl(211 92% 62%));
   --color-skill: #e8c547;
   --color-mention: #38bdf8;
   --font-mono:
@@ -28,10 +28,11 @@
 :root {
   --theme-hue: 240;
   --theme-saturation: 0%;
-  --sidebar-opacity: 0.85;
+  --sidebar-opacity: 1;
   --chat-background-opacity: 0.24;
   --background-lightness: 9%;
   --content-lightness: 92%;
+  --accent-color: hsl(211 92% 62%);
   --link-color: #7dd3fc;
   --color-skill: #e8c547;
   --color-mention: #38bdf8;
@@ -249,6 +250,13 @@ html.is-resizing * {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+}
+
+[data-composer-box] {
+  background: var(--color-background-base);
+  box-shadow:
+    0 8px 32px color-mix(in srgb, #000 35%, transparent),
+    0 2px 8px color-mix(in srgb, #000 20%, transparent);
 }
 
 html.theme-light [data-composer-box] {
@@ -1130,14 +1138,13 @@ header[data-tauri-drag-region] button {
   }
 }
 
-/* Keep the original content tint in dark mode. In light mode, use the base
-   color at the same opacity so the surface stays translucent without graying. */
+/* Solid background for popovers so menus are crisp and readable over wallpapers */
 .popover-backdrop {
-  background: color-mix(in srgb, var(--color-content) 2%, transparent);
+  background: var(--color-background-base);
 }
 
 html.theme-light .popover-backdrop {
-  background: color-mix(in srgb, var(--color-background-base) 10%, transparent);
+  background: var(--color-background-base);
 }
 
 /* Popover contents grow in from the edge they hang off, sliding the last few

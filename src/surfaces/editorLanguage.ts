@@ -5,6 +5,7 @@ import {
 import type { Extension } from "@codemirror/state";
 import { tagHighlighter, tags, type Highlighter } from "@lezer/highlight";
 import type { ColorScheme } from "../lib/appearance";
+import { getThemePreset, loadThemePresetId } from "../lib/themePresets";
 import { basename } from "../lib/fs";
 
 const HIGHLIGHT_TAGS = {
@@ -116,13 +117,18 @@ function highlightStyleFrom(palette: HighlightPalette) {
 const HIGHLIGHT_DARK = highlightStyleFrom(HIGHLIGHT_PALETTE.dark);
 const HIGHLIGHT_LIGHT = highlightStyleFrom(HIGHLIGHT_PALETTE.light);
 
-export function editorHighlightStyleFor(scheme: ColorScheme) {
-  return scheme === "light" ? HIGHLIGHT_LIGHT : HIGHLIGHT_DARK;
+export function editorHighlightStyleFor(scheme: ColorScheme, presetId?: string) {
+  const preset = getThemePreset(presetId ?? loadThemePresetId());
+  if (preset.id === "default") {
+    return scheme === "light" ? HIGHLIGHT_LIGHT : HIGHLIGHT_DARK;
+  }
+  return highlightStyleFrom(preset.editorPalette);
 }
 
 /** Same tag → color map as the editor, for highlighting outside CodeMirror. */
-export function syntaxTagHighlighter(scheme: ColorScheme): Highlighter {
-  const palette = HIGHLIGHT_PALETTE[scheme];
+export function syntaxTagHighlighter(scheme: ColorScheme, presetId?: string): Highlighter {
+  const preset = getThemePreset(presetId ?? loadThemePresetId());
+  const palette = preset.id === "default" ? HIGHLIGHT_PALETTE[scheme] : preset.editorPalette;
   return tagHighlighter([
     { tag: HIGHLIGHT_TAGS.keyword, class: palette.keyword },
     { tag: HIGHLIGHT_TAGS.heading, class: palette.heading },
