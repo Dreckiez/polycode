@@ -49,6 +49,11 @@ import {
   projectChatBackgroundRevision,
   subscribeProjectChatBackground,
 } from "../lib/projectChatBackground";
+import {
+  loadChatBackgroundDither,
+  subscribeChatBackgroundDither,
+} from "../lib/appearance";
+import { useProcessedBackground } from "../hooks/useProcessedBackground";
 import { projectChatBackgroundSrc } from "../lib/chatBackground";
 import type { SessionFolderTarget } from "../lib/sessionFolders";
 
@@ -179,11 +184,20 @@ export const SessionPane = memo(function SessionPane({
     projectChatBackgroundRevision,
     projectChatBackgroundRevision,
   );
+  const ditherEnabled = useSyncExternalStore(
+    subscribeChatBackgroundDither,
+    loadChatBackgroundDither,
+    loadChatBackgroundDither,
+  );
   const projectBackground = loadProjectChatBackground(projectKey(session.cwd));
+  const rawProjectBgSrc = projectBackground
+    ? projectChatBackgroundSrc(projectBackground.path, backgroundRevision)
+    : null;
+  const processedBgSrc = useProcessedBackground(rawProjectBgSrc, ditherEnabled);
   const projectBackgroundStyle = projectBackground
     ? ({
         "--chat-background-image": `url(${JSON.stringify(
-          projectChatBackgroundSrc(projectBackground.path, backgroundRevision),
+          processedBgSrc ?? rawProjectBgSrc,
         )})`,
         "--chat-background-opacity": String(projectBackground.opacity),
       } as CSSProperties)

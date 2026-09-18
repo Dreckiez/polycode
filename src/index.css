@@ -161,6 +161,64 @@ html.chat-background-empty-only
   opacity: 0;
 }
 
+/* Theme-contrasting background and border for the composer */
+html.has-chat-background .chat-pane-background[data-project-chat-background="false"] [data-composer-box],
+.chat-pane-background[data-project-chat-background="true"] [data-composer-box] {
+  background-color: color-mix(
+    in srgb,
+    var(--color-accent) 10%,
+    hsl(var(--theme-hue) max(18%, var(--theme-saturation)) 16%)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-accent) 25%,
+    rgba(255, 255, 255, 0.14)
+  );
+}
+
+html.has-chat-background .chat-pane-background[data-project-chat-background="false"] [data-composer-box]:focus-within,
+.chat-pane-background[data-project-chat-background="true"] [data-composer-box]:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--color-accent) 55%,
+    rgba(255, 255, 255, 0.25)
+  );
+}
+
+/* Ambient shadow on an isolated GPU compositor layer (prevents CPU blur recalculation on focus / typing) */
+html.has-chat-background .chat-pane-background[data-project-chat-background="false"] [data-composer-box]::before,
+.chat-pane-background[data-project-chat-background="true"] [data-composer-box]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  transform: translateZ(0);
+  will-change: transform;
+  box-shadow:
+    0 0 60px 20px rgba(0, 0, 0, 0.6),
+    0 25px 100px 50px rgba(0, 0, 0, 0.85),
+    0 60px 160px 80px rgba(0, 0, 0, 0.95);
+}
+
+html.chat-background-empty-only
+  .chat-pane-background[data-project-chat-background="false"][data-session-empty="false"]
+  [data-composer-box],
+.chat-pane-background[data-project-chat-background="true"][data-project-background-scope="empty"][data-session-empty="false"]
+  [data-composer-box] {
+  background-color: var(--color-background-base);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+html.chat-background-empty-only
+  .chat-pane-background[data-project-chat-background="false"][data-session-empty="false"]
+  [data-composer-box]::before,
+.chat-pane-background[data-project-chat-background="true"][data-project-background-scope="empty"][data-session-empty="false"]
+  [data-composer-box]::before {
+  display: none;
+}
+
 .transcript-turn {
   content-visibility: auto;
   contain-intrinsic-block-size: auto 240px;

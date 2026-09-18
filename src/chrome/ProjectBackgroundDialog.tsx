@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { Loader } from "./icons";
+import { Loader, Palette } from "./icons";
 import { Modal } from "./Modal";
 import {
   CHAT_BACKGROUND_OPACITY_MAX,
   CHAT_BACKGROUND_OPACITY_MIN,
   chatBackgroundSrc,
+  loadAutoMatchTheme,
+  loadChatBackgroundDither,
   loadChatBackgroundOpacity,
   loadChatBackgroundPath,
   loadChatBackgroundScope,
@@ -21,6 +23,11 @@ import {
   projectChatBackgroundRevision,
   saveProjectChatBackground,
 } from "../lib/projectChatBackground";
+import {
+  applyExtractedPaletteToApp,
+  extractPaletteFromImage,
+} from "../lib/paletteSync";
+import { useProcessedBackground } from "../hooks/useProcessedBackground";
 
 type Props = {
   project: string;
@@ -39,11 +46,14 @@ export function ProjectBackgroundDialog({ project, name, onClose }: Props) {
   );
   const [revision, setRevision] = useState(projectChatBackgroundRevision);
   const [busy, setBusy] = useState(false);
+  const [matchingTheme, setMatchingTheme] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const globalPath = loadChatBackgroundPath();
   const previewSrc = path
     ? projectChatBackgroundSrc(path, revision)
     : chatBackgroundSrc(globalPath);
+  const ditherEnabled = loadChatBackgroundDither();
+  const processedPreviewSrc = useProcessedBackground(previewSrc, ditherEnabled);
 
   const save = (
     nextPath: string,
@@ -66,10 +76,32 @@ export function ProjectBackgroundDialog({ project, name, onClose }: Props) {
       if (!nextPath) return;
       save(nextPath, opacity, scope);
       setPath(nextPath);
+      if (loadAutoMatchTheme()) {
+        try {
+          const src = projectChatBackgroundSrc(nextPath, projectChatBackgroundRevision());
+          const palette = await extractPaletteFromImage(src);
+          applyExtractedPaletteToApp(palette);
+        } catch {
+          // ignore error extracting palette
+        }
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const matchTheme = async () => {
+    if (!previewSrc) return;
+    setMatchingTheme(true);
+    try {
+      const palette = await extractPaletteFromImage(previewSrc);
+      applyExtractedPaletteToApp(palette);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setMatchingTheme(false);
     }
   };
 
@@ -114,9 +146,9 @@ export function ProjectBackgroundDialog({ project, name, onClose }: Props) {
       <div className="flex flex-col gap-5 p-4">
         <div>
           <div className="overflow-hidden rounded-xl border border-content/10 bg-content/5">
-            {previewSrc ? (
+            {processedPreviewSrc ? (
               <img
-                src={previewSrc}
+                src={processedPreviewSrc}
                 alt=""
                 draggable={false}
                 className="h-56 w-full object-cover"
@@ -127,17 +159,35 @@ export function ProjectBackgroundDialog({ project, name, onClose }: Props) {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => void choose()}
-            disabled={busy}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1.5 text-[12px] text-content/70 hover:bg-content/10 hover:text-content disabled:opacity-40"
-          >
-            {busy ? (
-              <Loader className="size-3.5 animate-spin" aria-hidden />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void choose()}
+              disabled={busy}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1.5 text-[12px] text-content/70 hover:bg-content/10 hover:text-content disabled:opacity-40"
+            >
+              {busy ? (
+                <Loader className="size-3.5 animate-spin" aria-hidden />
+              ) : null}
+              {path ? "Change image" : "Choose image"}
+            </button>
+            {previewSrc ? (
+              <button
+                type="button"
+                onClick={() => void matchTheme()}
+                disabled={busy || matchingTheme}
+                className="flex items-center justify-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1.5 text-[12px] text-content/70 hover:bg-content/10 hover:text-content disabled:opacity-40"
+                title="Extract colors from this image and apply to theme"
+              >
+                {matchingTheme ? (
+                  <Loader className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Palette className="size-3.5" aria-hidden />
+                )}
+                Match theme
+              </button>
             ) : null}
-            {path ? "Change image" : "Choose image"}
-          </button>
+          </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-content/45">
             {path
               ? "This image overrides the global background for this project."

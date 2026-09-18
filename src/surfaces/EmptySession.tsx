@@ -1,12 +1,4 @@
-import { type ReactNode, useSyncExternalStore } from "react";
-import { basename } from "../lib/fs";
-import { projectKey } from "../lib/paths";
-import { looksLikeProject } from "../lib/recents";
-import {
-  loadTabGroupLabels,
-  resolveTabGroupLabel,
-  subscribeTabGroupLabels,
-} from "../lib/tabGroups";
+import { type ReactNode } from "react";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 
 type Props = {
@@ -14,20 +6,8 @@ type Props = {
   composer?: ReactNode;
 };
 
-export function EmptySession({ cwd, composer }: Props) {
+export function EmptySession({ composer }: Props) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
-  const getProjectLabel = () =>
-    looksLikeProject(cwd)
-      ? resolveTabGroupLabel(projectKey(cwd), loadTabGroupLabels(), basename(cwd))
-      : null;
-  const project = useSyncExternalStore(
-    subscribeTabGroupLabels,
-    getProjectLabel,
-    getProjectLabel,
-  );
-  const title = project
-    ? `What should we work on in ${project}?`
-    : "What should we work on?";
 
   return (
     <div
@@ -35,16 +15,7 @@ export function EmptySession({ cwd, composer }: Props) {
       className="relative flex h-full min-h-0 overflow-y-auto overscroll-none"
     >
       {composer ? (
-        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[50.5rem] flex-1 flex-col justify-center px-6 py-12">
-          <div className="pointer-events-auto mb-4 px-2.5">
-            <h1
-              className="truncate text-lg text-content"
-              title={project ? cwd : undefined}
-            >
-              {title}
-            </h1>
-          </div>
-
+        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-202 flex-1 flex-col justify-center px-6 pt-36 pb-12">
           <div className="pointer-events-auto w-full">{composer}</div>
         </div>
       ) : null}

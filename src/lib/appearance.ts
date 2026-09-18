@@ -1,6 +1,11 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { HAS_NATIVE_GLASS, IS_MAC } from "./platform";
 import { applyUiScale, loadUiScale } from "./uiScale";
+import { createDitheredImageUrl } from "./dither";
+import {
+  applyExtractedPaletteToApp,
+  extractPaletteFromImage,
+} from "./paletteSync";
 import {
   applyThemePreset,
   applyThemePresetToDom,
@@ -112,6 +117,14 @@ export const CHAT_BACKGROUND_OPACITY_MAX = 1;
 export const CHAT_BACKGROUND_OPACITY_DEFAULT = 0.24;
 export const CHAT_BACKGROUND_SCOPE_DEFAULT: ChatBackgroundScope = "all";
 
+export const CHAT_BACKGROUND_DITHER_KEY = "monocode.chatBackgroundDither";
+export const CHAT_BACKGROUND_DITHER_DEFAULT = true;
+export const CHAT_BACKGROUND_DITHER_CHANGE_EVENT = "monocode:chat-background-dither-changed";
+
+export const AUTO_MATCH_THEME_KEY = "monocode.autoMatchTheme";
+export const AUTO_MATCH_THEME_DEFAULT = true;
+export const AUTO_MATCH_THEME_CHANGE_EVENT = "monocode:auto-match-theme-changed";
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -222,6 +235,7 @@ export function initAppearance() {
   applyChatBackground(loadChatBackgroundPath());
   applyChatBackgroundOpacity(loadChatBackgroundOpacity());
   applyChatBackgroundScope(loadChatBackgroundScope());
+  applyChatBackgroundDither(loadChatBackgroundDither());
   void applyUiScale(loadUiScale());
 }
 
@@ -390,10 +404,35 @@ export function applyChatBackground(path: string | null) {
   }
   chatBackgroundRevision += 1;
   const src = chatBackgroundSrc(path);
+  if (!src) return null;
+
   root.style.setProperty(
     "--chat-background-image",
     `url(${JSON.stringify(src)})`,
   );
+
+  const dither = loadChatBackgroundDither();
+  if (dither && typeof window !== "undefined") {
+    createDitheredImageUrl(src)
+      .then((dithered) => {
+        if (root.classList.contains("has-chat-background")) {
+          root.style.setProperty(
+            "--chat-background-image",
+            `url(${JSON.stringify(dithered)})`,
+          );
+        }
+      })
+      .catch(() => undefined);
+  }
+
+  if (loadAutoMatchTheme() && typeof window !== "undefined") {
+    extractPaletteFromImage(src)
+      .then((palette) => {
+        applyExtractedPaletteToApp(palette);
+      })
+      .catch(() => undefined);
+  }
+
   return path;
 }
 
@@ -456,6 +495,55 @@ export function applyChatBackgroundScope(value: ChatBackgroundScope) {
     value === "empty",
   );
   return value;
+}
+
+export function loadChatBackgroundDither(): boolean {
+  return readFlag(CHAT_BACKGROUND_DITHER_KEY) ?? CHAT_BACKGROUND_DITHER_DEFAULT;
+}
+
+export function saveChatBackgroundDither(value: boolean) {
+  writeFlag(CHAT_BACKGROUND_DITHER_KEY, value);
+  applyChatBackgroundDither(value);
+  applyChatBackground(loadChatBackgroundPath());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(CHAT_BACKGROUND_DITHER_CHANGE_EVENT, { detail: value }),
+    );
+  }
+}
+
+export function applyChatBackgroundDither(value: boolean) {
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("chat-background-dither", value);
+  }
+  return value;
+}
+
+export function subscribeChatBackgroundDither(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(CHAT_BACKGROUND_DITHER_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(CHAT_BACKGROUND_DITHER_CHANGE_EVENT, onStoreChange);
+}
+
+export function loadAutoMatchTheme(): boolean {
+  return readFlag(AUTO_MATCH_THEME_KEY) ?? AUTO_MATCH_THEME_DEFAULT;
+}
+
+export function saveAutoMatchTheme(value: boolean) {
+  writeFlag(AUTO_MATCH_THEME_KEY, value);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(AUTO_MATCH_THEME_CHANGE_EVENT, { detail: value }),
+    );
+  }
+}
+
+export function subscribeAutoMatchTheme(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(AUTO_MATCH_THEME_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(AUTO_MATCH_THEME_CHANGE_EVENT, onStoreChange);
 }
 
 function isSidebarTabId(value: unknown): value is SidebarTabId {

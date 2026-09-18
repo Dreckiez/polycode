@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { EmptySession } from "./EmptySession";
 
 describe("empty session background", () => {
-  it("renders the composer container and prompt title", () => {
+  it("renders the composer container", () => {
     const markup = renderToStaticMarkup(
       createElement(EmptySession, {
         cwd: "/work/demo",
@@ -13,7 +13,6 @@ describe("empty session background", () => {
     );
 
     expect(markup).toContain('id="composer-slot"');
-    expect(markup).toContain("What should we work on in demo?");
     expect(markup).not.toContain("<canvas");
   });
 });

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ImagePlus,
   Loader,
+  Palette,
   RefreshCw,
   RotateCcw,
   Search,
@@ -49,6 +50,12 @@ import {
   loadChatBackgroundOpacity,
   loadChatBackgroundPath,
   loadChatBackgroundScope,
+  loadChatBackgroundDither,
+  saveChatBackgroundDither,
+  subscribeChatBackgroundDither,
+  loadAutoMatchTheme,
+  saveAutoMatchTheme,
+  subscribeAutoMatchTheme,
   loadThemePreference,
   loadSidebarBlur,
   loadSidebarOpacity,
@@ -86,6 +93,13 @@ import {
   type ChatBackgroundScope,
   type TranscriptLayout,
 } from "../lib/appearance";
+import {
+  applyExtractedPaletteToApp,
+  extractPaletteFromImage,
+  loadExtractedImagePalette,
+  type ExtractedPalette,
+} from "../lib/paletteSync";
+import { useProcessedBackground } from "../hooks/useProcessedBackground";
 import {
   pickAndSaveChatBackground,
   removeChatBackground,
@@ -619,6 +633,13 @@ function useAppearanceSettings() {
   );
   const [chatBackgroundScope, setChatBackgroundScope] =
     useState<ChatBackgroundScope>(loadChatBackgroundScope);
+  const [chatBackgroundDither, setChatBackgroundDither] = useState(
+    loadChatBackgroundDither,
+  );
+  const [autoMatchTheme, setAutoMatchTheme] = useState(loadAutoMatchTheme);
+  const [imagePalette, setImagePalette] = useState<ExtractedPalette | null>(
+    loadExtractedImagePalette,
+  );
   const [chatBackgroundBusy, setChatBackgroundBusy] = useState(false);
   const [chatBackgroundError, setChatBackgroundError] = useState<string | null>(
     null,
@@ -626,6 +647,20 @@ function useAppearanceSettings() {
   const [uiScale, setUiScale] = useState(loadUiScale);
 
   useEffect(() => subscribeUiScale(() => setUiScale(loadUiScale())), []);
+  useEffect(
+    () =>
+      subscribeChatBackgroundDither(() =>
+        setChatBackgroundDither(loadChatBackgroundDither()),
+      ),
+    [],
+  );
+  useEffect(
+    () =>
+      subscribeAutoMatchTheme(() =>
+        setAutoMatchTheme(loadAutoMatchTheme()),
+      ),
+    [],
+  );
 
   const onThemePreference = useCallback((next: ThemePreference) => {
     applyThemePreference(next);
@@ -691,6 +726,19 @@ function useAppearanceSettings() {
       saveChatBackgroundPath(path);
       applyChatBackground(path);
       setChatBackgroundPath(path);
+      const src = chatBackgroundSrc(path);
+      if (src) {
+        try {
+          const palette = await extractPaletteFromImage(src);
+          setImagePalette(palette);
+          if (loadAutoMatchTheme()) {
+            applyExtractedPaletteToApp(palette);
+            setThemePresetId("custom");
+            setThemeHue(palette.themeHue);
+            setThemeSaturation(palette.themeSaturation);
+          }
+        } catch {}
+      }
     } catch (error) {
       setChatBackgroundError(
         error instanceof Error ? error.message : String(error),
@@ -729,6 +777,38 @@ function useAppearanceSettings() {
     setChatBackgroundScope(next);
   }, []);
 
+  const onChatBackgroundDither = useCallback((value: boolean) => {
+    saveChatBackgroundDither(value);
+    setChatBackgroundDither(value);
+  }, []);
+
+  const onAutoMatchTheme = useCallback((value: boolean) => {
+    saveAutoMatchTheme(value);
+    setAutoMatchTheme(value);
+  }, []);
+
+  const onMatchThemeToImage = useCallback(async () => {
+    if (!chatBackgroundPath) return;
+    setChatBackgroundBusy(true);
+    setChatBackgroundError(null);
+    try {
+      const src = chatBackgroundSrc(chatBackgroundPath);
+      if (!src) return;
+      const palette = await extractPaletteFromImage(src);
+      applyExtractedPaletteToApp(palette);
+      setImagePalette(palette);
+      setThemePresetId("custom");
+      setThemeHue(palette.themeHue);
+      setThemeSaturation(palette.themeSaturation);
+    } catch (error) {
+      setChatBackgroundError(
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setChatBackgroundBusy(false);
+    }
+  }, [chatBackgroundPath]);
+
   const onUiScale = useCallback((percent: number) => {
     const next = saveUiScale(percent / 100);
     setUiScale(next);
@@ -744,6 +824,8 @@ function useAppearanceSettings() {
     onBodyGlass(BODY_GLASS_DEFAULT);
     onChatBackgroundOpacity(Math.round(CHAT_BACKGROUND_OPACITY_DEFAULT * 100));
     onChatBackgroundScope(CHAT_BACKGROUND_SCOPE_DEFAULT);
+    onChatBackgroundDither(true);
+    onAutoMatchTheme(true);
     if (chatBackgroundPath) void onClearChatBackground();
     onUiScale(Math.round(UI_SCALE_DEFAULT * 100));
   }, [
@@ -752,6 +834,8 @@ function useAppearanceSettings() {
     onBodyGlass,
     onChatBackgroundOpacity,
     onChatBackgroundScope,
+    onChatBackgroundDither,
+    onAutoMatchTheme,
     onClearChatBackground,
     onThemePreference,
     onThemePreset,
@@ -771,6 +855,9 @@ function useAppearanceSettings() {
     chatBackgroundPath,
     chatBackgroundOpacity,
     chatBackgroundScope,
+    chatBackgroundDither,
+    autoMatchTheme,
+    imagePalette,
     chatBackgroundBusy,
     chatBackgroundError,
     uiScale,
@@ -784,6 +871,9 @@ function useAppearanceSettings() {
     onClearChatBackground,
     onChatBackgroundOpacity,
     onChatBackgroundScope,
+    onChatBackgroundDither,
+    onAutoMatchTheme,
+    onMatchThemeToImage,
     onUiScale,
     restoreDefaults,
   };
@@ -931,6 +1021,10 @@ function ChatBackgroundCard({
 }) {
   const src = chatBackgroundSrc(appearance.chatBackgroundPath);
   const hasImage = Boolean(appearance.chatBackgroundPath && src);
+  const processedPreviewSrc = useProcessedBackground(
+    src,
+    appearance.chatBackgroundDither,
+  );
   const visibility = Math.round(appearance.chatBackgroundOpacity * 100);
   const busy = appearance.chatBackgroundBusy;
 
@@ -942,11 +1036,19 @@ function ChatBackgroundCard({
             Chat background
           </div>
           <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-content/50">
-            An image behind your chat panes. It stays on this device.
+            An image behind your chat panes with retro dithering and theme matching.
           </p>
         </div>
         {hasImage ? (
-          <div className="flex shrink-0 items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2">
+            <SecondaryButton
+              onClick={() => void appearance.onMatchThemeToImage()}
+              disabled={busy}
+              title="Extract colors from image and set as app theme"
+            >
+              <Palette className="size-3.5" />
+              Match theme
+            </SecondaryButton>
             <SecondaryButton
               onClick={() => void appearance.onChooseChatBackground()}
               disabled={busy}
@@ -967,19 +1069,33 @@ function ChatBackgroundCard({
         ) : null}
       </div>
 
-      <div className="mt-3.5 overflow-hidden rounded-xl border border-content/10">
+      <div className="mt-3.5 overflow-hidden rounded-xl border border-content/10 bg-background-base">
         {hasImage ? (
-          <div className="relative h-40">
+          <div className="relative h-44 overflow-hidden bg-black">
             <img
-              src={src ?? undefined}
+              src={processedPreviewSrc ?? src ?? undefined}
               alt=""
               draggable={false}
               className="size-full object-cover"
               style={{ opacity: appearance.chatBackgroundOpacity }}
             />
-            <span className="pointer-events-none absolute bottom-2.5 left-2.5 text-[12px] text-content/50">
-              Preview at {visibility}%
-            </span>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5">
+              <span className="text-[11px] font-medium text-white/70 drop-shadow-sm">
+                Preview at {visibility}% {appearance.chatBackgroundDither ? "· Dithered" : ""}
+              </span>
+              {appearance.imagePalette?.swatches?.length ? (
+                <div className="flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-1 backdrop-blur-sm">
+                  {appearance.imagePalette.swatches.map((hex) => (
+                    <span
+                      key={hex}
+                      className="size-3 rounded-full border border-white/20 shadow-xs"
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : (
           <button
@@ -1029,6 +1145,36 @@ function ChatBackgroundCard({
                 min={Math.round(CHAT_BACKGROUND_OPACITY_MIN * 100)}
                 max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
                 onChange={appearance.onChatBackgroundOpacity}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-content/5 px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[13px] font-medium text-content">
+                  Dither background
+                </div>
+                <p className="text-[12px] text-content/45">
+                  Retro halftone dithering with smooth vertical transition to black.
+                </p>
+              </div>
+              <Toggle
+                label="Dither background"
+                on={appearance.chatBackgroundDither}
+                onChange={appearance.onChatBackgroundDither}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-content/5 px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[13px] font-medium text-content">
+                  Auto-sync theme to image
+                </div>
+                <p className="text-[12px] text-content/45">
+                  Automatically match app colors and accent when image changes.
+                </p>
+              </div>
+              <Toggle
+                label="Auto-sync theme to image"
+                on={appearance.autoMatchTheme}
+                onChange={appearance.onAutoMatchTheme}
               />
             </div>
           </div>
@@ -1823,11 +1969,13 @@ function SecondaryButton({
   onClick,
   disabled = false,
   danger = false,
+  title,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  title?: string;
   children: ReactNode;
 }) {
   return (
@@ -1835,6 +1983,7 @@ function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-content/10 px-3 py-1.5 text-[13px] font-medium transition-colors ${
         danger
           ? "text-red-400 hover:border-red-400/40 hover:bg-red-400/10"
