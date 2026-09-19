@@ -1,4 +1,6 @@
 import { Terminal } from "@xterm/xterm";
+import { WebglAddon } from "@xterm/addon-webgl";
+import { CanvasAddon } from "@xterm/addon-canvas";
 import { useEffect, useRef } from "react";
 import {
   getPtyStatus,
@@ -27,6 +29,37 @@ import {
 } from "../lib/terminalLayout";
 import { IS_MAC } from "../lib/platform";
 import "@xterm/xterm/css/xterm.css";
+
+/** Reuse a single decoder instead of creating one per PTY chunk. */
+const sharedDecoder = new TextDecoder();
+
+/**
+ * Activate a GPU-accelerated renderer for the terminal.
+ * Tries WebGL first, falls back to Canvas 2D, and silently stays on
+ * the default DOM renderer if neither is available.
+ */
+function activateGpuRenderer(term: Terminal): { dispose(): void } | null {
+  try {
+    const webgl = new WebglAddon();
+    // If the context is lost (GPU driver reset, tab backgrounded for too long),
+    // dispose the addon so xterm falls back to the DOM renderer gracefully.
+    webgl.onContextLoss(() => {
+      webgl.dispose();
+    });
+    term.loadAddon(webgl);
+    return webgl;
+  } catch {
+    // WebGL not available — try Canvas 2D.
+  }
+  try {
+    const canvas = new CanvasAddon();
+    term.loadAddon(canvas);
+    return canvas;
+  } catch {
+    // Canvas not available either — stay on the DOM renderer.
+  }
+  return null;
+}
 
 type Props = {
   id: string;
@@ -188,6 +221,10 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     });
     term.open(host);
     termRef.current = term;
+
+    // Activate GPU-accelerated rendering (WebGL → Canvas → DOM fallback).
+    const gpuRenderer = activateGpuRenderer(term);
+
     term.focus();
     let closed = false;
 
@@ -226,7 +263,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       (data) => {
         const onMeta = onMetaChangeRef.current;
         if (onMeta) {
-          const text = new TextDecoder().decode(data);
+          const text = sharedDecoder.decode(data);
           const scanned = scanOscCwd(text, oscBuffer);
           oscBuffer = scanned.rest;
           if (scanned.cwd) {
@@ -368,6 +405,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       renderSub.dispose();
       bufferSub.dispose();
       unsubscribe();
+      gpuRenderer?.dispose();
       term.dispose();
       termRef.current = null;
       spawned.current = false;
