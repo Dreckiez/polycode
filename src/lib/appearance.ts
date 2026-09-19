@@ -1,7 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { HAS_NATIVE_GLASS, IS_MAC } from "./platform";
 import { applyUiScale, loadUiScale } from "./uiScale";
-import { createDitheredImageUrl } from "./dither";
+import { createDitheredImageUrl, getCachedDitheredImageUrl } from "./dither";
 import {
   applyExtractedPaletteToApp,
   extractPaletteFromImage,
@@ -406,13 +406,16 @@ export function applyChatBackground(path: string | null) {
   const src = chatBackgroundSrc(path);
   if (!src) return null;
 
+  const dither = loadChatBackgroundDither();
+  const cachedDither = dither ? getCachedDitheredImageUrl(src) : null;
+  const initialBg = cachedDither ?? src;
+
   root.style.setProperty(
     "--chat-background-image",
-    `url(${JSON.stringify(src)})`,
+    `url(${JSON.stringify(initialBg)})`,
   );
 
-  const dither = loadChatBackgroundDither();
-  if (dither && typeof window !== "undefined") {
+  if (dither && !cachedDither && typeof window !== "undefined") {
     createDitheredImageUrl(src)
       .then((dithered) => {
         if (root.classList.contains("has-chat-background")) {

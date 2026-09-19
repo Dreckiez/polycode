@@ -19,7 +19,9 @@ import {
 } from "./icons";
 import {
   memo,
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -355,6 +357,10 @@ function SidebarComponent({
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const cwdRef = useRef(cwd);
+  cwdRef.current = cwd;
+  const selectedSessionIdsRef = useRef(selectedSessionIds);
+  selectedSessionIdsRef.current = selectedSessionIds;
   const contextSelectionRef = useRef(false);
   const [folderMenu, setFolderMenu] = useState<{
     x: number;
@@ -409,49 +415,72 @@ function SidebarComponent({
   // Revisits render straight from cache, so this is only ever true the first
   // time a project is opened.
   const pendingFirstLoad = pending && sessions.length === 0;
-  const listedSessions = mergeFolderSessionSummaries(
-    sessions,
-    openSessions,
-    sessionFolders,
+  const listedSessions = useMemo(
+    () => mergeFolderSessionSummaries(sessions, openSessions, sessionFolders),
+    [sessions, openSessions, sessionFolders],
   );
-  const visibleSessions = [
-    ...filterSessionsByQuery(
-      filterSessionsByStatus(
-        filterSessionsByTime(
-          filterSessionsByHarness(
-            filterSessionsByArchive(
-              listedSessions,
-              sessionFilters.showArchived,
+  const visibleSessions = useMemo(
+    () =>
+      [
+        ...filterSessionsByQuery(
+          filterSessionsByStatus(
+            filterSessionsByTime(
+              filterSessionsByHarness(
+                filterSessionsByArchive(
+                  listedSessions,
+                  sessionFilters.showArchived,
+                ),
+                sessionFilters.hiddenHarnesses,
+              ),
+              sessionFilters.time,
+              now,
             ),
-            sessionFilters.hiddenHarnesses,
+            sessionFilters.status,
+            busySessionIds,
+            approvalSessionIds,
+            unseenFinishedIds,
           ),
-          sessionFilters.time,
-          now,
+          searchQuery,
         ),
-        sessionFilters.status,
-        busySessionIds,
-        approvalSessionIds,
-        unseenFinishedIds,
-      ),
+      ].sort(compareSessionSummaries),
+    [
+      listedSessions,
+      sessionFilters.showArchived,
+      sessionFilters.hiddenHarnesses,
+      sessionFilters.time,
+      sessionFilters.status,
+      now,
+      busySessionIds,
+      approvalSessionIds,
+      unseenFinishedIds,
       searchQuery,
-    ),
-  ].sort(compareSessionSummaries);
+    ],
+  );
   const filtersActive = hasActiveSessionFilters(sessionFilters);
   const searchNarrowed = Boolean(searchQuery.trim());
   // Summaries for the whole project stay in `sessions` so filters still work.
   // Folders sit above the ungrouped list. Only a page of ungrouped cards
   // mounts; the sentinel below asks for the next page.
-  const reminderIds = new Set(reminders.map((reminder) => reminder.sessionId));
-  const reminderGroup = {
-    sessionIds: [...reminders]
-      .sort((a, b) => a.dueAt - b.dueAt)
-      .map((reminder) => reminder.sessionId),
-    collapsed: reminderSessionsCollapsed,
-  };
-  const ungroupedVisible = ungroupedSessions(
-    visibleSessions,
-    sessionFolders,
-  ).filter((session) => !reminderIds.has(session.id));
+  const reminderIds = useMemo(
+    () => new Set(reminders.map((reminder) => reminder.sessionId)),
+    [reminders],
+  );
+  const reminderGroup = useMemo(
+    () => ({
+      sessionIds: [...reminders]
+        .sort((a, b) => a.dueAt - b.dueAt)
+        .map((reminder) => reminder.sessionId),
+      collapsed: reminderSessionsCollapsed,
+    }),
+    [reminders, reminderSessionsCollapsed],
+  );
+  const ungroupedVisible = useMemo(
+    () =>
+      ungroupedSessions(visibleSessions, sessionFolders).filter(
+        (session) => !reminderIds.has(session.id),
+      ),
+    [visibleSessions, sessionFolders, reminderIds],
+  );
   const activeUngroupedIndex = ungroupedVisible.findIndex(
     (session) => session.id === activeSessionId,
   );
@@ -460,24 +489,47 @@ function SidebarComponent({
     sessionListLimit,
     activeUngroupedIndex,
   );
-  const shownUngrouped = ungroupedVisible.slice(0, shownUngroupedCount);
-  const fullSessionListEntries = buildSessionList(
-    visibleSessions,
-    sessionFolders,
-    ungroupedVisible,
-    pinnedSessionsCollapsed,
-    reminderGroup,
+  const shownUngrouped = useMemo(
+    () => ungroupedVisible.slice(0, shownUngroupedCount),
+    [ungroupedVisible, shownUngroupedCount],
   );
-  const sessionListEntries = buildSessionList(
-    visibleSessions,
-    sessionFolders,
-    shownUngrouped,
-    pinnedSessionsCollapsed,
-    reminderGroup,
+  const fullSessionListEntries = useMemo(
+    () =>
+      buildSessionList(
+        visibleSessions,
+        sessionFolders,
+        ungroupedVisible,
+        pinnedSessionsCollapsed,
+        reminderGroup,
+      ),
+    [
+      visibleSessions,
+      sessionFolders,
+      ungroupedVisible,
+      pinnedSessionsCollapsed,
+      reminderGroup,
+    ],
   );
-  const sessionNavigationIds = sessionListNavigationIds(
-    fullSessionListEntries,
-    searchNarrowed,
+  const sessionListEntries = useMemo(
+    () =>
+      buildSessionList(
+        visibleSessions,
+        sessionFolders,
+        shownUngrouped,
+        pinnedSessionsCollapsed,
+        reminderGroup,
+      ),
+    [
+      visibleSessions,
+      sessionFolders,
+      shownUngrouped,
+      pinnedSessionsCollapsed,
+      reminderGroup,
+    ],
+  );
+  const sessionNavigationIds = useMemo(
+    () => sessionListNavigationIds(fullSessionListEntries, searchNarrowed),
+    [fullSessionListEntries, searchNarrowed],
   );
   const sessionNavigationKey = sessionNavigationIds.join("\0");
   useEffect(() => {
@@ -495,7 +547,10 @@ function SidebarComponent({
   }, [cwd, tab, sessionNavigationKey]);
   const hasMoreSessions = shownUngroupedCount < ungroupedVisible.length;
   const sessionListKey = `${cwd}\0${sessionFilters.showArchived}\0${sessionFilters.time}\0${sessionFilters.hiddenHarnesses.join(",")}\0${sessionFilters.status.working}\0${sessionFilters.status.needsApproval}\0${sessionFilters.status.done}\0${searchQuery}`;
-  const sessionHarnesses = harnessesInSessions(sessions);
+  const sessionHarnesses = useMemo(
+    () => harnessesInSessions(sessions),
+    [sessions],
+  );
   const narrowedByUser = searchNarrowed || filtersActive;
   const sortable = useSortable(tabOrder, (ids) => {
     const next = ids as SidebarTab[];
@@ -503,8 +558,12 @@ function SidebarComponent({
     saveSidebarTabOrder(next);
     if (next[0]) onTabChange(next[0]);
   });
-  const visibleFolderIds = sessionListEntries.flatMap((entry) =>
-    entry.kind === "folder" ? [entry.folder.id] : [],
+  const visibleFolderIds = useMemo(
+    () =>
+      sessionListEntries.flatMap((entry) =>
+        entry.kind === "folder" ? [entry.folder.id] : [],
+      ),
+    [sessionListEntries],
   );
   const folderSortable = useSortable(
     visibleFolderIds,
@@ -804,20 +863,21 @@ function SidebarComponent({
       : []),
   ];
 
-  const onSessionContextMenu = (
-    sessionId: string,
-    e: ReactMouseEvent<HTMLDivElement>,
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    contextSelectionRef.current = !selectedSessionIds.has(sessionId);
-    if (contextSelectionRef.current) {
-      setSelectedSessionIds(new Set([sessionId]));
-    }
-    setFilterMenu(null);
-    setFolderMenu(null);
-    setSessionMenu({ x: e.clientX, y: e.clientY, sessionId });
-  };
+  const onSessionContextMenu = useCallback(
+    (sessionId: string, e: ReactMouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      contextSelectionRef.current =
+        !selectedSessionIdsRef.current.has(sessionId);
+      if (contextSelectionRef.current) {
+        setSelectedSessionIds(new Set([sessionId]));
+      }
+      setFilterMenu(null);
+      setFolderMenu(null);
+      setSessionMenu({ x: e.clientX, y: e.clientY, sessionId });
+    },
+    [],
+  );
 
   const closeSessionMenu = () => {
     setSessionMenu(null);
@@ -941,38 +1001,62 @@ function SidebarComponent({
     );
   };
 
-  const onSessionListDrop = (
-    draggedId: string,
-    target: SessionListDropTarget,
-  ) => {
-    const { folders, createdId } = applySessionListDrop(
-      sessionFolders,
-      draggedId,
-      target,
-    );
-    if (folders === sessionFolders) return;
-    commitSessionFolders(folders);
-    if (createdId) setRenamingFolderId(createdId);
-  };
+  const onSessionListDrop = useCallback(
+    (draggedId: string, target: SessionListDropTarget) => {
+      setSessionFolders((current) => {
+        const { folders, createdId } = applySessionListDrop(
+          current,
+          draggedId,
+          target,
+        );
+        if (folders === current) return current;
+        saveSessionFolders(cwdRef.current, folders);
+        if (createdId) setRenamingFolderId(createdId);
+        return folders;
+      });
+    },
+    [],
+  );
 
-  const isSessionDrop = (kind: "folder" | "session", id: string) =>
-    sessionDrop?.kind === kind && sessionDrop.id === id;
+  const isSessionDrop = useCallback(
+    (kind: "folder" | "session", id: string) =>
+      sessionDrop?.kind === kind && sessionDrop.id === id,
+    [sessionDrop],
+  );
 
-  const onSessionCardSelect = (
-    sessionId: string,
-    event: { shiftKey: boolean },
-  ) => {
-    if (event.shiftKey) {
-      contextSelectionRef.current = false;
-      setSessionMenu(null);
-      setSelectedSessionIds((current) =>
-        toggleSessionSelection(current, sessionId),
-      );
-      return;
-    }
-    setSelectedSessionIds(new Set());
-    onSelectSession(sessionId);
-  };
+  const onSessionCardSelect = useCallback(
+    (sessionId: string, event: { shiftKey: boolean }) => {
+      if (event.shiftKey) {
+        contextSelectionRef.current = false;
+        setSessionMenu(null);
+        setSelectedSessionIds((current) =>
+          toggleSessionSelection(current, sessionId),
+        );
+        return;
+      }
+      setSelectedSessionIds(new Set());
+      onSelectSession(sessionId);
+    },
+    [onSelectSession],
+  );
+
+  const handleArchiveSession = useCallback(
+    (sessionId: string, nextArchived: boolean) => {
+      onArchiveSession?.(sessionId, nextArchived);
+    },
+    [onArchiveSession],
+  );
+
+  const handleRenameSession = useCallback((sessionId: string) => {
+    setRenamingSessionId(sessionId);
+  }, []);
+
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      onDeleteSession?.(sessionId);
+    },
+    [onDeleteSession],
+  );
 
   const renderSessionCard = (session: SessionSummary, compact = false) =>
     renamingSessionId === session.id && onRenameSession ? (
@@ -1002,18 +1086,10 @@ function SidebarComponent({
         onPlaceOnPane={onPlaceSessionOnPane}
         onListDrop={reminderIds.has(session.id) ? undefined : onSessionListDrop}
         onListDropTargetChange={setSessionDrop}
-        onContextMenu={(e) => onSessionContextMenu(session.id, e)}
-        onArchive={
-          onArchiveSession
-            ? () => onArchiveSession(session.id, !session.archived)
-            : undefined
-        }
-        onRename={
-          onRenameSession ? () => setRenamingSessionId(session.id) : undefined
-        }
-        onDelete={
-          onDeleteSession ? () => onDeleteSession(session.id) : undefined
-        }
+        onContextMenu={onSessionContextMenu}
+        onArchive={onArchiveSession ? handleArchiveSession : undefined}
+        onRename={onRenameSession ? handleRenameSession : undefined}
+        onDelete={onDeleteSession ? handleDeleteSession : undefined}
       />
     );
 
@@ -2027,7 +2103,7 @@ function FolderColorSwatches({
   );
 }
 
-function FolderRow({
+const FolderRow = memo(function FolderRow({
   folder,
   sessions,
   expanded,
@@ -2135,7 +2211,7 @@ function FolderRow({
       </span>
     </button>
   );
-}
+});
 
 function FolderRenameRow({
   folder,
@@ -2214,7 +2290,7 @@ function FolderRenameRow({
   );
 }
 
-function SessionCard({
+const SessionCard = memo(function SessionCard({
   session,
   isActive,
   isSelected,
@@ -2248,10 +2324,10 @@ function SessionCard({
   onPlaceOnPane?: (sessionId: string, targetId: string, edge: PaneEdge) => void;
   onListDrop?: (draggedId: string, target: SessionListDropTarget) => void;
   onListDropTargetChange?: (target: SessionListDropTarget | null) => void;
-  onContextMenu?: (e: ReactMouseEvent<HTMLDivElement>) => void;
-  onArchive?: () => void;
-  onRename?: () => void;
-  onDelete?: () => void;
+  onContextMenu?: (sessionId: string, e: ReactMouseEvent<HTMLDivElement>) => void;
+  onArchive?: (sessionId: string, nextArchived: boolean) => void;
+  onRename?: (sessionId: string) => void;
+  onDelete?: (sessionId: string) => void;
 }) {
   const skipClickUntil = useRef(0);
   const [dragging, setDragging] = useState(false);
@@ -2333,12 +2409,12 @@ function SessionCard({
     }
     if (e.key === "F2" && onRename) {
       e.preventDefault();
-      onRename();
+      onRename(session.id);
       return;
     }
     if ((e.key === "Delete" || e.key === "Backspace") && onDelete) {
       e.preventDefault();
-      onDelete();
+      onDelete(session.id);
     }
   };
 
@@ -2464,7 +2540,9 @@ function SessionCard({
           if (performance.now() < skipClickUntil.current) return;
           onSelect(session.id, event);
         }}
-        onContextMenu={onContextMenu}
+        onContextMenu={
+          onContextMenu ? (e) => onContextMenu(session.id, e) : undefined
+        }
         onKeyDown={onKeyDown}
         className={`relative border flex w-full touch-none flex-col rounded-md px-2.5 text-left ${
           compact ? "py-1.5" : "py-2"
@@ -2554,7 +2632,7 @@ function SessionCard({
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
-            onArchive();
+            onArchive(session.id, !session.archived);
           }}
           className={`pointer-events-none absolute right-7 grid size-5 place-items-center rounded text-content/50 opacity-0 transition-opacity hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 ${
             compact ? "bottom-[5px]" : "bottom-[7px]"
@@ -2565,7 +2643,7 @@ function SessionCard({
       ) : null}
     </div>
   );
-}
+});
 
 function SessionRenameRow({
   session,

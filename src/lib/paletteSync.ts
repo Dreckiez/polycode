@@ -11,6 +11,7 @@ import {
   type ThemePreset,
   getThemePreset,
 } from "./themePresets";
+import { loadImageElement } from "./dither";
 
 const THEME_HUE_KEY = "monocode.themeHue";
 const THEME_SATURATION_KEY = "monocode.themeSaturation";
@@ -108,8 +109,16 @@ export function extractPaletteFromRgbaBuffer(
     const b = data[i + 2];
     const a = data[i + 3];
 
-    // Ignore transparent or near-black / near-white pixels
+    // Ignore transparent pixels
     if (a < 128) continue;
+
+    // Quick RGB luminance approximation: skip dark (<8% L) and blown highlight (>94% L)
+    // without executing full rgbToHsl conversion
+    const maxRgb = Math.max(r, g, b);
+    const minRgb = Math.min(r, g, b);
+    const sumMinMax = maxRgb + minRgb;
+    if (sumMinMax < 41 || sumMinMax > 480) continue;
+
     const hsl = rgbToHsl(r, g, b);
     if (hsl.l < 8 || hsl.l > 94) continue;
 
@@ -221,13 +230,7 @@ export async function extractPaletteFromImage(
 ): Promise<ExtractedPalette> {
   let img: HTMLImageElement;
   if (typeof imageSource === "string") {
-    img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image for palette extraction: ${imageSource}`));
-      img.src = imageSource;
-    });
+    img = await loadImageElement(imageSource);
   } else {
     img = imageSource;
   }

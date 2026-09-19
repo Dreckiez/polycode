@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
-import { createDitheredImageUrl } from "../lib/dither";
+import {
+  createDitheredImageUrl,
+  getCachedDitheredImageUrl,
+} from "../lib/dither";
 
 /**
  * Hook that returns the dithered background image URL if dithering is enabled,
  * falling back to the raw image source.
+ * Synchronously checks in-memory cache to prevent visual flashing and redundant renders.
  */
 export function useProcessedBackground(
   rawSrc: string | null | undefined,
   dither = true,
 ): string | null {
-  const [url, setUrl] = useState<string | null>(rawSrc ?? null);
+  const [url, setUrl] = useState<string | null>(() => {
+    if (!rawSrc) return null;
+    if (!dither) return rawSrc;
+    return getCachedDitheredImageUrl(rawSrc) ?? rawSrc;
+  });
 
   useEffect(() => {
     if (!rawSrc) {
@@ -18,6 +26,12 @@ export function useProcessedBackground(
     }
     if (!dither) {
       setUrl(rawSrc);
+      return;
+    }
+
+    const cached = getCachedDitheredImageUrl(rawSrc);
+    if (cached) {
+      setUrl(cached);
       return;
     }
 

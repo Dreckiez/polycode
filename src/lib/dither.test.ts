@@ -1,9 +1,15 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import {
   applyBayerDitherToBuffer,
   BAYER_8X8,
   calculateVerticalFade,
+  cleanupPendingBlobs,
+  clearDitherCache,
   DEFAULT_DITHER_OPTIONS,
+  freeUrlIfBlob,
+  getCachedDitheredImageUrl,
+  isBlobInUse,
 } from "./dither";
 
 describe("dither engine", () => {
@@ -93,6 +99,107 @@ describe("dither engine", () => {
       expect(buffer[bottomIdx + 1]).toBe(0);
       expect(buffer[bottomIdx + 2]).toBe(0);
       expect(buffer[bottomIdx + 3]).toBe(255);
+    });
+
+    it("processes a full 960x720 background image quickly", () => {
+      const width = 960;
+      const height = 720;
+      const buffer = new Uint8ClampedArray(width * height * 4);
+      buffer.fill(128);
+
+      const start = performance.now();
+      applyBayerDitherToBuffer(buffer, width, height);
+      const elapsed = performance.now() - start;
+
+      console.log(`[Dither Benchmark] 960x720 took ${elapsed.toFixed(2)}ms`);
+      expect(elapsed).toBeLessThan(500);
+    });
+  });
+
+  describe("caching and deduplication", () => {
+    it("returns null when item is not in cache", () => {
+      clearDitherCache();
+      expect(getCachedDitheredImageUrl("non-existent-image.png")).toBeNull();
+    });
+
+    it("clears cache completely when clearDitherCache is invoked", () => {
+      clearDitherCache();
+      expect(getCachedDitheredImageUrl("test.png")).toBeNull();
+    });
+
+    it("detects when a blob URL is in use on root, in an element style, or in an img tag", () => {
+      const testBlob = "blob:http://localhost/test-blob-123";
+      expect(isBlobInUse(testBlob)).toBe(false);
+
+      // 1. Attached to document root --chat-background-image
+      document.documentElement.style.setProperty(
+        "--chat-background-image",
+        `url("${testBlob}")`,
+      );
+      expect(isBlobInUse(testBlob)).toBe(true);
+      document.documentElement.style.removeProperty("--chat-background-image");
+      expect(isBlobInUse(testBlob)).toBe(false);
+
+      // 2. Attached to a SessionPane style attribute
+      const pane = document.createElement("div");
+      pane.setAttribute(
+        "style",
+        `--chat-background-image: url("${testBlob}"); opacity: 0.5;`,
+      );
+      document.body.appendChild(pane);
+      expect(isBlobInUse(testBlob)).toBe(true);
+      pane.remove();
+      expect(isBlobInUse(testBlob)).toBe(false);
+
+      // 3. Attached to an img element src
+      const img = document.createElement("img");
+      img.src = testBlob;
+      document.body.appendChild(img);
+      expect(isBlobInUse(testBlob)).toBe(true);
+      img.remove();
+      expect(isBlobInUse(testBlob)).toBe(false);
+    });
+
+    it("defers revoking in-use blobs until cleanup runs and forces revocation on clearDitherCache", () => {
+      let revokedUrls: string[] = [];
+      const origRevoke = URL.revokeObjectURL;
+      URL.revokeObjectURL = (url: string) => {
+        revokedUrls.push(url);
+      };
+
+      try {
+        const testBlob = "blob:http://localhost/active-blob-456";
+        const img = document.createElement("img");
+        img.src = testBlob;
+        document.body.appendChild(img);
+
+        // Eviction / freeing attempt while in use: must not revoke immediately
+        freeUrlIfBlob(testBlob);
+        expect(revokedUrls).not.toContain(testBlob);
+
+        // Remove element from DOM
+        img.remove();
+
+        // Cleanup now detects it is no longer in use and revokes
+        cleanupPendingBlobs();
+        expect(revokedUrls).toContain(testBlob);
+
+        // clearDitherCache forces revocation of all pending blobs
+        revokedUrls = [];
+        const activeBlob2 = "blob:http://localhost/active-blob-789";
+        const img2 = document.createElement("img");
+        img2.src = activeBlob2;
+        document.body.appendChild(img2);
+
+        freeUrlIfBlob(activeBlob2);
+        expect(revokedUrls).not.toContain(activeBlob2);
+
+        clearDitherCache();
+        expect(revokedUrls).toContain(activeBlob2);
+        img2.remove();
+      } finally {
+        URL.revokeObjectURL = origRevoke;
+      }
     });
   });
 });

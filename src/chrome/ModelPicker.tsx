@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Gauge, Search, Star, X } from "./icons";
 import {
+  memo,
   useEffect,
   useId,
   useMemo,
@@ -101,7 +102,7 @@ function recentMenuModels(current: AgentModel): AgentModel[] {
   return models.slice(0, 6);
 }
 
-export function ModelPicker({
+export const ModelPicker = memo(function ModelPicker({
   harness,
   model,
   values,
@@ -699,9 +700,9 @@ export function ModelPicker({
     setQuery(val);
     setActiveModel(0);
   }
-}
+});
 
-export function EffortPicker({
+export const EffortPicker = memo(function EffortPicker({
   harness,
   model,
   values,
@@ -832,7 +833,7 @@ export function EffortPicker({
       ) : null}
     </>
   );
-}
+});
 
 function ProviderTabButton({
   title,

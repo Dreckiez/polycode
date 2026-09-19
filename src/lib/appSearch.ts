@@ -1,4 +1,4 @@
-import { fuzzyMatch } from "./fuzzy";
+import { fuzzyMatch, prepareFuzzyQuery } from "./fuzzy";
 import { projectName } from "./paths";
 import { sameProjectPath, type RecentProject } from "./recents";
 import {
@@ -164,13 +164,13 @@ export function searchConversationTitles(
   }>,
   query: string,
 ): ConversationHit[] {
-  const needle = query.trim();
-  if (!needle) return [];
+  const prepared = prepareFuzzyQuery(query);
+  if (!prepared.raw) return [];
   const hits: ConversationHit[] = [];
   for (const row of rows) {
     const title = sessionDisplayTitle(row.title, row.harness);
-    const displayHit = fuzzyMatch(needle, title);
-    const rawHit = displayHit ? null : fuzzyMatch(needle, row.title);
+    const displayHit = fuzzyMatch(prepared, title);
+    const rawHit = displayHit ? null : fuzzyMatch(prepared, row.title);
     const match = displayHit ?? rawHit;
     if (!match) continue;
     hits.push({
@@ -230,13 +230,13 @@ export function searchRecentProjects(
   recents: RecentProject[],
   query: string,
 ): ProjectHit[] {
-  const needle = query.trim();
-  if (!needle) return [];
+  const prepared = prepareFuzzyQuery(query);
+  if (!prepared.raw) return [];
   const hits: ProjectHit[] = [];
   for (const recent of recents) {
     const name = projectName(recent.path);
-    const nameHit = fuzzyMatch(needle, name);
-    const pathHit = nameHit ? null : fuzzyMatch(needle, recent.path);
+    const nameHit = fuzzyMatch(prepared, name);
+    const pathHit = nameHit ? null : fuzzyMatch(prepared, recent.path);
     const match = nameHit ?? pathHit;
     if (!match) continue;
     hits.push({

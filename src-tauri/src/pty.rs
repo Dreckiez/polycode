@@ -432,7 +432,8 @@ fn spawn_windows(
                             if byte == query[matched] {
                                 matched += 1;
                                 if matched == query.len() {
-                                    let mut w = write_live.writer.lock().unwrap_or_else(|e| e.into_inner());
+                                    let mut w =
+                                        write_live.writer.lock().unwrap_or_else(|e| e.into_inner());
                                     let _ = w.write_all(b"\x1b[1;1R");
                                     let _ = w.flush();
                                     answered_cursor = true;
@@ -492,7 +493,10 @@ fn working_dir(cwd: &str) -> std::path::PathBuf {
 fn default_shell() -> (String, Vec<String>) {
     #[cfg(windows)]
     {
-        ("powershell.exe".into(), vec!["-NoExit".into(), "-NoLogo".into()])
+        (
+            "powershell.exe".into(),
+            vec!["-NoExit".into(), "-NoLogo".into()],
+        )
     }
     #[cfg(not(windows))]
     {
@@ -889,7 +893,10 @@ mod windows_pty_tests {
                 break;
             }
         }
-        assert!(got_prompt, "Terminal prompt should appear once cursor query is answered");
+        assert!(
+            got_prompt,
+            "Terminal prompt should appear once cursor query is answered"
+        );
 
         // Test single character echo
         let _ = writer.write_all(b"x");
@@ -903,7 +910,10 @@ mod windows_pty_tests {
                 break;
             }
         }
-        assert!(got_echo, "Single character 'x' should be echoed by the shell");
+        assert!(
+            got_echo,
+            "Single character 'x' should be echoed by the shell"
+        );
 
         // Verify typing standard characters works
         let _ = writer.write_all(b"Write-Output PTY_TEST_OK\r\n");
@@ -917,7 +927,10 @@ mod windows_pty_tests {
                 break;
             }
         }
-        assert!(command_output, "Typed command output should be received from the PTY");
+        assert!(
+            command_output,
+            "Typed command output should be received from the PTY"
+        );
 
         let _ = child.kill();
     }

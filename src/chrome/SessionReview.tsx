@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FileDiff } from "./icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   keepSessionChanges,
   sessionCheckpointStatus,
@@ -24,7 +24,7 @@ type Props = {
   ) => void;
 };
 
-export function SessionReview({
+export const SessionReview = memo(function SessionReview({
   sessionId,
   cwd,
   enabled = true,
@@ -95,12 +95,16 @@ export function SessionReview({
   const canUndoAll = !undoLocked && files.every((file) => file.undoable);
   const visibleFiles = expanded ? files : files.slice(0, 3);
   const hiddenFileCount = files.length - visibleFiles.length;
-  const totals = files.reduce(
-    (sum, file) => ({
-      additions: sum.additions + file.additions,
-      deletions: sum.deletions + file.deletions,
-    }),
-    { additions: 0, deletions: 0 },
+  const totals = useMemo(
+    () =>
+      files.reduce(
+        (sum, file) => ({
+          additions: sum.additions + file.additions,
+          deletions: sum.deletions + file.deletions,
+        }),
+        { additions: 0, deletions: 0 },
+      ),
+    [files],
   );
 
   const run = (action: "keep" | "undo") => {
@@ -214,9 +218,9 @@ export function SessionReview({
       </div>
     </div>
   );
-}
+});
 
-function FileRow({
+const FileRow = memo(function FileRow({
   file,
   sessionId,
   cwd,
@@ -245,7 +249,7 @@ function FileRow({
       <DiffCounts file={file} />
     </button>
   );
-}
+});
 
 function DiffCounts({ file }: { file: CheckpointFile }) {
   if (!file.exact) {

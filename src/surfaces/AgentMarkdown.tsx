@@ -419,6 +419,20 @@ const MARKDOWN_COMPONENTS = {
   img: MarkdownImage,
 } satisfies Components;
 
+const remarkPluginsCache = new Map<string | undefined, PluggableList>();
+
+function getRemarkPlugins(cwd: string | undefined): PluggableList {
+  let plugins = remarkPluginsCache.get(cwd);
+  if (!plugins) {
+    plugins = [
+      ...Object.values(defaultRemarkPlugins),
+      [remarkWorkspaceFileLinks, { cwd }],
+    ];
+    remarkPluginsCache.set(cwd, plugins);
+  }
+  return plugins;
+}
+
 export const AgentMarkdown = memo(function AgentMarkdown({
   text,
   streaming,
@@ -446,10 +460,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     [cwd, onOpenFile, onFileContextMenu],
   );
   const remarkPlugins = useMemo<PluggableList>(
-    () => [
-      ...Object.values(defaultRemarkPlugins),
-      [remarkWorkspaceFileLinks, { cwd }],
-    ],
+    () => getRemarkPlugins(cwd),
     [cwd],
   );
 

@@ -213,7 +213,7 @@ function TabHarnesses({
 
 type SortableApi = ReturnType<typeof useSortable>;
 
-function TitleTabItem({
+const TitleTabItem = memo(function TitleTabItem({
   tab,
   index,
   active,
@@ -370,7 +370,7 @@ function TitleTabItem({
       ) : null}
     </div>
   );
-}
+});
 
 function TabStripChevron({
   side,
@@ -555,8 +555,21 @@ function TitleBarComponent({
   recents = [],
   onSelectProject,
 }: Props) {
-  const tabIds = tabs.map((tab) => tab.id);
+  const tabIds = useMemo(() => tabs.map((tab) => tab.id), [tabs]);
   const sortable = useSortable(tabIds, onReorder);
+  const onActiveTabRef = useCallback((el: HTMLDivElement | null) => {
+    activeTabRef.current = el;
+  }, []);
+  const onContextMenuTab = useCallback(
+    (tabId: string, event: ReactMouseEvent<HTMLDivElement>) => {
+      setTabMenu({
+        tabId,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [],
+  );
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const tabStripRef = useRef<HTMLDivElement | null>(null);
   const setTabStripRef = useCallback(
@@ -798,20 +811,8 @@ function TitleBarComponent({
                   sortable={sortable}
                   onSelect={onSelect}
                   onClose={onClose}
-                  onContextMenu={(tabId, event) =>
-                    setTabMenu({
-                      tabId,
-                      x: event.clientX,
-                      y: event.clientY,
-                    })
-                  }
-                  itemRef={
-                    tab.id === activeId
-                      ? (el) => {
-                          activeTabRef.current = el;
-                        }
-                      : undefined
-                  }
+                  onContextMenu={onContextMenuTab}
+                  itemRef={tab.id === activeId ? onActiveTabRef : undefined}
                 />
               </div>
             ))}

@@ -1,7 +1,14 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import { GitCompare, GripVertical, Terminal, X } from "./icons";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  memo,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { copyText } from "../lib/clipboard";
 import { basename, revealPath } from "../lib/fs";
 import {
@@ -162,7 +169,7 @@ export function appendProblems(title: string, errors: number): string {
   return `${title} — ${errors} ${errors === 1 ? "problem" : "problems"}`;
 }
 
-export function SurfaceTabs({
+export const SurfaceTabs = memo(function SurfaceTabs({
   files,
   activeFileId,
   dirtyFileIds,
@@ -179,7 +186,7 @@ export function SurfaceTabs({
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const activeTabRef = useRef<HTMLDivElement | null>(null);
   const [menu, setMenu] = useState<SurfaceTabMenu | null>(null);
-  const fileIds = files.map((file) => file.id);
+  const fileIds = useMemo(() => files.map((file) => file.id), [files]);
   const sortable = useSortable(fileIds, onReorder);
   const canDrag = files.length > 1;
   const menuFile = menu
@@ -410,4 +417,4 @@ export function SurfaceTabs({
       ) : null}
     </div>
   );
-}
+});

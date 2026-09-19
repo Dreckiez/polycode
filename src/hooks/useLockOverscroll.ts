@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { IS_MAC } from "../lib/platform";
 
 /** Stop macOS rubber-band bounce when a scroller reaches any edge. */
 export function useLockOverscroll<T extends HTMLElement>() {
@@ -7,7 +8,7 @@ export function useLockOverscroll<T extends HTMLElement>() {
   return useCallback((el: T | null) => {
     cleanup.current?.();
     cleanup.current = null;
-    if (!el) return;
+    if (!el || !IS_MAC) return;
 
     const onWheel = (e: WheelEvent) => {
       const canScrollX = el.scrollWidth > el.clientWidth + 1;

@@ -116,7 +116,10 @@ pub fn import_skill(source_path: String) -> Result<DiscoveredSkill, String> {
 
         let bytes = read_prefix(&source, MAX_FRONTMATTER_BYTES).unwrap_or_default();
         let text = String::from_utf8_lossy(&bytes);
-        let fallback_stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("skill");
+        let fallback_stem = source
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("skill");
         let parent_name = source
             .parent()
             .and_then(|p| p.file_name())
@@ -165,7 +168,10 @@ pub fn import_skill(source_path: String) -> Result<DiscoveredSkill, String> {
 
         let bytes = read_prefix(&skill_md, MAX_FRONTMATTER_BYTES).unwrap_or_default();
         let text = String::from_utf8_lossy(&bytes);
-        let fallback = source.file_name().and_then(|s| s.to_str()).unwrap_or("skill");
+        let fallback = source
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("skill");
         let fallback_slug = slug_name(fallback);
         let (name, description) = parse_frontmatter(&text, &fallback_slug);
         let skill_name = if name.is_empty() { fallback_slug } else { name };
@@ -1279,7 +1285,13 @@ mod tests {
         std::fs::write(sub.join("sub.txt"), "world").unwrap();
 
         copy_dir_contents(&src.0, &dst.0).unwrap();
-        assert_eq!(std::fs::read_to_string(dst.0.join("test.txt")).unwrap(), "hello");
-        assert_eq!(std::fs::read_to_string(dst.0.join("nested").join("sub.txt")).unwrap(), "world");
+        assert_eq!(
+            std::fs::read_to_string(dst.0.join("test.txt")).unwrap(),
+            "hello"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dst.0.join("nested").join("sub.txt")).unwrap(),
+            "world"
+        );
     }
 }

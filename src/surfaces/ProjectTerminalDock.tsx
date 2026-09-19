@@ -10,7 +10,9 @@ import {
   Plus,
 } from "../chrome/icons";
 import {
+  memo,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -23,14 +25,14 @@ import {
   defaultDockSize,
   isVerticalDock,
   type DockSide,
-  type ProjectTerminalDock,
+  type ProjectTerminalDock as ProjectTerminalDockModel,
 } from "../lib/projectTerminal";
 import { MOD } from "../lib/platform";
 import type { TerminalMetaPatch } from "../lib/terminalTab";
 import { TerminalView } from "./TerminalView";
 
 type Props = {
-  dock: ProjectTerminalDock;
+  dock: ProjectTerminalDockModel;
   focused: boolean;
   onFocus: () => void;
   onHide: () => void;
@@ -66,7 +68,7 @@ function hideIcon(side: DockSide) {
   return ChevronDown;
 }
 
-export function ProjectTerminalDock({
+export const ProjectTerminalDock = memo(function ProjectTerminalDock({
   dock,
   focused,
   onFocus,
@@ -92,6 +94,44 @@ export function ProjectTerminalDock({
   const frame = useRef<number | null>(null);
   const SideIcon = sideIcon(dock.side);
   const HideIcon = hideIcon(dock.side);
+
+  const afterTabs = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={onAddTerminal}
+        aria-label={`New Terminal (${MOD}\`)`}
+        title={`New Terminal (${MOD}\`)`}
+        className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content ml-1 self-center transition-colors"
+      >
+        <Plus className="size-3.5" strokeWidth={1.75} />
+      </button>
+    ),
+    [onAddTerminal],
+  );
+
+  const trailing = useMemo(
+    () => (
+      <div className="flex shrink-0 items-center gap-0.5 border-l border-content/10 px-1">
+        <div ref={sideButton}>
+          <IconButton
+            label="Move Terminal"
+            onClick={() => {
+              const rect = sideButton.current?.getBoundingClientRect();
+              if (!rect) return;
+              setMenu({ x: rect.left, y: rect.bottom + 4 });
+            }}
+          >
+            <SideIcon className="size-3.5" strokeWidth={1.75} />
+          </IconButton>
+        </div>
+        <IconButton label={`Hide Terminal (${MOD}J)`} onClick={onHide}>
+          <HideIcon className="size-3.5" strokeWidth={1.75} />
+        </IconButton>
+      </div>
+    ),
+    [HideIcon, SideIcon, onHide],
+  );
 
   useEffect(() => {
     if (!dragging) return;
@@ -212,39 +252,8 @@ export function ProjectTerminalDock({
         onCloseFile={onCloseTerminal}
         onCloseOtherFiles={onCloseOtherTerminals}
         onReorder={onReorderTerminals}
-        afterTabs={
-          <button
-            type="button"
-            onClick={onAddTerminal}
-            aria-label={`New Terminal (${MOD}\`)`}
-            title={`New Terminal (${MOD}\`)`}
-            className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content ml-1 self-center transition-colors"
-          >
-            <Plus className="size-3.5" strokeWidth={1.75} />
-          </button>
-        }
-        trailing={
-          <div className="flex shrink-0 items-center gap-0.5 border-l border-content/10 px-1">
-            <div ref={sideButton}>
-            <IconButton
-              label="Move Terminal"
-              onClick={() => {
-                const rect = sideButton.current?.getBoundingClientRect();
-                if (!rect) return;
-                setMenu({ x: rect.left, y: rect.bottom + 4 });
-              }}
-            >
-              <SideIcon className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-            </div>
-            <IconButton
-              label={`Hide Terminal (${MOD}J)`}
-              onClick={onHide}
-            >
-              <HideIcon className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-          </div>
-        }
+        afterTabs={afterTabs}
+        trailing={trailing}
       />
       <div className="relative min-h-0 min-w-0 flex-1">
         {dock.pane.files.map((file) => (
@@ -288,7 +297,7 @@ export function ProjectTerminalDock({
       ) : null}
     </section>
   );
-}
+});
 
 const EMPTY_IDS = new Set<string>();
 const EMPTY_ERRORS = new Map<string, number>();

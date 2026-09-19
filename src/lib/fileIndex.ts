@@ -1,6 +1,6 @@
 import { listProjectFiles, type ProjectFile } from "./fs";
 import { subscribeDirsChanged } from "./fileTree";
-import { scorePath, type FuzzyHit } from "./fuzzy";
+import { prepareFuzzyQuery, scorePath, type FuzzyHit } from "./fuzzy";
 import { resolveWorkspacePath, slash } from "./paths";
 import { looksLikeProject } from "./recents";
 import { normalizeEditorPath, type FileOpenOptions } from "./search";
@@ -161,9 +161,10 @@ export function rankProjectFiles(
     return out;
   }
 
+  const prepared = prepareFuzzyQuery(query);
   const scored: RankedFile[] = [];
   for (const file of files) {
-    const hit = scorePath(query, file.relative, file.name);
+    const hit = scorePath(prepared, file.relative, file.name);
     if (!hit) continue;
     const recency = recentRank.get(file.path);
     const score =

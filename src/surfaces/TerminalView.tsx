@@ -35,13 +35,54 @@ type Props = {
   onMetaChange?: (patch: TerminalMetaPatch) => void;
 };
 
-function cssColor(expr: string, fallback: string): string {
-  const probe = document.createElement("span");
-  probe.style.color = expr;
-  document.body.appendChild(probe);
-  const color = getComputedStyle(probe).color;
-  probe.remove();
-  return color || fallback;
+let colorProbeEl: HTMLDivElement | null = null;
+let colorProbeCtx: CanvasRenderingContext2D | null = null;
+
+export function cssColor(expr: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  try {
+    let resolved = expr.trim();
+    if (resolved.startsWith("var(") && resolved.endsWith(")")) {
+      const match = /^var\(\s*(--[A-Za-z0-9_-]+)(?:\s*,\s*(.+))?\s*\)$/.exec(
+        resolved,
+      );
+      if (match) {
+        const varName = match[1];
+        const varFallback = match[2]?.trim() || fallback;
+        resolved =
+          getComputedStyle(document.documentElement)
+            .getPropertyValue(varName)
+            .trim() || varFallback;
+      }
+    }
+    if (!colorProbeEl) {
+      colorProbeEl = document.createElement("div");
+    }
+    colorProbeEl.style.color = "";
+    colorProbeEl.style.color = resolved;
+    if (!colorProbeEl.style.color) {
+      return fallback;
+    }
+
+    if (!colorProbeCtx) {
+      colorProbeCtx = document.createElement("canvas").getContext("2d");
+    }
+    if (colorProbeCtx) {
+      colorProbeCtx.fillStyle = "#010203";
+      colorProbeCtx.fillStyle = resolved;
+      if (colorProbeCtx.fillStyle !== "#010203") {
+        return colorProbeCtx.fillStyle;
+      }
+      colorProbeCtx.fillStyle = "#040506";
+      colorProbeCtx.fillStyle = resolved;
+      if (colorProbeCtx.fillStyle !== "#040506") {
+        return colorProbeCtx.fillStyle;
+      }
+    }
+    return colorProbeEl.style.color || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const ANSI_DARK = {

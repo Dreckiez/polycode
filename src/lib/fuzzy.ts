@@ -6,15 +6,36 @@ export type FuzzyHit = {
   positions: number[];
 };
 
-export function fuzzyMatch(query: string, text: string): FuzzyHit | null {
-  const tokens = query.trim().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return { score: 0, positions: [] };
-  if (tokens.length === 1) return matchToken(tokens[0], text);
+export type PreparedFuzzyQuery = {
+  raw: string;
+  tokens: { raw: string; lower: string }[];
+};
+
+export function prepareFuzzyQuery(query: string): PreparedFuzzyQuery {
+  const raw = query.trim();
+  const tokens = raw
+    ? raw
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => ({ raw: t, lower: t.toLowerCase() }))
+    : [];
+  return { raw, tokens };
+}
+
+export function fuzzyMatch(
+  query: string | PreparedFuzzyQuery,
+  text: string,
+): FuzzyHit | null {
+  const prepared = typeof query === "string" ? prepareFuzzyQuery(query) : query;
+  if (prepared.tokens.length === 0) return { score: 0, positions: [] };
+  if (prepared.tokens.length === 1) {
+    return matchTokenPrepared(prepared.tokens[0], text);
+  }
 
   const positions: number[] = [];
   let score = 0;
-  for (const token of tokens) {
-    const hit = matchToken(token, text);
+  for (const token of prepared.tokens) {
+    const hit = matchTokenPrepared(token, text);
     if (!hit) return null;
     score += hit.score;
     for (const index of hit.positions) positions.push(index);
@@ -23,10 +44,13 @@ export function fuzzyMatch(query: string, text: string): FuzzyHit | null {
   return { score, positions };
 }
 
-function matchToken(query: string, text: string): FuzzyHit | null {
-  if (!query) return { score: 0, positions: [] };
+function matchTokenPrepared(
+  token: { raw: string; lower: string },
+  text: string,
+): FuzzyHit | null {
+  const needle = token.lower;
+  if (!needle) return { score: 0, positions: [] };
 
-  const needle = query.toLowerCase();
   const hay = text.toLowerCase();
   const positions: number[] = [];
   let score = 0;
@@ -61,15 +85,15 @@ function isUpper(ch: string): boolean {
 
 /** Prefer filename hits over directory-only hits. Positions index `relative`. */
 export function scorePath(
-  query: string,
+  query: string | PreparedFuzzyQuery,
   relative: string,
   name: string,
 ): FuzzyHit | null {
-  const needle = query.trim();
-  if (!needle) return { score: 0, positions: [] };
+  const prepared = typeof query === "string" ? prepareFuzzyQuery(query) : query;
+  if (prepared.tokens.length === 0) return { score: 0, positions: [] };
 
   const offset = Math.max(0, relative.length - name.length);
-  const nameHit = fuzzyMatch(needle, name);
+  const nameHit = fuzzyMatch(prepared, name);
   if (nameHit) {
     return {
       score: nameHit.score + 400,
@@ -77,5 +101,5 @@ export function scorePath(
     };
   }
 
-  return fuzzyMatch(needle, relative);
+  return fuzzyMatch(prepared, relative);
 }

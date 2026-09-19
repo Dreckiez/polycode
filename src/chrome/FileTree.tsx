@@ -8,10 +8,14 @@ import {
 import {
   createContext,
   memo,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -89,7 +93,7 @@ const REVEAL_LABEL = IS_MAC
     ? "Reveal in File Explorer"
     : "Open Containing Folder";
 
-type TreeCtxValue = {
+type TreeState = {
   expanded: Set<string>;
   selectedPath: string | null;
   creating: Creating | null;
@@ -97,6 +101,43 @@ type TreeCtxValue = {
   cutPath: string | null;
   epoch: number;
   gitStatuses?: GitStatusMap;
+};
+
+type TreeStore = {
+  getState: () => TreeState;
+  setState: (updater: (prev: TreeState) => TreeState) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+function createTreeStore(initialState: TreeState): TreeStore {
+  let state = initialState;
+  const listeners = new Set<() => void>();
+  return {
+    getState: () => state,
+    setState: (updater) => {
+      const next = updater(state);
+      if (next === state) return;
+      state = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+const TreeStoreCtx = createContext<TreeStore | null>(null);
+
+function useTreeStore(): TreeStore {
+  const store = useContext(TreeStoreCtx);
+  if (!store) throw new Error("TreeStoreCtx missing");
+  return store;
+}
+
+type TreeActionsValue = {
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onFilePointerDown: (
@@ -115,13 +156,14 @@ type TreeCtxValue = {
   ) => void;
 };
 
-const TreeCtx = createContext<TreeCtxValue | null>(null);
+const TreeActionsCtx = createContext<TreeActionsValue | null>(null);
 
-function useTree(): TreeCtxValue {
-  const ctx = useContext(TreeCtx);
-  if (!ctx) throw new Error("TreeCtx missing");
+function useTreeActions(): TreeActionsValue {
+  const ctx = useContext(TreeActionsCtx);
+  if (!ctx) throw new Error("TreeActionsCtx missing");
   return ctx;
 }
+
 
 function isDirAt(cwd: string, path: string): boolean {
   if (path === cwd) return true;
@@ -231,283 +273,373 @@ export const FileTree = memo(function FileTree({
   onSearch,
   gitStatuses,
 }: Props) {
-  const [expanded, setExpanded] = useState(() => loadExpanded(cwd));
-  const [selectedPath, setSelectedPath] = useState(() => loadSelected(cwd));
+  const store = useMemo(() => {
+    return createTreeStore({
+      expanded: loadExpanded(cwd),
+      selectedPath: loadSelected(cwd),
+      creating: null,
+      renaming: null,
+      cutPath: null,
+      epoch: 0,
+      gitStatuses,
+    });
+  }, [cwd]);
+
+  useLayoutEffect(() => {
+    store.setState((prev) => {
+      if (prev.gitStatuses === gitStatuses) return prev;
+      return { ...prev, gitStatuses };
+    });
+  }, [store, gitStatuses]);
+
   const [children, setChildren] = useState<FsEntry[] | null>(() =>
     peekDir(cwd),
   );
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState<Creating | null>(null);
-  const [renaming, setRenaming] = useState<string | null>(null);
   const [clip, setClip] = useState<Clip | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const [epoch, setEpoch] = useState(0);
-  const creatingRef = useRef(creating);
-  creatingRef.current = creating;
+
+  const updateClip = useCallback(
+    (nextClip: Clip | null | ((cur: Clip | null) => Clip | null)) => {
+      setClip((cur) => {
+        const resolved =
+          typeof nextClip === "function" ? nextClip(cur) : nextClip;
+        const cutPath = resolved?.mode === "cut" ? resolved.path : null;
+        store.setState((s) => (s.cutPath === cutPath ? s : { ...s, cutPath }));
+        return resolved;
+      });
+    },
+    [store],
+  );
+
   const rootRef = useRef<HTMLDivElement>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const name = basename(cwd);
-  const rootOpen = expanded.has(cwd);
 
-  const toggle = (path: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      saveExpanded(cwd, next);
-      return next;
-    });
-  };
+  const rootOpen = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().expanded.has(cwd), [store, cwd]),
+  );
+  const epoch = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().epoch, [store]),
+  );
 
-  const onSelect = (path: string) => {
-    setSelectedPath(path);
-    saveSelected(cwd, path);
-  };
+  const toggle = useCallback(
+    (path: string) => {
+      store.setState((prev) => {
+        const next = new Set(prev.expanded);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        saveExpanded(cwd, next);
+        return { ...prev, expanded: next };
+      });
+    },
+    [cwd, store],
+  );
+
+  const onSelect = useCallback(
+    (path: string) => {
+      store.setState((prev) => {
+        if (prev.selectedPath === path) return prev;
+        saveSelected(cwd, path);
+        return { ...prev, selectedPath: path };
+      });
+    },
+    [cwd, store],
+  );
 
   const fileDragCleanup = useRef<(() => void) | null>(null);
   const suppressFileClickUntil = useRef(0);
 
-  const onFilePointerDown = (
-    path: string,
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) => {
-    if (event.button !== 0 || fileDragCleanup.current) return;
-    const handle = event.currentTarget;
-    const pointerId = event.pointerId;
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let lastX = startX;
-    let lastY = startY;
-    let active = false;
-    let restoreSelection: (() => void) | undefined;
-    let preview: HTMLDivElement | null = null;
+  const onFilePointerDown = useCallback(
+    (
+      path: string,
+      event: ReactPointerEvent<HTMLButtonElement>,
+    ) => {
+      if (event.button !== 0 || fileDragCleanup.current) return;
+      const handle = event.currentTarget;
+      const pointerId = event.pointerId;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      let lastX = startX;
+      let lastY = startY;
+      let active = false;
+      let restoreSelection: (() => void) | undefined;
+      let preview: HTMLDivElement | null = null;
 
-    const movePreview = () => {
-      if (!preview) return;
-      const edge = 8;
-      const grabX = 12;
-      const grabY = 13;
-      const width = preview.offsetWidth;
-      const height = preview.offsetHeight;
-      const x = Math.min(
-        Math.max(edge, lastX - grabX),
-        Math.max(edge, window.innerWidth - width - edge),
-      );
-      const y = Math.min(
-        Math.max(edge, lastY - grabY),
-        Math.max(edge, window.innerHeight - height - edge),
-      );
-      preview.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(
-        y,
-      )}px, 0)`;
-    };
+      const movePreview = () => {
+        if (!preview) return;
+        const edge = 8;
+        const grabX = 12;
+        const grabY = 13;
+        const width = preview.offsetWidth;
+        const height = preview.offsetHeight;
+        const x = Math.min(
+          Math.max(edge, lastX - grabX),
+          Math.max(edge, window.innerWidth - width - edge),
+        );
+        const y = Math.min(
+          Math.max(edge, lastY - grabY),
+          Math.max(edge, window.innerHeight - height - edge),
+        );
+        preview.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(
+          y,
+        )}px, 0)`;
+      };
 
-    const createPreview = () => {
-      preview = document.createElement("div");
-      preview.setAttribute("aria-hidden", "true");
-      preview.classList.add("explorer-file-drag-preview");
+      const createPreview = () => {
+        preview = document.createElement("div");
+        preview.setAttribute("aria-hidden", "true");
+        preview.classList.add("explorer-file-drag-preview");
 
-      // Keep the useful identity of the row without dragging its full-width
-      // layout, indentation spacer, selection state, or button behavior.
-      const icon = handle.children.item(1)?.cloneNode(true);
-      const label = handle.children.item(2)?.cloneNode(true);
-      if (icon) preview.append(icon);
-      if (label) preview.append(label);
+        // Keep the useful identity of the row without dragging its full-width
+        // layout, indentation spacer, selection state, or button behavior.
+        const icon = handle.children.item(1)?.cloneNode(true);
+        const label = handle.children.item(2)?.cloneNode(true);
+        if (icon) preview.append(icon);
+        if (label) preview.append(label);
 
-      document.body.append(preview);
-      movePreview();
-    };
+        document.body.append(preview);
+        movePreview();
+      };
 
-    const release = () => {
-      delete handle.dataset.explorerDragging;
-      preview?.remove();
-      preview = null;
-      document.documentElement.classList.remove("is-explorer-file-dragging");
-      if (restoreSelection) {
-        restoreSelection();
-        restoreSelection = undefined;
-        setGrabbing(false);
-      }
-      try {
-        if (handle.hasPointerCapture(pointerId))
-          handle.releasePointerCapture(pointerId);
-      } catch {
-        /* already released */
-      }
-    };
-
-    const reset = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("blur", onCancel);
-      release();
-      if (active) emitExplorerFilePointerDrag({ type: "end", path });
-      fileDragCleanup.current = null;
-    };
-
-    const activate = () => {
-      active = true;
-      onSelect(path);
-      restoreSelection = suppressTextSelection();
-      setGrabbing(true);
-      createPreview();
-      document.documentElement.classList.add("is-explorer-file-dragging");
-      handle.dataset.explorerDragging = "true";
-      try {
-        handle.setPointerCapture(pointerId);
-      } catch {
-        /* window listeners still track the gesture */
-      }
-    };
-
-    function onMove(moveEvent: PointerEvent) {
-      if (moveEvent.pointerId !== pointerId) return;
-      lastX = moveEvent.clientX;
-      lastY = moveEvent.clientY;
-      if (!active) {
-        if (Math.hypot(lastX - startX, lastY - startY) < 5) return;
-        activate();
-      }
-      moveEvent.preventDefault();
-      movePreview();
-      emitExplorerFilePointerDrag({ type: "move", path, x: lastX, y: lastY });
-    }
-
-    function finish(commit: boolean, upEvent?: PointerEvent) {
-      if (commit && upEvent) onMove(upEvent);
-      if (active) {
-        suppressFileClickUntil.current = performance.now() + 400;
-        if (commit) {
-          emitExplorerFilePointerDrag({
-            type: "drop",
-            path,
-            x: lastX,
-            y: lastY,
-          });
+      const release = () => {
+        delete handle.dataset.explorerDragging;
+        preview?.remove();
+        preview = null;
+        document.documentElement.classList.remove("is-explorer-file-dragging");
+        if (restoreSelection) {
+          restoreSelection();
+          restoreSelection = undefined;
+          setGrabbing(false);
         }
+        try {
+          if (handle.hasPointerCapture(pointerId))
+            handle.releasePointerCapture(pointerId);
+        } catch {
+          /* already released */
+        }
+      };
+
+      const reset = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("blur", onCancel);
+        release();
+        if (active) emitExplorerFilePointerDrag({ type: "end", path });
+        fileDragCleanup.current = null;
+      };
+
+      const activate = () => {
+        active = true;
+        onSelect(path);
+        restoreSelection = suppressTextSelection();
+        setGrabbing(true);
+        createPreview();
+        document.documentElement.classList.add("is-explorer-file-dragging");
+        handle.dataset.explorerDragging = "true";
+        try {
+          handle.setPointerCapture(pointerId);
+        } catch {
+          /* window listeners still track the gesture */
+        }
+      };
+
+      function onMove(moveEvent: PointerEvent) {
+        if (moveEvent.pointerId !== pointerId) return;
+        lastX = moveEvent.clientX;
+        lastY = moveEvent.clientY;
+        if (!active) {
+          if (Math.hypot(lastX - startX, lastY - startY) < 5) return;
+          activate();
+        }
+        moveEvent.preventDefault();
+        movePreview();
+        emitExplorerFilePointerDrag({ type: "move", path, x: lastX, y: lastY });
       }
-      reset();
-    }
 
-    function onUp(upEvent: PointerEvent) {
-      if (upEvent.pointerId === pointerId) finish(true, upEvent);
-    }
-    function onCancel() {
-      finish(false);
-    }
-    function onKey(keyEvent: KeyboardEvent) {
-      if (keyEvent.key !== "Escape") return;
-      keyEvent.preventDefault();
-      finish(false);
-    }
+      function finish(commit: boolean, upEvent?: PointerEvent) {
+        if (commit && upEvent) onMove(upEvent);
+        if (active) {
+          suppressFileClickUntil.current = performance.now() + 400;
+          if (commit) {
+            emitExplorerFilePointerDrag({
+              type: "drop",
+              path,
+              x: lastX,
+              y: lastY,
+            });
+          }
+        }
+        reset();
+      }
 
-    fileDragCleanup.current = onCancel;
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("blur", onCancel);
-  };
+      function onUp(upEvent: PointerEvent) {
+        if (upEvent.pointerId === pointerId) finish(true, upEvent);
+      }
+      function onCancel() {
+        finish(false);
+      }
+      function onKey(keyEvent: KeyboardEvent) {
+        if (keyEvent.key !== "Escape") return;
+        keyEvent.preventDefault();
+        finish(false);
+      }
 
-  const consumeFileClick = () =>
-    performance.now() < suppressFileClickUntil.current;
+      fileDragCleanup.current = onCancel;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("blur", onCancel);
+    },
+    [onSelect],
+  );
+
+  const consumeFileClick = useCallback(
+    () => performance.now() < suppressFileClickUntil.current,
+    [],
+  );
 
   useEffect(() => () => fileDragCleanup.current?.(), []);
 
-  const expandDirs = (dirs: string[]) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const dir of dirs) next.add(dir);
-      saveExpanded(cwd, next);
-      return next;
-    });
-  };
+  const expandDirs = useCallback(
+    (dirs: string[]) => {
+      store.setState((prev) => {
+        const next = new Set(prev.expanded);
+        for (const dir of dirs) next.add(dir);
+        saveExpanded(cwd, next);
+        return { ...prev, expanded: next };
+      });
+    },
+    [cwd, store],
+  );
 
-  const refreshTouched = async (touched: string[], forget: string[] = []) => {
-    for (const path of forget) forgetDir(path);
-    await Promise.all([...new Set(touched)].map((path) => refreshDir(path)));
-    setEpoch((n) => n + 1);
-  };
+  const refreshTouched = useCallback(
+    async (touched: string[], forget: string[] = []) => {
+      for (const path of forget) forgetDir(path);
+      await Promise.all([...new Set(touched)].map((path) => refreshDir(path)));
+      store.setState((cur) => ({ ...cur, epoch: cur.epoch + 1 }));
+    },
+    [store],
+  );
 
-  const remapTreePaths = (from: string, to: string) => {
-    setExpanded((prev) => {
-      const next = new Set<string>();
-      for (const path of prev) next.add(rebasePath(path, from, to));
-      saveExpanded(cwd, next);
-      return next;
-    });
-    setSelectedPath((prev) => {
-      const next = prev ? rebasePath(prev, from, to) : prev;
-      saveSelected(cwd, next);
-      return next;
-    });
-    setClip((cur) =>
-      cur && (cur.path === from || cur.path.startsWith(`${from}/`))
-        ? { ...cur, path: rebasePath(cur.path, from, to) }
-        : cur,
-    );
-  };
+  const remapTreePaths = useCallback(
+    (from: string, to: string) => {
+      store.setState((prev) => {
+        const nextExpanded = new Set<string>();
+        for (const path of prev.expanded)
+          nextExpanded.add(rebasePath(path, from, to));
+        saveExpanded(cwd, nextExpanded);
+        const nextSelected = prev.selectedPath
+          ? rebasePath(prev.selectedPath, from, to)
+          : prev.selectedPath;
+        saveSelected(cwd, nextSelected);
+        return {
+          ...prev,
+          expanded: nextExpanded,
+          selectedPath: nextSelected,
+        };
+      });
+      updateClip((cur) =>
+        cur && (cur.path === from || cur.path.startsWith(`${from}/`))
+          ? { ...cur, path: rebasePath(cur.path, from, to) }
+          : cur,
+      );
+    },
+    [cwd, store, updateClip],
+  );
 
   const startCreate = (
     isDir: boolean,
-    atPath: string | null = selectedPath,
+    atPath: string | null = store.getState().selectedPath,
   ) => {
     const parent = createParentOf(cwd, atPath);
-    setRenaming(null);
     expandDirs([cwd, parent]);
-    setCreating({ id: Date.now(), parent, isDir });
+    store.setState((prev) => ({
+      ...prev,
+      renaming: null,
+      creating: { id: Date.now(), parent, isDir },
+    }));
   };
 
   const startRename = (path: string) => {
     if (path === cwd) return;
-    setCreating(null);
     setMenu(null);
     onSelect(path);
-    setRenaming(path);
+    store.setState((prev) => ({
+      ...prev,
+      creating: null,
+      renaming: path,
+    }));
   };
 
-  const onCreateCancel = (id: number) => {
-    setCreating((cur) => (cur?.id === id ? null : cur));
-  };
+  const onCreateCancel = useCallback(
+    (id: number) => {
+      store.setState((cur) =>
+        cur.creating?.id === id ? { ...cur, creating: null } : cur,
+      );
+    },
+    [store],
+  );
 
-  const onCreateCommit = async (id: number, raw: string) => {
-    const session = creatingRef.current;
-    if (!session || session.id !== id) return;
-    const asFolder = session.isDir || /[/\\]$/.test(raw);
-    const fileName = wellFormedFileName(raw);
-    const created = await createPath(session.parent, fileName, asFolder);
-    const touched = dirsTouchedByCreate(session.parent, fileName);
-    await refreshTouched(touched);
-    setCreating((cur) => (cur?.id === id ? null : cur));
-    expandDirs(touched);
-    setSelectedPath(created);
-    saveSelected(cwd, created);
-    if (!asFolder) onOpenFile(created, undefined, { exact: true });
-  };
+  const onCreateCommit = useCallback(
+    async (id: number, raw: string) => {
+      const session = store.getState().creating;
+      if (!session || session.id !== id) return;
+      const asFolder = session.isDir || /[/\\]$/.test(raw);
+      const fileName = wellFormedFileName(raw);
+      const created = await createPath(session.parent, fileName, asFolder);
+      const touched = dirsTouchedByCreate(session.parent, fileName);
+      await refreshTouched(touched);
+      store.setState((cur) => {
+        const nextExpanded = new Set(cur.expanded);
+        for (const dir of touched) nextExpanded.add(dir);
+        saveExpanded(cwd, nextExpanded);
+        saveSelected(cwd, created);
+        return {
+          ...cur,
+          creating: cur.creating?.id === id ? null : cur.creating,
+          expanded: nextExpanded,
+          selectedPath: created,
+        };
+      });
+      if (!asFolder) onOpenFile(created, undefined, { exact: true });
+    },
+    [cwd, onOpenFile, refreshTouched, store],
+  );
 
-  const onRenameCancel = () => setRenaming(null);
+  const onRenameCancel = useCallback(() => {
+    store.setState((cur) => (cur.renaming ? { ...cur, renaming: null } : cur));
+  }, [store]);
 
-  const onRenameCommit = async (path: string, raw: string) => {
-    const fileName = wellFormedFileName(raw);
-    if (!fileName || (fileName === basename(path) && !/[/\\]/.test(raw))) {
-      setRenaming(null);
-      return;
-    }
-    const next = await renamePath(path, fileName);
-    const wasDir = isDirAt(cwd, path);
-    const parent = parentPath(path);
-    await refreshTouched(
-      [...dirsTouchedByCreate(parent, fileName), parent],
-      wasDir ? [path] : [],
-    );
-    setRenaming(null);
-    expandDirs(dirsTouchedByCreate(parent, fileName));
-    remapTreePaths(path, next);
-    onFileMoved?.(path, next);
-  };
+  const onRenameCommit = useCallback(
+    async (path: string, raw: string) => {
+      const fileName = wellFormedFileName(raw);
+      if (!fileName || (fileName === basename(path) && !/[/\\]/.test(raw))) {
+        store.setState((cur) =>
+          cur.renaming ? { ...cur, renaming: null } : cur,
+        );
+        return;
+      }
+      const next = await renamePath(path, fileName);
+      const wasDir = isDirAt(cwd, path);
+      const parent = parentPath(path);
+      await refreshTouched(
+        [...dirsTouchedByCreate(parent, fileName), parent],
+        wasDir ? [path] : [],
+      );
+      expandDirs(dirsTouchedByCreate(parent, fileName));
+      remapTreePaths(path, next);
+      store.setState((cur) => ({ ...cur, renaming: null }));
+      onFileMoved?.(path, next);
+    },
+    [cwd, expandDirs, onFileMoved, refreshTouched, remapTreePaths, store],
+  );
 
   const removeEntry = async (path: string) => {
     if (path === cwd) return;
@@ -521,15 +653,19 @@ export const FileTree = memo(function FileTree({
     if (!ok) return;
     await deletePath(path);
     await refreshTouched([parentPath(path)], isDir ? [path] : []);
-    setSelectedPath((prev) => {
-      if (!prev || prev === path || prev.startsWith(`${path}/`)) {
+    store.setState((prev) => {
+      if (
+        !prev.selectedPath ||
+        prev.selectedPath === path ||
+        prev.selectedPath.startsWith(`${path}/`)
+      ) {
         const parent = parentPath(path);
         saveSelected(cwd, parent);
-        return parent;
+        return { ...prev, selectedPath: parent };
       }
       return prev;
     });
-    setClip((cur) =>
+    updateClip((cur) =>
       cur && (cur.path === path || cur.path.startsWith(`${path}/`))
         ? null
         : cur,
@@ -560,13 +696,12 @@ export const FileTree = memo(function FileTree({
       );
       remapTreePaths(from, created);
       onFileMoved?.(from, created);
-      setClip(null);
+      updateClip(null);
     } else {
       await refreshTouched([destParent]);
     }
     expandDirs([destParent]);
-    setSelectedPath(created);
-    saveSelected(cwd, created);
+    onSelect(created);
   };
 
   const duplicateAt = async (path: string) => {
@@ -574,8 +709,7 @@ export const FileTree = memo(function FileTree({
     const destParent = parentPath(path);
     const created = await copyPath(path, destParent);
     await refreshTouched([destParent]);
-    setSelectedPath(created);
-    saveSelected(cwd, created);
+    onSelect(created);
   };
 
   const run = async (work: () => Promise<void>) => {
@@ -587,12 +721,14 @@ export const FileTree = memo(function FileTree({
     }
   };
 
-  const openMenu = (target: MenuTarget, x: number, y: number) => {
-    setCreating(null);
-    setRenaming(null);
-    onSelect(target.path);
-    setMenu({ x, y, target });
-  };
+  const openMenu = useCallback(
+    (target: MenuTarget, x: number, y: number) => {
+      store.setState((prev) => ({ ...prev, creating: null, renaming: null }));
+      onSelect(target.path);
+      setMenu({ x, y, target });
+    },
+    [onSelect, store],
+  );
 
   const runAction = async (id: string, target: MenuTarget) => {
     switch (id) {
@@ -604,11 +740,11 @@ export const FileTree = memo(function FileTree({
         return;
       case "cut":
         if (target.isRoot) return;
-        setClip({ mode: "cut", path: target.path, isDir: target.isDir });
+        updateClip({ mode: "cut", path: target.path, isDir: target.isDir });
         return;
       case "copy":
         if (target.isRoot) return;
-        setClip({ mode: "copy", path: target.path, isDir: target.isDir });
+        updateClip({ mode: "copy", path: target.path, isDir: target.isDir });
         return;
       case "paste":
         await run(() => pasteAt(target.path));
@@ -637,18 +773,21 @@ export const FileTree = memo(function FileTree({
     }
   };
 
-  const onItemContextMenu = (
-    entry: { path: string; isDir: boolean },
-    e: ReactMouseEvent,
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openMenu(
-      { path: entry.path, isDir: entry.isDir, isRoot: false },
-      e.clientX,
-      e.clientY,
-    );
-  };
+  const onItemContextMenu = useCallback(
+    (
+      entry: { path: string; isDir: boolean },
+      e: ReactMouseEvent,
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openMenu(
+        { path: entry.path, isDir: entry.isDir, isRoot: false },
+        e.clientX,
+        e.clientY,
+      );
+    },
+    [openMenu],
+  );
 
   const onBackgroundMenu = (e: ReactMouseEvent) => {
     if ((e.target as HTMLElement).closest("input")) return;
@@ -664,7 +803,7 @@ export const FileTree = memo(function FileTree({
     ) {
       return;
     }
-    const path = selectedPath ?? cwd;
+    const path = store.getState().selectedPath ?? cwd;
     const isRoot = path === cwd;
     const isDir = isDirAt(cwd, path);
     const mod = e.metaKey || e.ctrlKey;
@@ -672,13 +811,13 @@ export const FileTree = memo(function FileTree({
     if (mod && !e.altKey && !e.shiftKey && key === "c") {
       if (isRoot) return;
       e.preventDefault();
-      setClip({ mode: "copy", path, isDir });
+      updateClip({ mode: "copy", path, isDir });
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && key === "x") {
       if (isRoot) return;
       e.preventDefault();
-      setClip({ mode: "cut", path, isDir });
+      updateClip({ mode: "cut", path, isDir });
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && key === "v") {
@@ -698,7 +837,7 @@ export const FileTree = memo(function FileTree({
     }
     if (e.key === "Escape" && clip?.mode === "cut") {
       e.preventDefault();
-      setClip(null);
+      updateClip(null);
     }
   };
 
@@ -711,7 +850,9 @@ export const FileTree = memo(function FileTree({
   }, [menu]);
 
   useEffect(() => {
-    const unsub = subscribeDirsChanged(() => setEpoch((n) => n + 1));
+    const unsub = subscribeDirsChanged(() => {
+      store.setState((cur) => ({ ...cur, epoch: cur.epoch + 1 }));
+    });
     const onResume = () => {
       if (!document.hidden) notifyDirsChanged();
     };
@@ -722,7 +863,7 @@ export const FileTree = memo(function FileTree({
       window.removeEventListener("focus", onResume);
       document.removeEventListener("visibilitychange", onResume);
     };
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     const hit = peekDir(cwd);
@@ -749,122 +890,131 @@ export const FileTree = memo(function FileTree({
     };
   }, [cwd, epoch]);
 
+  const treeActionsValue = useMemo<TreeActionsValue>(
+    () => ({
+      onToggle: toggle,
+      onSelect,
+      onFilePointerDown,
+      consumeFileClick,
+      onOpenFile,
+      onCreateCommit,
+      onCreateCancel,
+      onRenameCommit,
+      onRenameCancel,
+      onItemContextMenu,
+    }),
+    [
+      toggle,
+      onSelect,
+      onFilePointerDown,
+      consumeFileClick,
+      onOpenFile,
+      onCreateCommit,
+      onCreateCancel,
+      onRenameCommit,
+      onRenameCancel,
+      onItemContextMenu,
+    ],
+  );
+
   return (
-    <TreeCtx.Provider
-      value={{
-        expanded,
-        selectedPath,
-        creating,
-        renaming,
-        cutPath: clip?.mode === "cut" ? clip.path : null,
-        epoch,
-        gitStatuses,
-        onToggle: toggle,
-        onSelect,
-        onFilePointerDown,
-        consumeFileClick,
-        onOpenFile,
-        onCreateCommit,
-        onCreateCancel,
-        onRenameCommit,
-        onRenameCancel,
-        onItemContextMenu,
-      }}
-    >
-      <div
-        ref={rootRef}
-        tabIndex={-1}
-        className="flex h-full min-h-0 flex-col outline-none"
-        onKeyDown={onKeyDown}
-        onContextMenu={onBackgroundMenu}
-      >
+    <TreeStoreCtx.Provider value={store}>
+      <TreeActionsCtx.Provider value={treeActionsValue}>
         <div
-          className="flex h-9 shrink-0 items-center gap-px overflow-visible border-b border-content/10 px-2"
-          onContextMenu={(e) => e.stopPropagation()}
+          ref={rootRef}
+          tabIndex={-1}
+          className="flex h-full min-h-0 flex-col outline-none"
+          onKeyDown={onKeyDown}
+          onContextMenu={onBackgroundMenu}
         >
-          <HeaderIcon label="New File" onClick={() => startCreate(false)}>
-            <FilePlus className="size-3.5" strokeWidth={1.75} />
-          </HeaderIcon>
-          <HeaderIcon label="New Folder" onClick={() => startCreate(true)}>
-            <FolderPlus className="size-3.5" strokeWidth={1.75} />
-          </HeaderIcon>
-          {onSearch ? (
-            <HeaderIcon
-              label={`Search in files (${MOD}Shift+F)`}
-              onClick={onSearch}
-            >
-              <Search className="size-3.5" strokeWidth={1.75} />
-            </HeaderIcon>
-          ) : null}
-        </div>
-        <div className="flex h-8 shrink-0 items-center">
-          <button
-            type="button"
-            aria-expanded={rootOpen}
-            title={cwd}
-            onClick={() => {
-              onSelect(cwd);
-              toggle(cwd);
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openMenu(
-                { path: cwd, isDir: true, isRoot: true },
-                e.clientX,
-                e.clientY,
-              );
-            }}
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 h-full pl-2 text-left"
+          <div
+            className="flex h-9 shrink-0 items-center gap-px overflow-visible border-b border-content/10 px-2"
+            onContextMenu={(e) => e.stopPropagation()}
           >
-            <span className="grid size-4 shrink-0 place-items-center text-content/50">
-              {rootOpen ? (
-                <ChevronDown className="size-3.5" strokeWidth={1.75} />
-              ) : (
-                <ChevronRight className="size-3.5" strokeWidth={1.75} />
-              )}
-            </span>
-            <span className="min-w-0 truncate text-[11px] font-semibold tracking-[0.08em] text-content/50 uppercase">
-              {name}
-            </span>
-          </button>
+            <HeaderIcon label="New File" onClick={() => startCreate(false)}>
+              <FilePlus className="size-3.5" strokeWidth={1.75} />
+            </HeaderIcon>
+            <HeaderIcon label="New Folder" onClick={() => startCreate(true)}>
+              <FolderPlus className="size-3.5" strokeWidth={1.75} />
+            </HeaderIcon>
+            {onSearch ? (
+              <HeaderIcon
+                label={`Search in files (${MOD}Shift+F)`}
+                onClick={onSearch}
+              >
+                <Search className="size-3.5" strokeWidth={1.75} />
+              </HeaderIcon>
+            ) : null}
+          </div>
+          <div className="flex h-8 shrink-0 items-center">
+            <button
+              type="button"
+              aria-expanded={rootOpen}
+              title={cwd}
+              onClick={() => {
+                onSelect(cwd);
+                toggle(cwd);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openMenu(
+                  { path: cwd, isDir: true, isRoot: true },
+                  e.clientX,
+                  e.clientY,
+                );
+              }}
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 h-full pl-2 text-left"
+            >
+              <span className="grid size-4 shrink-0 place-items-center text-content/50">
+                {rootOpen ? (
+                  <ChevronDown className="size-3.5" strokeWidth={1.75} />
+                ) : (
+                  <ChevronRight className="size-3.5" strokeWidth={1.75} />
+                )}
+              </span>
+              <span className="min-w-0 truncate text-[11px] font-semibold tracking-[0.08em] text-content/50 uppercase">
+                {name}
+              </span>
+            </button>
+          </div>
+          <div
+            ref={lockOverscroll}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-none"
+          >
+            {opError ? (
+              <p className="px-3 py-1 text-[12px] leading-4 text-red-400">
+                {opError}
+              </p>
+            ) : null}
+            {rootOpen ? (
+              <div role="tree" aria-label={`${name} files`}>
+                <TreeChildren
+                  parent={cwd}
+                  depth={0}
+                  entries={children}
+                  loading={children === null && !error}
+                  error={error}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
-        <div
-          ref={lockOverscroll}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-none"
-        >
-          {opError ? (
-            <p className="px-3 py-1 text-[12px] leading-4 text-red-400">
-              {opError}
-            </p>
-          ) : null}
-          {rootOpen ? (
-            <div role="tree" aria-label={`${name} files`}>
-              <TreeChildren
-                parent={cwd}
-                depth={0}
-                entries={children}
-                loading={children === null && !error}
-                error={error}
-              />
-            </div>
-          ) : null}
-        </div>
-      </div>
-      {menu ? (
-        <ExplorerMenu
-          x={menu.x}
-          y={menu.y}
-          items={explorerItems(menu.target, clip, !!onOpenTerminal)}
-          onPick={(id) => {
-            const target = menu.target;
-            setMenu(null);
-            void runAction(id, target);
-          }}
-          onClose={() => setMenu(null)}
-        />
-      ) : null}
-    </TreeCtx.Provider>
+        {menu ? (
+          <ExplorerMenu
+            x={menu.x}
+            y={menu.y}
+            items={explorerItems(menu.target, clip, !!onOpenTerminal)}
+            onPick={(id) => {
+              const target = menu.target;
+              setMenu(null);
+              void runAction(id, target);
+            }}
+            onClose={() => setMenu(null)}
+          />
+        ) : null}
+      </TreeActionsCtx.Provider>
+    </TreeStoreCtx.Provider>
   );
 });
 
@@ -898,7 +1048,7 @@ function HeaderIcon({
   );
 }
 
-function TreeChildren({
+const TreeChildren = memo(function TreeChildren({
   parent,
   depth,
   entries,
@@ -911,9 +1061,31 @@ function TreeChildren({
   loading: boolean;
   error: string | null;
 }) {
-  const ctx = useTree();
-  const creating = ctx.creating;
-  const show = creating?.parent === parent;
+  const store = useTreeStore();
+  const { onCreateCommit, onCreateCancel } = useTreeActions();
+
+  const creating = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => {
+      const c = store.getState().creating;
+      return c?.parent === parent ? c : null;
+    }, [store, parent]),
+  );
+
+  const { folders, files } = useMemo(() => {
+    const folders: FsEntry[] = [];
+    const files: FsEntry[] = [];
+    if (entries) {
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (e.isDir) folders.push(e);
+        else files.push(e);
+      }
+    }
+    return { folders, files };
+  }, [entries]);
+
+  const show = creating !== null;
   const row =
     show && creating ? (
       <NameRow
@@ -921,13 +1093,11 @@ function TreeChildren({
         depth={depth}
         isDir={creating.isDir}
         siblings={(entries ?? []).map((entry) => entry.name)}
-        onCommit={(raw) => ctx.onCreateCommit(creating.id, raw)}
-        onCancel={() => ctx.onCreateCancel(creating.id)}
+        onCommit={(raw) => onCreateCommit(creating.id, raw)}
+        onCancel={() => onCreateCancel(creating.id)}
       />
     ) : null;
-  const folders = entries?.filter((e) => e.isDir) ?? [];
-  const files = entries?.filter((e) => !e.isDir) ?? [];
-  const pad = { paddingLeft: 28 + depth * 12 };
+  const pad = useMemo(() => ({ paddingLeft: 28 + depth * 12 }), [depth]);
 
   return (
     <>
@@ -936,7 +1106,7 @@ function TreeChildren({
           {error}
         </p>
       ) : null}
-      {show && ctx.creating?.isDir ? row : null}
+      {show && creating?.isDir ? row : null}
       {loading && !error ? (
         <p className="pr-2 text-[12px] text-content/50" style={pad}>
           …
@@ -945,22 +1115,23 @@ function TreeChildren({
       {folders.map((child) => (
         <TreeNode key={child.path} entry={child} depth={depth} />
       ))}
-      {show && ctx.creating && !ctx.creating.isDir ? row : null}
+      {show && creating && !creating.isDir ? row : null}
       {files.map((child) => (
         <TreeNode key={child.path} entry={child} depth={depth} />
       ))}
     </>
   );
-}
+});
 
-function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
+const TreeNode = memo(function TreeNode({
+  entry,
+  depth,
+}: {
+  entry: FsEntry;
+  depth: number;
+}) {
+  const store = useTreeStore();
   const {
-    expanded,
-    selectedPath,
-    renaming,
-    cutPath,
-    epoch,
-    gitStatuses,
     onToggle,
     onSelect,
     onFilePointerDown,
@@ -969,17 +1140,58 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
     onRenameCommit,
     onRenameCancel,
     onItemContextMenu,
-  } = useTree();
-  const open = expanded.has(entry.path);
+  } = useTreeActions();
+
+  const open = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => (entry.isDir ? store.getState().expanded.has(entry.path) : false),
+      [store, entry.isDir, entry.path],
+    ),
+  );
+  const selected = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => store.getState().selectedPath === entry.path,
+      [store, entry.path],
+    ),
+  );
+  const editing = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => store.getState().renaming === entry.path,
+      [store, entry.path],
+    ),
+  );
+  const cut = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => store.getState().cutPath === entry.path,
+      [store, entry.path],
+    ),
+  );
+  const gitStatus = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => {
+      const statuses = store.getState().gitStatuses;
+      if (!statuses) return undefined;
+      return entry.isDir
+        ? statuses.dirs.get(entry.path)
+        : statuses.files.get(entry.path);
+    }, [store, entry.isDir, entry.path]),
+  );
+  const epoch = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => (entry.isDir ? store.getState().epoch : 0),
+      [store, entry.isDir],
+    ),
+  );
+
   const [children, setChildren] = useState<FsEntry[] | null>(() =>
     entry.isDir ? peekDir(entry.path) : null,
   );
   const [error, setError] = useState<string | null>(null);
-  const selected = selectedPath === entry.path;
-  const editing = renaming === entry.path;
-  const gitStatus = entry.isDir
-    ? gitStatuses?.dirs.get(entry.path)
-    : gitStatuses?.files.get(entry.path);
   const gitColor = gitStatus ? GIT_STATUS_COLOR[gitStatus] : undefined;
 
   useEffect(() => {
@@ -1009,16 +1221,38 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
     };
   }, [entry.isDir, entry.path, open, epoch]);
 
-  const onClick = () => {
+  const onClick = useCallback(() => {
     if (consumeFileClick()) return;
     onSelect(entry.path);
     if (entry.isDir) onToggle(entry.path);
     else onOpenFile(entry.path, undefined, { exact: true });
-  };
+  }, [consumeFileClick, onSelect, onToggle, onOpenFile, entry.path, entry.isDir]);
 
-  const siblings = (peekDir(parentPath(entry.path)) ?? [])
-    .map((child) => child.name)
-    .filter((name) => name !== entry.name);
+  const onPointerDownHandler = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!entry.isDir) onFilePointerDown(entry.path, event);
+    },
+    [entry.isDir, entry.path, onFilePointerDown],
+  );
+
+  const onContextMenuHandler = useCallback(
+    (e: ReactMouseEvent) => {
+      onItemContextMenu(entry, e);
+    },
+    [entry, onItemContextMenu],
+  );
+
+  const siblings = useMemo(
+    () =>
+      editing
+        ? (peekDir(parentPath(entry.path)) ?? [])
+            .map((child) => child.name)
+            .filter((name) => name !== entry.name)
+        : [],
+    [editing, entry.path, entry.name],
+  );
+
+  const rowStyle = useMemo(() => ({ paddingLeft: 8 + depth * 12 }), [depth]);
 
   return (
     <div>
@@ -1039,16 +1273,14 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
           title={entry.path}
           aria-expanded={entry.isDir ? open : undefined}
           onClick={onClick}
-          onPointerDown={(event) => {
-            if (!entry.isDir) onFilePointerDown(entry.path, event);
-          }}
-          onContextMenu={(e) => onItemContextMenu(entry, e)}
-          style={{ paddingLeft: 8 + depth * 12 }}
+          onPointerDown={onPointerDownHandler}
+          onContextMenu={onContextMenuHandler}
+          style={rowStyle}
           className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal data-[explorer-dragging]:opacity-50 ${
             selected
               ? "bg-content/10 text-content"
               : "text-content hover:bg-content/5"
-          } ${cutPath === entry.path ? "opacity-50" : ""}`}
+          } ${cut ? "opacity-50" : ""}`}
         >
           <span className="grid size-4 shrink-0 place-items-center text-content/50">
             {entry.isDir ? (
@@ -1082,7 +1314,7 @@ function TreeNode({ entry, depth }: { entry: FsEntry; depth: number }) {
       ) : null}
     </div>
   );
-}
+});
 
 function NameRow({
   depth,

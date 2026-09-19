@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { memo, useSyncExternalStore } from "react";
+import { memo, useCallback, useSyncExternalStore } from "react";
 import {
   MarkdownViewShell,
   useMarkdownMode,
@@ -93,6 +93,23 @@ function FilePaneComponent({
       (diffViewer === "unified" && isReviewTab(activeFile)));
   const commitReview = !!activeFile && isCommitTab(activeFile);
 
+  const handleSelectFile = useCallback(
+    (fileId: string) => onSelectFile(pane.id, fileId),
+    [onSelectFile, pane.id],
+  );
+  const handleCloseFile = useCallback(
+    (fileId: string) => onCloseFile(pane.id, fileId),
+    [onCloseFile, pane.id],
+  );
+  const handleCloseOtherFiles = useCallback(
+    (fileId: string) => onCloseOtherFiles(pane.id, fileId),
+    [onCloseOtherFiles, pane.id],
+  );
+  const handleReorderFiles = useCallback(
+    (ids: string[]) => onReorderFiles(pane.id, ids),
+    [onReorderFiles, pane.id],
+  );
+
   return (
     <div
       className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
@@ -103,10 +120,10 @@ function FilePaneComponent({
         activeFileId={pane.activeFileId}
         dirtyFileIds={dirtyFileIds}
         fileErrorCounts={fileErrorCounts}
-        onSelectFile={(fileId) => onSelectFile(pane.id, fileId)}
-        onCloseFile={(fileId) => onCloseFile(pane.id, fileId)}
-        onCloseOtherFiles={(fileId) => onCloseOtherFiles(pane.id, fileId)}
-        onReorder={(ids) => onReorderFiles(pane.id, ids)}
+        onSelectFile={handleSelectFile}
+        onCloseFile={handleCloseFile}
+        onCloseOtherFiles={handleCloseOtherFiles}
+        onReorder={handleReorderFiles}
         onPaneDragStart={onPaneDragStart}
       />
       <div className="relative min-h-0 flex-1">

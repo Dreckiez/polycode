@@ -15,6 +15,7 @@ import {
   X,
 } from "./icons";
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -35,7 +36,7 @@ import {
   pickAttachments,
   revokeAttachment,
 } from "../lib/attachments";
-import { resizeComposer } from "../lib/composerResize";
+import { COMPOSER_MAX_HEIGHT, resizeComposer } from "../lib/composerResize";
 import {
   EXPLORER_FILE_POINTER_DRAG_EVENT,
   type ExplorerFilePointerDragDetail,
@@ -387,7 +388,7 @@ function MessageQueue({
   );
 }
 
-export function Composer({
+export const Composer = memo(function Composer({
   enabled = true,
   focused,
   hotkeys = false,
@@ -526,7 +527,10 @@ export function Composer({
   const skillLimit = hasNativeCommands(harness)
     ? Number.POSITIVE_INFINITY
     : undefined;
-  const rankedSkills = rankSkills(slashItems, slash?.query ?? "", skillLimit);
+  const rankedSkills = useMemo(() => {
+    if (slash === null && !creatingSkill) return [];
+    return rankSkills(slashItems, slash?.query ?? "", skillLimit);
+  }, [slashItems, slash?.query, skillLimit, creatingSkill]);
   const attachmentsSupported = harnessSupportsAttachments(harness);
   const skillNames = useMemo(
     () => new Set(slashItems.map((skill) => skill.invocation)),
@@ -718,10 +722,18 @@ export function Composer({
     const el = ref.current;
     if (!el) return;
 
+    syncHighlightScroll(el);
+    if (
+      el.scrollHeight <= COMPOSER_MAX_HEIGHT &&
+      el.scrollTop === 0 &&
+      el.scrollLeft === 0
+    ) {
+      return;
+    }
+
     // The textarea can scroll itself to keep the caret visible before React
     // commits the updated highlight text. Sync again after that commit, when
     // the overlay has enough scrollable content to accept the same offset.
-    syncHighlightScroll(el);
     const frame = requestAnimationFrame(() => {
       if (ref.current === el) syncHighlightScroll(el);
     });
@@ -989,6 +1001,25 @@ export function Composer({
       unlisten?.();
     };
   }, [addAttachments, attachmentsSupported, enabled]);
+
+  const handlePickerSettingsChange = useCallback(
+    (settings: Record<string, string>) => {
+      onModelSettingsChange?.(settings);
+    },
+    [onModelSettingsChange],
+  );
+
+  const handlePickerClose = useCallback(() => {
+    ref.current?.focus();
+  }, []);
+
+  const handleStop = useCallback(() => {
+    onStop?.();
+  }, [onStop]);
+
+  const handleRunnerExited = useCallback(() => {
+    setRunnerLive(false);
+  }, []);
 
   const submit = (value: string) => {
     const folderCommand = consumeSessionFolderCommand(value);
@@ -1331,7 +1362,7 @@ export function Composer({
                   enabled={enabled}
                   onCwdChange={onCwdChange}
                   onNewTerminal={onNewTerminal}
-                  onClose={() => ref.current?.focus()}
+                  onClose={handlePickerClose}
                 />
               )}
               {hideBranchPicker ? null : (
@@ -1340,7 +1371,7 @@ export function Composer({
                   branch={branch}
                   enabled={enabled && !busy}
                   onChange={onBranchChange}
-                  onClose={() => ref.current?.focus()}
+                  onClose={handlePickerClose}
                 />
               )}
               <div className="ml-auto flex shrink-0 items-center">
@@ -1538,26 +1569,22 @@ export function Composer({
                   values={modelSettings}
                   hotkeys={hotkeys && enabled}
                   onChange={onModelChange}
-                  onSettingsChange={(settings) =>
-                    onModelSettingsChange?.(settings)
-                  }
-                  onClose={() => ref.current?.focus()}
+                  onSettingsChange={handlePickerSettingsChange}
+                  onClose={handlePickerClose}
                 />
                 <EffortPicker
                   harness={harness}
                   model={model}
                   values={modelSettings}
-                  onSettingsChange={(settings) =>
-                    onModelSettingsChange?.(settings)
-                  }
-                  onClose={() => ref.current?.focus()}
+                  onSettingsChange={handlePickerSettingsChange}
+                  onClose={handlePickerClose}
                 />
                 {harness !== "fx" ? (
                   <AccessPicker
                     value={runtimeMode}
                     busy={busy}
                     onChange={onRuntimeModeChange}
-                    onClose={() => ref.current?.focus()}
+                    onClose={handlePickerClose}
                   />
                 ) : null}
               </div>
@@ -1568,7 +1595,7 @@ export function Composer({
                 busy={busy}
                 hasValue={hasValue}
                 onSend={() => submit(ref.current?.value ?? "")}
-                onStop={() => onStop?.()}
+                onStop={handleStop}
               />
             </div>
           </div>
@@ -1579,13 +1606,13 @@ export function Composer({
             cwd={cwd}
             busy={busy}
             enabled={enabled}
-            onExited={() => setRunnerLive(false)}
+            onExited={handleRunnerExited}
           />
         ) : null}
       </div>
     </div>
   );
-}
+});
 
 function ComposerHighlight({
   text,

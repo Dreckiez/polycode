@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -51,13 +52,25 @@ type Props = {
   revealBlock?: (blockId: string) => boolean;
 };
 
-export function PromptOutline({
+export const PromptOutline = memo(function PromptOutline({
   blocks,
   scope,
   visible = true,
   revealBlock,
 }: Props) {
-  const prompts = useMemo(() => promptBlocks(blocks), [blocks]);
+  const previousPromptsRef = useRef<Block[]>([]);
+  const prompts = useMemo(() => {
+    const next = promptBlocks(blocks);
+    const prev = previousPromptsRef.current;
+    if (
+      prev.length === next.length &&
+      prev.every((b, i) => b === next[i])
+    ) {
+      return prev;
+    }
+    previousPromptsRef.current = next;
+    return next;
+  }, [blocks]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [stackBudget, setStackBudget] = useState(BAR_STACK_MAX_PX);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -138,7 +151,7 @@ export function PromptOutline({
 
   useEffect(() => {
     schedule();
-  }, [schedule, blocks, visible]);
+  }, [schedule, prompts, visible]);
 
   const cancelOpen = () => {
     if (openTimer.current == null) return;
@@ -329,7 +342,7 @@ export function PromptOutline({
       ) : null}
     </div>
   );
-}
+});
 
 /** Clicking a bar focuses it as well. Only a keyboard focus holds the card open. */
 function keyboardFocused(rail: HTMLElement | null): boolean {

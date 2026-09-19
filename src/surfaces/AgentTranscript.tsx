@@ -128,6 +128,14 @@ type Props = {
   visible?: boolean;
 };
 
+function sameTurnBlocks(a: Block[], b: Block[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function AgentTranscriptComponent({
   blocks,
   busy,
@@ -277,7 +285,6 @@ function AgentTranscriptComponent({
   useLayoutEffect(() => {
     if (!visible || !stickToBottom.current) return;
     const el = scroller.current;
-    syncTranscriptViewport(el);
     pinToBottom(el);
   }, [blocks, busy, visible]);
 
@@ -303,9 +310,33 @@ function AgentTranscriptComponent({
     return () => observer.disconnect();
   }, [scrollerEl, setShowJump, visible]);
 
-  const turns = groupTurns(blocks);
+  const rawTurns = useMemo(() => groupTurns(blocks), [blocks]);
+  const previousTurnsRef = useRef<Block[][]>([]);
+  const turns = useMemo(() => {
+    const prev = previousTurnsRef.current;
+    const stabilized: Block[][] = [];
+    let changed = false;
+    for (let i = 0; i < rawTurns.length; i++) {
+      const nextTurn = rawTurns[i];
+      const prevTurn = prev[i];
+      if (prevTurn && sameTurnBlocks(prevTurn, nextTurn)) {
+        stabilized.push(prevTurn);
+      } else {
+        stabilized.push(nextTurn);
+        changed = true;
+      }
+    }
+    if (!changed && prev.length === rawTurns.length) {
+      return prev;
+    }
+    previousTurnsRef.current = stabilized;
+    return stabilized;
+  }, [rawTurns]);
   const firstVisibleTurn = Math.max(0, turns.length - visibleTurnCount);
-  const visibleTurns = turns.slice(firstVisibleTurn);
+  const visibleTurns = useMemo(
+    () => turns.slice(firstVisibleTurn),
+    [turns, firstVisibleTurn],
+  );
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
   const visibleTurnCountRef = useRef(visibleTurnCount);
@@ -374,207 +405,45 @@ function AgentTranscriptComponent({
         ) : null}
         {visibleTurns.map((turn, turnIndex) => {
           const isLastTurn = firstVisibleTurn + turnIndex === turns.length - 1;
-          const userBlock = turnUserBlock(turn);
-          const durationMs = userBlock?.durationMs;
-          const settled = !(busy && isLastTurn);
-          const items = groupTurnItems(turn);
-          // Earlier activity groups have already been followed by prose or
-          // more work. Only the last one can still be the live group.
-          const foldedAt = lastActivityIndex(items);
-          const initialThinkingAt = initialThinkingIndex(items);
-          const startedAt = userBlock?.startedAt;
-          // The agent starting its answer is the end of the work: fold the
-          // groups then, not when the turn finally settles, so the collapse
-          // never lands under the text you have already started reading.
-          const answering =
-            foldedAt >= 0 &&
-            items
-              .slice(foldedAt + 1)
-              .some(
-                (item) => item.type === "block" && isProseBlock(item.block),
-              );
-          const workStillRunning = activityStillRunning(turn);
-          // New turns carry immutable model provenance. Legacy turns do not,
-          // so omit their model instead of rewriting history from the picker.
-          const turnModel = userBlock?.turnModel;
+          const turnId = turn[0].id;
+          const subagentFailure = subagentFailureSummary(turn);
+          const workOpen = openWork[turnId] ?? !!subagentFailure;
+          const turnModel = turnUserBlock(turn)?.turnModel;
           const turnHarness = harness
             ? (turnModel?.harness ?? harnessForTurn(blocks, turn, harness))
             : undefined;
-          // Work the turn has already answered for folds away behind one line,
-          // leaving the prompt and the answer to it.
-          const turnId = turn[0].id;
-          const fold = foldableWork(items);
-          const folded = fold ? foldedBlocks(items, fold) : [];
-          const subagentFailure = subagentFailureSummary(turn);
-          // Failures open once by default so their provider detail is not
-          // buried. An explicit click still lets the reader fold them away.
-          const workOpen = openWork[turnId] ?? !!subagentFailure;
-          // The fold line is the turn's status line from the first token to
-          // the last: the mark, and the clock beside it. It never moves, so a
-          // turn settling does not shuffle the layout around the answer.
-          const live = visible && !settled && !preparingHandoff;
-          const turnModelName =
-            turnModel?.name ?? (live ? currentModelName : undefined);
-          const foldTitle: ReactNode = subagentFailure ? (
-            subagentFailure
-          ) : live ? (
-            <LiveFoldTitle
-              startedAt={startedAt}
-              paused={waitingForApproval}
-              waitingLabel={pendingQuestion ? "Waiting for answers" : undefined}
-              subagent={hasRunningSubagent(turn)}
-              modelName={turnModelName}
-            />
-          ) : durationMs != null ? (
-            formatWorkingDuration(durationMs, true, false, turnModelName)
-          ) : (
-            workSummaryLine(folded)
-          );
-          const showFoldLine = live || durationMs != null || !!fold;
-          // It sits where the work starts, from before there is any: the row
-          // is there from the first token, so nothing shoves the answer down
-          // when the turn folds.
-          const firstWork = firstFoldableIndex(items);
-          const foldLineAt = fold
-            ? fold.start
-            : firstWork >= 0
-              ? firstWork
-              : items.length;
-          const renderItem = (item: TurnItem, itemIndex: number) =>
-            item.type === "activity" ? (
-              itemIndex === initialThinkingAt ? (
-                <InitialThinking
-                  key={item.blocks[0].id}
-                  live={visible && !settled}
-                />
-              ) : (
-                <ActivityPhases
-                  key={item.blocks[0].id}
-                  blocks={item.blocks}
-                  cwd={cwd}
-                  done={
-                    !visible ||
-                    settled ||
-                    itemIndex < foldedAt ||
-                    (answering && !workStillRunning)
-                  }
-                  onApproval={onApproval}
-                  onOpenFile={onOpenFile}
-                  onOpenDiff={onOpenDiff}
-                />
-              )
-            ) : (
-              <TranscriptBlock
-                key={item.block.id}
-                block={item.block}
-                layout={transcriptLayout}
-                stickyIndex={firstVisibleTurn + turnIndex + 1}
-                // Prose reads the same wherever it lands: under the fold
-                // line at the top of the turn, or under the work it follows.
-                underLine={
-                  isProseBlock(item.block) &&
-                  itemIndex > 0 &&
-                  (items[itemIndex - 1]?.type === "activity" ||
-                    (itemIndex === foldLineAt && showFoldLine))
-                }
-                onApproval={onApproval}
-                onOpenFile={onOpenFile}
-                onOpenDiff={onOpenDiff}
-                onOpenPlan={onOpenPlan}
-                onBuildPlan={onBuildPlan}
-                planBusy={!!busy}
-                planHarness={harness}
-                planModel={model}
-                cwd={cwd}
-              />
-            );
-          const foldLineRow = (
-            <TurnRow key="work-fold" folded={!showFoldLine}>
-              <WorkFoldLine
-                title={foldTitle}
-                kind={workKind(folded)}
-                harness={turnHarness}
-                live={live}
-                failed={!!subagentFailure}
-                expandable={!!fold}
-                open={workOpen && !!fold}
-                onToggle={() => toggleWork(turnId, workOpen)}
-              />
-            </TurnRow>
-          );
           return (
-            <div
-              key={turn[0].id}
-              className={`transcript-turn flex min-w-0 flex-col${
-                isLastTurn ? " transcript-turn-live" : ""
-              }${
-                promptAnchor && anchorTurn && isLastTurn && userBlock
-                  ? " transcript-turn-anchor"
-                  : ""
-              }`}
-            >
-              {items.flatMap((item, itemIndex) => {
-                const inFold =
-                  !!fold && itemIndex >= fold.start && itemIndex <= fold.end;
-                if (inFold) {
-                  if (itemIndex !== fold.start) return [];
-                  return [
-                    foldLineRow,
-                    <TurnRow key="work-details" folded={!workOpen}>
-                      {() =>
-                        items
-                          .slice(fold.start, fold.end + 1)
-                          .map((entry, offset) => (
-                            <div
-                              key={turnItemKey(entry)}
-                              className={`flow-root pb-1 last:pb-0 pl-5 zen-fold-rail ${
-                                fold.start + offset === fold.end
-                                  ? "zen-fold-tail"
-                                  : ""
-                              }`}
-                            >
-                              {renderItem(entry, fold.start + offset)}
-                            </div>
-                          ))
-                      }
-                    </TurnRow>,
-                  ];
-                }
-                const row = (
-                  <div key={turnItemKey(item)} className="flow-root pb-1">
-                    {renderItem(item, itemIndex)}
-                  </div>
-                );
-                if (itemIndex !== foldLineAt) return row;
-                return [foldLineRow, row];
-              })}
-              {foldLineAt >= items.length ? foldLineRow : null}
-              {isLastTurn && latestTurnAccessory ? latestTurnAccessory : null}
-              {durationMs != null && settled ? (
-                <TurnDuration
-                  elapsedMs={durationMs}
-                  labelHidden={showFoldLine}
-                  modelName={turnModelName}
-                  completedAt={
-                    startedAt != null ? startedAt + durationMs : undefined
-                  }
-                  copyText={turnCopyText(turn)}
-                  onSaveNote={onSaveNote}
-                  harness={turnHarness}
-                  fromHarness={turnHarness}
-                  onSecondOpinion={
-                    onSecondOpinion
-                      ? (target, model) => onSecondOpinion(target, turn, model)
-                      : undefined
-                  }
-                  onHandoff={
-                    onHandoff
-                      ? (target, model) => onHandoff(target, turn, model)
-                      : undefined
-                  }
-                />
-              ) : null}
-            </div>
+            <TranscriptTurn
+              key={turnId}
+              turn={turn}
+              turnIndex={turnIndex}
+              firstVisibleTurn={firstVisibleTurn}
+              isLastTurn={isLastTurn}
+              busy={!!busy}
+              visible={visible}
+              cwd={cwd}
+              harness={harness}
+              model={model}
+              turnHarness={turnHarness}
+              currentModelName={currentModelName}
+              waitingForApproval={waitingForApproval}
+              pendingQuestion={pendingQuestion}
+              preparingHandoff={preparingHandoff}
+              transcriptLayout={transcriptLayout}
+              promptAnchor={promptAnchor}
+              anchorTurn={anchorTurn}
+              workOpen={workOpen}
+              onToggleWork={toggleWork}
+              latestTurnAccessory={isLastTurn ? latestTurnAccessory : null}
+              onApproval={onApproval}
+              onOpenFile={onOpenFile}
+              onOpenDiff={onOpenDiff}
+              onOpenPlan={onOpenPlan}
+              onBuildPlan={onBuildPlan}
+              onSecondOpinion={onSecondOpinion}
+              onHandoff={onHandoff}
+              onSaveNote={onSaveNote}
+            />
           );
         })}
       </div>
@@ -2203,6 +2072,320 @@ function ToolCallIcon({ state }: { state: ToolCallState }) {
   return null;
 }
 
+type TranscriptTurnProps = {
+  turn: Block[];
+  turnIndex: number;
+  firstVisibleTurn: number;
+  isLastTurn: boolean;
+  busy: boolean;
+  visible: boolean;
+  cwd?: string;
+  harness?: HarnessId;
+  model?: string;
+  turnHarness?: HarnessId;
+  currentModelName?: string;
+  waitingForApproval: boolean;
+  pendingQuestion: boolean;
+  preparingHandoff: boolean;
+  transcriptLayout: TranscriptLayout;
+  promptAnchor: boolean;
+  anchorTurn: boolean;
+  workOpen: boolean;
+  onToggleWork: (turnId: string, open: boolean) => void;
+  latestTurnAccessory?: ReactNode;
+  onApproval?: (requestId: number, decision: ApprovalDecision) => void;
+  onOpenFile?: (path: string) => void;
+  onOpenDiff?: (path: string) => void;
+  onOpenPlan?: (blockId: string) => void;
+  onBuildPlan?: (blockId: string, target?: PlanBuildTarget) => void;
+  onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
+  onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
+  onSaveNote?: (text: string) => void;
+};
+
+function areTurnsEqual(
+  prev: TranscriptTurnProps,
+  next: TranscriptTurnProps,
+): boolean {
+  if (prev.isLastTurn || next.isLastTurn) {
+    return (
+      prev.turn === next.turn &&
+      prev.isLastTurn === next.isLastTurn &&
+      prev.busy === next.busy &&
+      prev.visible === next.visible &&
+      prev.currentModelName === next.currentModelName &&
+      prev.waitingForApproval === next.waitingForApproval &&
+      prev.pendingQuestion === next.pendingQuestion &&
+      prev.preparingHandoff === next.preparingHandoff &&
+      prev.workOpen === next.workOpen &&
+      prev.transcriptLayout === next.transcriptLayout &&
+      prev.promptAnchor === next.promptAnchor &&
+      prev.anchorTurn === next.anchorTurn &&
+      prev.latestTurnAccessory === next.latestTurnAccessory &&
+      prev.cwd === next.cwd &&
+      prev.firstVisibleTurn === next.firstVisibleTurn &&
+      prev.turnIndex === next.turnIndex &&
+      prev.turnHarness === next.turnHarness &&
+      prev.onApproval === next.onApproval &&
+      prev.onOpenFile === next.onOpenFile &&
+      prev.onOpenDiff === next.onOpenDiff &&
+      prev.onOpenPlan === next.onOpenPlan &&
+      prev.onBuildPlan === next.onBuildPlan &&
+      prev.onSecondOpinion === next.onSecondOpinion &&
+      prev.onHandoff === next.onHandoff &&
+      prev.onSaveNote === next.onSaveNote
+    );
+  }
+
+  return (
+    prev.turn === next.turn &&
+    prev.workOpen === next.workOpen &&
+    prev.transcriptLayout === next.transcriptLayout &&
+    prev.firstVisibleTurn === next.firstVisibleTurn &&
+    prev.turnIndex === next.turnIndex &&
+    prev.cwd === next.cwd &&
+    prev.turnHarness === next.turnHarness &&
+    prev.visible === next.visible &&
+    prev.onApproval === next.onApproval &&
+    prev.onOpenFile === next.onOpenFile &&
+    prev.onOpenDiff === next.onOpenDiff &&
+    prev.onOpenPlan === next.onOpenPlan &&
+    prev.onBuildPlan === next.onBuildPlan &&
+    prev.onSecondOpinion === next.onSecondOpinion &&
+    prev.onHandoff === next.onHandoff &&
+    prev.onSaveNote === next.onSaveNote
+  );
+}
+
+const TranscriptTurn = memo(function TranscriptTurn({
+  turn,
+  turnIndex,
+  firstVisibleTurn,
+  isLastTurn,
+  busy,
+  visible,
+  cwd,
+  harness,
+  model,
+  turnHarness,
+  currentModelName,
+  waitingForApproval,
+  pendingQuestion,
+  preparingHandoff,
+  transcriptLayout,
+  promptAnchor,
+  anchorTurn,
+  workOpen,
+  onToggleWork,
+  latestTurnAccessory,
+  onApproval,
+  onOpenFile,
+  onOpenDiff,
+  onOpenPlan,
+  onBuildPlan,
+  onSecondOpinion,
+  onHandoff,
+  onSaveNote,
+}: TranscriptTurnProps) {
+  const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
+  const durationMs = userBlock?.durationMs;
+  const settled = !(busy && isLastTurn);
+  const items = useMemo(() => groupTurnItems(turn), [turn]);
+  const foldedAt = useMemo(() => lastActivityIndex(items), [items]);
+  const initialThinkingAt = useMemo(() => initialThinkingIndex(items), [items]);
+  const startedAt = userBlock?.startedAt;
+  const answering = useMemo(
+    () =>
+      foldedAt >= 0 &&
+      items
+        .slice(foldedAt + 1)
+        .some((item) => item.type === "block" && isProseBlock(item.block)),
+    [items, foldedAt],
+  );
+  const workStillRunning = activityStillRunning(turn);
+  const turnModel = userBlock?.turnModel;
+  const turnId = turn[0].id;
+  const fold = useMemo(() => foldableWork(items), [items]);
+  const folded = useMemo(
+    () => (fold ? foldedBlocks(items, fold) : []),
+    [items, fold],
+  );
+  const subagentFailure = useMemo(() => subagentFailureSummary(turn), [turn]);
+  const live = visible && !settled && !preparingHandoff;
+  const turnModelName = turnModel?.name ?? (live ? currentModelName : undefined);
+  const foldTitle: ReactNode = subagentFailure ? (
+    subagentFailure
+  ) : live ? (
+    <LiveFoldTitle
+      startedAt={startedAt}
+      paused={waitingForApproval}
+      waitingLabel={pendingQuestion ? "Waiting for answers" : undefined}
+      subagent={hasRunningSubagent(turn)}
+      modelName={turnModelName}
+    />
+  ) : durationMs != null ? (
+    formatWorkingDuration(durationMs, true, false, turnModelName)
+  ) : (
+    workSummaryLine(folded)
+  );
+  const showFoldLine = live || durationMs != null || !!fold;
+  const firstWork = useMemo(() => firstFoldableIndex(items), [items]);
+  const foldLineAt = fold
+    ? fold.start
+    : firstWork >= 0
+      ? firstWork
+      : items.length;
+
+  const handleToggle = useCallback(() => {
+    onToggleWork(turnId, workOpen);
+  }, [onToggleWork, turnId, workOpen]);
+
+  const handleSecondOpinion = useCallback(
+    (target: HarnessId, mod: string) => {
+      onSecondOpinion?.(target, turn, mod);
+    },
+    [onSecondOpinion, turn],
+  );
+
+  const handleHandoff = useCallback(
+    (target: HarnessId, mod: string) => {
+      onHandoff?.(target, turn, mod);
+    },
+    [onHandoff, turn],
+  );
+
+  const copyOutput = useMemo(() => turnCopyText(turn), [turn]);
+
+  const renderItem = (item: TurnItem, itemIndex: number) =>
+    item.type === "activity" ? (
+      itemIndex === initialThinkingAt ? (
+        <InitialThinking
+          key={item.blocks[0].id}
+          live={visible && !settled}
+        />
+      ) : (
+        <ActivityPhases
+          key={item.blocks[0].id}
+          blocks={item.blocks}
+          cwd={cwd}
+          done={
+            !visible ||
+            settled ||
+            itemIndex < foldedAt ||
+            (answering && !workStillRunning)
+          }
+          onApproval={onApproval}
+          onOpenFile={onOpenFile}
+          onOpenDiff={onOpenDiff}
+        />
+      )
+    ) : (
+      <TranscriptBlock
+        key={item.block.id}
+        block={item.block}
+        layout={transcriptLayout}
+        stickyIndex={firstVisibleTurn + turnIndex + 1}
+        underLine={
+          isProseBlock(item.block) &&
+          itemIndex > 0 &&
+          (items[itemIndex - 1]?.type === "activity" ||
+            (itemIndex === foldLineAt && showFoldLine))
+        }
+        onApproval={onApproval}
+        onOpenFile={onOpenFile}
+        onOpenDiff={onOpenDiff}
+        onOpenPlan={onOpenPlan}
+        onBuildPlan={onBuildPlan}
+        planBusy={!!busy}
+        planHarness={harness}
+        planModel={model}
+        cwd={cwd}
+      />
+    );
+
+  const foldLineRow = (
+    <TurnRow key="work-fold" folded={!showFoldLine}>
+      <WorkFoldLine
+        title={foldTitle}
+        kind={workKind(folded)}
+        harness={turnHarness}
+        live={live}
+        failed={!!subagentFailure}
+        expandable={!!fold}
+        open={workOpen && !!fold}
+        onToggle={handleToggle}
+      />
+    </TurnRow>
+  );
+
+  return (
+    <div
+      key={turn[0].id}
+      className={`transcript-turn flex min-w-0 flex-col${
+        isLastTurn ? " transcript-turn-live" : ""
+      }${
+        promptAnchor && anchorTurn && isLastTurn && userBlock
+          ? " transcript-turn-anchor"
+          : ""
+      }`}
+    >
+      {items.flatMap((item, itemIndex) => {
+        const inFold =
+          !!fold && itemIndex >= fold.start && itemIndex <= fold.end;
+        if (inFold) {
+          if (itemIndex !== fold.start) return [];
+          return [
+            foldLineRow,
+            <TurnRow key="work-details" folded={!workOpen}>
+              {() =>
+                items
+                  .slice(fold.start, fold.end + 1)
+                  .map((entry, offset) => (
+                    <div
+                      key={turnItemKey(entry)}
+                      className={`flow-root pb-1 last:pb-0 pl-5 zen-fold-rail ${
+                        fold.start + offset === fold.end
+                          ? "zen-fold-tail"
+                          : ""
+                      }`}
+                    >
+                      {renderItem(entry, fold.start + offset)}
+                    </div>
+                  ))
+              }
+            </TurnRow>,
+          ];
+        }
+        const row = (
+          <div key={turnItemKey(item)} className="flow-root pb-1">
+            {renderItem(item, itemIndex)}
+          </div>
+        );
+        if (itemIndex !== foldLineAt) return row;
+        return [foldLineRow, row];
+      })}
+      {foldLineAt >= items.length ? foldLineRow : null}
+      {isLastTurn && latestTurnAccessory ? latestTurnAccessory : null}
+      {durationMs != null && settled ? (
+        <TurnDuration
+          elapsedMs={durationMs}
+          labelHidden={showFoldLine}
+          modelName={turnModelName}
+          completedAt={
+            startedAt != null ? startedAt + durationMs : undefined
+          }
+          copyText={copyOutput}
+          onSaveNote={onSaveNote}
+          harness={turnHarness}
+          fromHarness={turnHarness}
+          onSecondOpinion={onSecondOpinion ? handleSecondOpinion : undefined}
+          onHandoff={onHandoff ? handleHandoff : undefined}
+        />
+      ) : null}
+    </div>
+  );
+}, areTurnsEqual);
+
 function ApprovalControls({
   block,
   onApproval,
@@ -2289,9 +2472,14 @@ function pinToBottom(el: HTMLElement | null) {
   el.scrollTop = el.scrollHeight;
 }
 
+const lastViewportHeight = new WeakMap<HTMLElement, number>();
+
 /** Keep the live turn's min-height in lockstep with the visible transcript. */
 function syncTranscriptViewport(el: HTMLElement | null) {
   if (!el || el.clientHeight <= 0) return;
+  const prevHeight = lastViewportHeight.get(el);
+  if (prevHeight === el.clientHeight) return;
+  lastViewportHeight.set(el, el.clientHeight);
   const inner = el.firstElementChild as HTMLElement | null;
   const pad = inner
     ? Number.parseFloat(getComputedStyle(inner).paddingBottom) || 0

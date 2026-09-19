@@ -23,4 +23,11 @@ describe("resizeComposer", () => {
     resizeComposer(el);
     expect(el.style.height).toBe("88px");
   });
+
+  it("shrinks back down when text is deleted from max height", () => {
+    // Simulating textarea that was at max height, then user deletes lines down to 48px
+    const el = field(48, `${COMPOSER_MAX_HEIGHT}px`);
+    resizeComposer(el);
+    expect(el.style.height).toBe("48px");
+  });
 });

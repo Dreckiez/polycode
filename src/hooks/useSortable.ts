@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -261,14 +262,30 @@ export function useSortable(
     [],
   );
 
-  return {
-    draggingId,
-    fromIndex: draggingId ? ids.indexOf(draggingId) : null,
-    toIndex: draggingId && !dropTarget ? toIndex : null,
-    dropTarget: draggingId ? dropTarget : null,
-    setItemRef,
-    setGroupDropRef,
-    onItemPointerDown,
-    consumeClick,
-  };
+  const fromIndex = draggingId ? ids.indexOf(draggingId) : null;
+  const effectiveToIndex = draggingId && !dropTarget ? toIndex : null;
+  const effectiveDropTarget = draggingId ? dropTarget : null;
+
+  return useMemo(
+    () => ({
+      draggingId,
+      fromIndex,
+      toIndex: effectiveToIndex,
+      dropTarget: effectiveDropTarget,
+      setItemRef,
+      setGroupDropRef,
+      onItemPointerDown,
+      consumeClick,
+    }),
+    [
+      draggingId,
+      fromIndex,
+      effectiveToIndex,
+      effectiveDropTarget,
+      setItemRef,
+      setGroupDropRef,
+      onItemPointerDown,
+      consumeClick,
+    ],
+  );
 }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   listCachedDir,
   notifyDirsChanged,
+  refreshDir,
   saveExpanded,
 } from "../lib/fileTree";
 import type { FsEntry } from "../lib/fs";
@@ -125,5 +126,26 @@ describe("FileTree render isolation", () => {
     });
     expect(row("added.ts")).not.toBeNull();
     expect(row("first.ts")).toBeNull();
+  });
+
+  it("skips re-rendering unaffected rows when selection changes", async () => {
+    directories.set(cwd, [file("a.ts"), file("b.ts"), file("c.ts")]);
+    await refreshDir(cwd);
+    await act(async () => render());
+    expect(row("a.ts")).not.toBeNull();
+    expect(row("b.ts")).not.toBeNull();
+    expect(row("c.ts")).not.toBeNull();
+
+    // Select a.ts first
+    act(() => row("a.ts").click());
+    iconRender.mockClear();
+
+    // Switch selection from a.ts to b.ts
+    act(() => row("b.ts").click());
+
+    // Only a.ts (deselected) and b.ts (selected) should re-render; c.ts must NOT re-render!
+    const renderedNames = iconRender.mock.calls.map((call) => call[0]);
+    expect(renderedNames).not.toContain("c.ts");
+    expect(iconRender.mock.calls.length).toBe(2);
   });
 });

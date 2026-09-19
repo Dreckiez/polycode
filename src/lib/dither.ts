@@ -66,10 +66,6 @@ export const DEFAULT_DITHER_OPTIONS: Required<DitherOptions> = {
   fadeBottomPower: 2,
 };
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
 /**
  * Calculates the vertical luminance fade factor for normalized height y in [0, 1].
  * Separately evaluates:
@@ -141,8 +137,99 @@ export function applyBayerDitherToBuffer(
     options?.ditherStrength ?? DEFAULT_DITHER_OPTIONS.ditherStrength;
   const stepSize = 255 / (colorSteps - 1);
 
-  for (let y = 0; y < height; y += pixelSize) {
+  // Precompute scaled Bayer matrix offsets to eliminate inner-loop arithmetic
+  const scaledBayer = new Float32Array(64);
+  for (let i = 0; i < 64; i++) {
+    scaledBayer[i] = (BAYER_8X8[i] / 64 - 0.5) * strength;
+  }
+
+  // Precompute quantization lookup table for all 256 possible clamped values
+  const quantTable = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) {
+    quantTable[i] = Math.round(Math.round(i / stepSize) * stepSize);
+  }
+
+  // Fast path for pixelSize === 1 (linear sequential memory traversal)
+  if (pixelSize === 1) {
+    let srcIdx = 0;
+    for (let y = 0; y < height; y++) {
+      const yNorm = height > 1 ? y / (height - 1) : 0;
+      const fade = calculateVerticalFade(
+        yNorm,
+        fadeStart,
+        fadeEnd,
+        fadeMid,
+        fadeMidLevel,
+        fadeStartLevel,
+        fadeEndLevel,
+        fadeTopPower,
+        fadeBottomPower,
+      );
+
+      // When reaching solid black tail, zero remaining pixels and exit loop immediately
+      if (yNorm >= fadeEnd && fadeEndLevel === 0) {
+        const remainingPixels = (height - y) * width;
+        for (let i = 0; i < remainingPixels; i++) {
+          data[srcIdx] = 0;
+          data[srcIdx + 1] = 0;
+          data[srcIdx + 2] = 0;
+          srcIdx += 4;
+        }
+        break;
+      }
+
+      if (fade <= 0.001) {
+        for (let x = 0; x < width; x++) {
+          data[srcIdx] = 0;
+          data[srcIdx + 1] = 0;
+          data[srcIdx + 2] = 0;
+          srcIdx += 4;
+        }
+        continue;
+      }
+
+      const byRow = (y & 7) << 3;
+      for (let x = 0; x < width; x++) {
+        const offset = scaledBayer[byRow | (x & 7)];
+        const rVal = data[srcIdx] * fade + offset;
+        const gVal = data[srcIdx + 1] * fade + offset;
+        const bVal = data[srcIdx + 2] * fade + offset;
+
+        data[srcIdx] =
+          rVal <= 0 ? 0 : rVal >= 255 ? quantTable[255] : quantTable[rVal | 0];
+        data[srcIdx + 1] =
+          gVal <= 0 ? 0 : gVal >= 255 ? quantTable[255] : quantTable[gVal | 0];
+        data[srcIdx + 2] =
+          bVal <= 0 ? 0 : bVal >= 255 ? quantTable[255] : quantTable[bVal | 0];
+        srcIdx += 4;
+      }
+    }
+    return;
+  }
+
+  // General path for block pixelSize > 1
+  const data32 = new Uint32Array(
+    data.buffer,
+    data.byteOffset,
+    data.byteLength >> 2,
+  );
+  let blockY = 0;
+  for (let y = 0; y < height; y += pixelSize, blockY++) {
     const yNorm = height > 1 ? y / (height - 1) : 0;
+
+    // Solid black tail: zero out RGB for all remaining pixels and exit immediately
+    if (yNorm >= fadeEnd && fadeEndLevel === 0) {
+      let srcIdx = y * width * 4;
+      const remainingPixels = (height - y) * width;
+      for (let i = 0; i < remainingPixels; i++) {
+        data[srcIdx] = 0;
+        data[srcIdx + 1] = 0;
+        data[srcIdx + 2] = 0;
+        srcIdx += 4;
+      }
+      break;
+    }
+
     const fade = calculateVerticalFade(
       yNorm,
       fadeStart,
@@ -154,15 +241,15 @@ export function applyBayerDitherToBuffer(
       fadeTopPower,
       fadeBottomPower,
     );
-    const by = Math.floor(y / pixelSize) % 8;
 
-    for (let x = 0; x < width; x += pixelSize) {
-      const bx = Math.floor(x / pixelSize) % 8;
-      const bayerVal = (BAYER_8X8[by * 8 + bx] / 64 - 0.5) * strength;
-      // Preserve full dither threshold amplitude so dots thin out cleanly to fadeEnd
-      const offset = bayerVal;
+    const byRow = (blockY & 7) << 3;
+    const yMax = Math.min(y + pixelSize, height);
+    const rowHeight = yMax - y;
+    let blockX = 0;
 
-      // Sample base pixel at (x, y)
+    for (let x = 0; x < width; x += pixelSize, blockX++) {
+      const offset = scaledBayer[byRow | (blockX & 7)];
+
       const srcIdx = (y * width + x) * 4;
       const srcR = data[srcIdx];
       const srcG = data[srcIdx + 1];
@@ -174,36 +261,190 @@ export function applyBayerDitherToBuffer(
       let outB = 0;
 
       if (fade > 0.001) {
-        // Modulate RGB by fade, apply dither offset, and quantize
-        const rVal = clamp(srcR * fade + offset, 0, 255);
-        const gVal = clamp(srcG * fade + offset, 0, 255);
-        const bVal = clamp(srcB * fade + offset, 0, 255);
+        const rVal = srcR * fade + offset;
+        const gVal = srcG * fade + offset;
+        const bVal = srcB * fade + offset;
 
-        outR = Math.round(Math.round(rVal / stepSize) * stepSize);
-        outG = Math.round(Math.round(gVal / stepSize) * stepSize);
-        outB = Math.round(Math.round(bVal / stepSize) * stepSize);
+        outR =
+          rVal <= 0 ? 0 : rVal >= 255 ? quantTable[255] : quantTable[rVal | 0];
+        outG =
+          gVal <= 0 ? 0 : gVal >= 255 ? quantTable[255] : quantTable[gVal | 0];
+        outB =
+          bVal <= 0 ? 0 : bVal >= 255 ? quantTable[255] : quantTable[bVal | 0];
       }
 
-      // Write pixel block of size pixelSize x pixelSize
-      const yMax = Math.min(y + pixelSize, height);
+      const pixel32 = (srcA << 24) | (outB << 16) | (outG << 8) | outR;
       const xMax = Math.min(x + pixelSize, width);
-      for (let py = y; py < yMax; py++) {
-        const rowOffset = py * width;
-        for (let px = x; px < xMax; px++) {
-          const idx = (rowOffset + px) * 4;
-          data[idx] = outR;
-          data[idx + 1] = outG;
-          data[idx + 2] = outB;
-          data[idx + 3] = srcA;
+      const blockWidth = xMax - x;
+
+      let rowStart = y * width + x;
+      for (let py = 0; py < rowHeight; py++) {
+        for (let px = 0; px < blockWidth; px++) {
+          data32[rowStart + px] = pixel32;
         }
+        rowStart += width;
       }
     }
   }
 }
 
-// Memory cache for dithered image data URLs: key -> dataUrl
+// Memory cache for dithered image URLs: key -> url (blob: or data:)
 const ditherUrlCache = new Map<string, string>();
-const MAX_CACHE_ITEMS = 24;
+const inFlightRequests = new Map<string, Promise<string>>();
+const imageElementCache = new Map<string, Promise<HTMLImageElement>>();
+const pendingRevokeBlobs = new Set<string>();
+const MAX_CACHE_ITEMS = 36;
+const MAX_IMAGE_CACHE = 12;
+
+let ditherWorker: Worker | null = null;
+let nextWorkerRequestId = 0;
+const workerPendingRequests = new Map<
+  number,
+  {
+    resolve: (buffer: ArrayBuffer) => void;
+    reject: (err: Error) => void;
+  }
+>();
+
+export function canUseDitherWorker(): boolean {
+  return typeof window !== "undefined" && typeof Worker !== "undefined";
+}
+
+function getDitherWorker(): Worker {
+  if (!ditherWorker) {
+    ditherWorker = new Worker(new URL("./dither.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    ditherWorker.onmessage = (
+      e: MessageEvent<{ id: number; buffer?: ArrayBuffer; error?: string }>,
+    ) => {
+      const { id, buffer, error } = e.data;
+      const pending = workerPendingRequests.get(id);
+      if (!pending) return;
+      workerPendingRequests.delete(id);
+      if (error) {
+        pending.reject(new Error(error));
+      } else if (buffer) {
+        pending.resolve(buffer);
+      } else {
+        pending.reject(new Error("Worker returned empty response"));
+      }
+    };
+    ditherWorker.onerror = (e) => {
+      console.error("Dither worker error:", e);
+      for (const pending of workerPendingRequests.values()) {
+        pending.reject(new Error("Dither worker error"));
+      }
+      workerPendingRequests.clear();
+      ditherWorker = null;
+    };
+  }
+  return ditherWorker;
+}
+
+export function runDitherInWorker(
+  buffer: ArrayBuffer,
+  width: number,
+  height: number,
+  options?: DitherOptions,
+): Promise<ArrayBuffer> {
+  const worker = getDitherWorker();
+  const id = ++nextWorkerRequestId;
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    workerPendingRequests.set(id, { resolve, reject });
+    worker.postMessage({ id, buffer, width, height, options }, [buffer]);
+  });
+}
+
+export function terminateDitherWorker(): void {
+  if (ditherWorker) {
+    ditherWorker.terminate();
+    ditherWorker = null;
+    for (const pending of workerPendingRequests.values()) {
+      pending.reject(new Error("Dither worker terminated"));
+    }
+    workerPendingRequests.clear();
+  }
+}
+
+export function isBlobInUse(url: string): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const bg = document.documentElement?.style?.getPropertyValue(
+      "--chat-background-image",
+    );
+    if (bg && bg.includes(url)) return true;
+    if (typeof document.querySelector === "function") {
+      const escaped = url.replace(/["\\]/g, "\\$&");
+      if (document.querySelector(`[style*="${escaped}"]`)) return true;
+      if (document.querySelector(`img[src="${escaped}"]`)) return true;
+    }
+  } catch {}
+  return false;
+}
+
+export function cleanupPendingBlobs(): void {
+  if (typeof URL === "undefined" || typeof URL.revokeObjectURL !== "function") {
+    pendingRevokeBlobs.clear();
+    return;
+  }
+  for (const url of Array.from(pendingRevokeBlobs)) {
+    if (!isBlobInUse(url)) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+      pendingRevokeBlobs.delete(url);
+    }
+  }
+}
+
+export function freeUrlIfBlob(url: string | undefined, force = false): void {
+  if (!url || !url.startsWith("blob:")) return;
+  cleanupPendingBlobs();
+  if (force || !isBlobInUse(url)) {
+    if (
+      typeof URL !== "undefined" &&
+      typeof URL.revokeObjectURL === "function"
+    ) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+    }
+    pendingRevokeBlobs.delete(url);
+  } else {
+    pendingRevokeBlobs.add(url);
+  }
+}
+
+/**
+ * Shared image element loader and cache to prevent decoding the same image multiple times.
+ */
+export function loadImageElement(src: string): Promise<HTMLImageElement> {
+  const existing = imageElementCache.get(src);
+  if (existing) return existing;
+
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
+    if (typeof Image === "undefined") {
+      reject(new Error("Image is not available in this environment"));
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      imageElementCache.delete(src);
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+    img.src = src;
+  });
+
+  if (imageElementCache.size >= MAX_IMAGE_CACHE) {
+    const firstKey = imageElementCache.keys().next().value;
+    if (firstKey) imageElementCache.delete(firstKey);
+  }
+  imageElementCache.set(src, promise);
+  return promise;
+}
 
 function cacheKey(
   src: string,
@@ -226,7 +467,50 @@ function cacheKey(
 }
 
 /**
- * Creates a dithered image data URL from an image URL or element.
+ * Synchronously retrieves a cached dithered URL if available.
+ * Useful for initializing React state without frame flashing.
+ */
+export function getCachedDitheredImageUrl(
+  imageSource: string | HTMLImageElement,
+  targetWidth = 960,
+  targetHeight = 720,
+  options?: DitherOptions,
+): string | null {
+  const src = typeof imageSource === "string" ? imageSource : imageSource.src;
+  const key = cacheKey(src, targetWidth, targetHeight, options);
+  return ditherUrlCache.get(key) ?? null;
+}
+
+/**
+ * Converts a canvas to an efficient Object URL (Blob) or data URL fallback.
+ */
+function canvasToUrl(canvas: HTMLCanvasElement): Promise<string> {
+  return new Promise<string>((resolve) => {
+    if (
+      typeof canvas.toBlob === "function" &&
+      typeof URL !== "undefined" &&
+      typeof URL.createObjectURL === "function"
+    ) {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(URL.createObjectURL(blob));
+          } else {
+            resolve(canvas.toDataURL("image/webp", 0.92));
+          }
+        },
+        "image/webp",
+        0.92,
+      );
+    } else {
+      resolve(canvas.toDataURL("image/png"));
+    }
+  });
+}
+
+/**
+ * Creates a dithered image URL from an image URL or element.
+ * Deduplicates in-flight requests and caches results.
  */
 export async function createDitheredImageUrl(
   imageSource: string | HTMLImageElement,
@@ -239,55 +523,100 @@ export async function createDitheredImageUrl(
   const cached = ditherUrlCache.get(key);
   if (cached) return cached;
 
-  let img: HTMLImageElement;
-  if (typeof imageSource === "string") {
-    img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () =>
-        reject(new Error(`Failed to load image: ${imageSource}`));
-      img.src = imageSource;
-    });
-  } else {
-    img = imageSource;
-  }
+  const inFlight = inFlightRequests.get(key);
+  if (inFlight) return inFlight;
 
-  if (typeof document === "undefined") {
-    return src;
-  }
+  const promise = (async () => {
+    try {
+      let img: HTMLImageElement;
+      if (typeof imageSource === "string") {
+        img = await loadImageElement(imageSource);
+      } else {
+        img = imageSource;
+      }
 
-  const canvas = document.createElement("canvas");
-  // Scale proportionally to fit within target bounds to optimize dither rendering speed
-  const aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-  let w = targetWidth;
-  let h = Math.round(w / aspect);
-  if (h > targetHeight) {
-    h = targetHeight;
-    w = Math.round(h * aspect);
-  }
-  w = Math.max(16, w);
-  h = Math.max(16, h);
+      if (typeof document === "undefined") {
+        return src;
+      }
 
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return src;
+      const canvas = document.createElement("canvas");
+      // Scale proportionally to fit within target bounds to optimize dither rendering speed
+      const aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+      let w = targetWidth;
+      let h = Math.round(w / aspect);
+      if (h > targetHeight) {
+        h = targetHeight;
+        w = Math.round(h * aspect);
+      }
+      w = Math.max(16, w);
+      h = Math.max(16, h);
 
-  ctx.drawImage(img, 0, 0, w, h);
-  const imgData = ctx.getImageData(0, 0, w, h);
-  applyBayerDitherToBuffer(imgData.data, w, h, options);
-  ctx.putImageData(imgData, 0, 0);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return src;
 
-  const resultUrl = canvas.toDataURL("image/png");
-  if (ditherUrlCache.size >= MAX_CACHE_ITEMS) {
-    const firstKey = ditherUrlCache.keys().next().value;
-    if (firstKey) ditherUrlCache.delete(firstKey);
-  }
-  ditherUrlCache.set(key, resultUrl);
-  return resultUrl;
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
+
+      if (canUseDitherWorker()) {
+        try {
+          const ditheredBuffer = await runDitherInWorker(
+            imgData.data.buffer,
+            w,
+            h,
+            options,
+          );
+          const finalImgData = new ImageData(
+            new Uint8ClampedArray(ditheredBuffer),
+            w,
+            h,
+          );
+          ctx.putImageData(finalImgData, 0, 0);
+        } catch {
+          applyBayerDitherToBuffer(imgData.data, w, h, options);
+          ctx.putImageData(imgData, 0, 0);
+        }
+      } else {
+        applyBayerDitherToBuffer(imgData.data, w, h, options);
+        ctx.putImageData(imgData, 0, 0);
+      }
+
+      const resultUrl = await canvasToUrl(canvas);
+      if (ditherUrlCache.size >= MAX_CACHE_ITEMS) {
+        const firstKey = ditherUrlCache.keys().next().value;
+        if (firstKey) {
+          freeUrlIfBlob(ditherUrlCache.get(firstKey));
+          ditherUrlCache.delete(firstKey);
+        }
+      }
+      ditherUrlCache.set(key, resultUrl);
+      return resultUrl;
+    } finally {
+      inFlightRequests.delete(key);
+    }
+  })();
+
+  inFlightRequests.set(key, promise);
+  return promise;
 }
 
 export function clearDitherCache(): void {
+  for (const url of ditherUrlCache.values()) {
+    freeUrlIfBlob(url, true);
+  }
+  for (const url of pendingRevokeBlobs) {
+    if (
+      typeof URL !== "undefined" &&
+      typeof URL.revokeObjectURL === "function"
+    ) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+    }
+  }
+  pendingRevokeBlobs.clear();
   ditherUrlCache.clear();
+  inFlightRequests.clear();
+  imageElementCache.clear();
 }

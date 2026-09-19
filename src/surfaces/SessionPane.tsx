@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -194,14 +195,18 @@ export const SessionPane = memo(function SessionPane({
     ? projectChatBackgroundSrc(projectBackground.path, backgroundRevision)
     : null;
   const processedBgSrc = useProcessedBackground(rawProjectBgSrc, ditherEnabled);
-  const projectBackgroundStyle = projectBackground
-    ? ({
-        "--chat-background-image": `url(${JSON.stringify(
-          processedBgSrc ?? rawProjectBgSrc,
-        )})`,
-        "--chat-background-opacity": String(projectBackground.opacity),
-      } as CSSProperties)
-    : undefined;
+  const projectBackgroundStyle = useMemo(
+    () =>
+      projectBackground
+        ? ({
+            "--chat-background-image": `url(${JSON.stringify(
+              processedBgSrc ?? rawProjectBgSrc,
+            )})`,
+            "--chat-background-opacity": String(projectBackground.opacity),
+          } as CSSProperties)
+        : undefined,
+    [projectBackground, processedBgSrc, rawProjectBgSrc],
+  );
   const approve = useCallback(
     (requestId: number, decision: ApprovalDecision) =>
       onApproval(session.id, requestId, decision),
@@ -300,6 +305,123 @@ export const SessionPane = memo(function SessionPane({
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit;
   const draftRef = useRef<string | undefined>(undefined);
+  const onDraftChange = useCallback((text: string) => {
+    draftRef.current = text;
+  }, []);
+  const onNoteCardDismissCb = useCallback(() => {
+    onNoteCardDismiss?.(session.id);
+  }, [onNoteCardDismiss, session.id]);
+  const onHandoffCardDismissCb = useCallback(() => {
+    onHandoffCardDismiss?.(session.id);
+  }, [onHandoffCardDismiss, session.id]);
+  const onQuestionInteractionCb = useCallback(
+    (id: number) => {
+      onQuestionInteraction?.(session.id, id);
+    },
+    [onQuestionInteraction, session.id],
+  );
+  const onFocusCb = useCallback(() => {
+    onFocus(session.id);
+  }, [onFocus, session.id]);
+  const onCwdChangeCb = useCallback(
+    (cwd: string) => {
+      onCwdChange(session.id, cwd);
+    },
+    [onCwdChange, session.id],
+  );
+  const onBranchChangeCb = useCallback(() => {
+    onBranchChange(session.id);
+  }, [onBranchChange, session.id]);
+  const onNewTerminalCb = useCallback(() => {
+    onNewTerminal(session.id);
+  }, [onNewTerminal, session.id]);
+  const onModelChangeCb = useCallback(
+    (harness: HarnessId, model: string) => {
+      onModelChange(session.id, harness, model);
+      const selected = resolveModel(harness, model);
+      // A new key restarts the animation and its cleanup timer on every pick.
+      setAstraWelcomeRun(
+        isAstraModel(selected) ? ++astraWelcomeSequence.current : null,
+      );
+    },
+    [onModelChange, session.id],
+  );
+  const onModelSettingsChangeCb = useCallback(
+    (settings: Record<string, string>) => {
+      onModelSettingsChange(session.id, settings);
+    },
+    [onModelSettingsChange, session.id],
+  );
+  const onRuntimeModeChangeCb = useCallback(
+    (mode: RuntimeMode) => {
+      onRuntimeModeChange(session.id, mode);
+    },
+    [onRuntimeModeChange, session.id],
+  );
+  const onSubmitCb = useCallback(
+    (
+      text: string,
+      attachments: Attachment[],
+      options?: { intent?: TurnIntent },
+    ) => {
+      onSubmit(session.id, text, attachments, options);
+    },
+    [onSubmit, session.id],
+  );
+  const onStopCb = useCallback(() => {
+    onStop(session.id);
+  }, [onStop, session.id]);
+  const onCompactContextCb = useCallback(
+    () => onCompactContext(session.id),
+    [onCompactContext, session.id],
+  );
+  const onPlaceInFolderCb = useCallback(
+    (target: SessionFolderTarget) => {
+      onPlaceSessionInFolder(session.id, target);
+    },
+    [onPlaceSessionInFolder, session.id],
+  );
+  const onDeleteQueuedMessageCb = useCallback(
+    (messageId: string) => {
+      onDeleteQueuedMessage(session.id, messageId);
+    },
+    [onDeleteQueuedMessage, session.id],
+  );
+  const onEditQueuedMessageCb = useCallback(
+    (messageId: string, text: string) => {
+      onEditQueuedMessage(session.id, messageId, text);
+    },
+    [onEditQueuedMessage, session.id],
+  );
+  const onQueuedMessageEditingChangeCb = useCallback(
+    (messageId?: string) => {
+      onQueuedMessageEditingChange(session.id, messageId);
+    },
+    [onQueuedMessageEditingChange, session.id],
+  );
+  const onSteerQueuedMessageCb = useCallback(
+    (messageId: string) => {
+      onSteerQueuedMessage(session.id, messageId);
+    },
+    [onSteerQueuedMessage, session.id],
+  );
+  const onResumeQueueCb = useCallback(() => {
+    onResumeQueue(session.id);
+  }, [onResumeQueue, session.id]);
+
+  const onSecondOpinionCb = useCallback(
+    (harness: HarnessId, turn: Block[], model: string) => {
+      onSecondOpinion?.(session.id, harness, turn, model);
+    },
+    [onSecondOpinion, session.id],
+  );
+  const onHandoffCb = useCallback(
+    (harness: HarnessId, turn: Block[], model: string) => {
+      onHandoff?.(session.id, harness, turn, model);
+    },
+    [onHandoff, session.id],
+  );
+
   const composer = (
     <Composer
       enabled={visible}
@@ -319,57 +441,50 @@ export const SessionPane = memo(function SessionPane({
       context={session.context}
       quoteRequest={quoteRequest}
       initialDraft={draftRef.current}
-      onDraftChange={(text) => {
-        draftRef.current = text;
-      }}
+      onDraftChange={onDraftChange}
       noteCard={session.noteCard}
       handoffCard={session.handoffCard}
       question={session.pendingQuestion}
       onQuoteRequestConsumed={acknowledgeQuote}
-      onNoteCardDismiss={() => onNoteCardDismiss?.(session.id)}
-      onHandoffCardDismiss={() => onHandoffCardDismiss?.(session.id)}
+      onNoteCardDismiss={onNoteCardDismiss ? onNoteCardDismissCb : undefined}
+      onHandoffCardDismiss={onHandoffCardDismiss ? onHandoffCardDismissCb : undefined}
       onQuestionReply={replyQuestion}
-      onQuestionInteraction={(id) => onQuestionInteraction?.(session.id, id)}
-      onFocus={() => onFocus(session.id)}
-      onCwdChange={(cwd) => onCwdChange(session.id, cwd)}
-      onBranchChange={() => onBranchChange(session.id)}
-      onNewTerminal={() => onNewTerminal(session.id)}
-      onModelChange={(harness, model) => {
-        onModelChange(session.id, harness, model);
-        const selected = resolveModel(harness, model);
-        // A new key restarts the animation and its cleanup timer on every pick.
-        setAstraWelcomeRun(
-          isAstraModel(selected) ? ++astraWelcomeSequence.current : null,
-        );
-      }}
-      onModelSettingsChange={(settings) =>
-        onModelSettingsChange(session.id, settings)
-      }
-      onRuntimeModeChange={(mode) => onRuntimeModeChange(session.id, mode)}
-      onSubmit={(text, attachments, options) =>
-        onSubmit(session.id, text, attachments, options)
-      }
-      onStop={() => onStop(session.id)}
-      onCompactContext={() => onCompactContext(session.id)}
-      onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
+      onQuestionInteraction={onQuestionInteraction ? onQuestionInteractionCb : undefined}
+      onFocus={onFocusCb}
+      onCwdChange={onCwdChangeCb}
+      onBranchChange={onBranchChangeCb}
+      onNewTerminal={onNewTerminalCb}
+      onModelChange={onModelChangeCb}
+      onModelSettingsChange={onModelSettingsChangeCb}
+      onRuntimeModeChange={onRuntimeModeChangeCb}
+      onSubmit={onSubmitCb}
+      onStop={onStopCb}
+      onCompactContext={onCompactContextCb}
+      onPlaceInFolder={onPlaceInFolderCb}
       queuedMessages={session.queuedMessages}
       queueStatus={session.queueStatus}
-      onDeleteQueuedMessage={(messageId) =>
-        onDeleteQueuedMessage(session.id, messageId)
-      }
-      onEditQueuedMessage={(messageId, text) =>
-        onEditQueuedMessage(session.id, messageId, text)
-      }
-      onQueuedMessageEditingChange={(messageId) =>
-        onQueuedMessageEditingChange(session.id, messageId)
-      }
-      onSteerQueuedMessage={(messageId) =>
-        onSteerQueuedMessage(session.id, messageId)
-      }
-      onResumeQueue={() => onResumeQueue(session.id)}
+      onDeleteQueuedMessage={onDeleteQueuedMessageCb}
+      onEditQueuedMessage={onEditQueuedMessageCb}
+      onQueuedMessageEditingChange={onQueuedMessageEditingChangeCb}
+      onSteerQueuedMessage={onSteerQueuedMessageCb}
+      onResumeQueue={onResumeQueueCb}
       onOpenFile={onOpenFile}
       busy={!!session.busy}
     />
+  );
+
+  const latestTurnAccessory = useMemo(
+    () => (
+      <SessionReview
+        sessionId={session.id}
+        cwd={workCwd}
+        enabled={visible}
+        busy={!!session.busy}
+        undoLocked={reviewUndoLocked}
+        onOpenDiff={onOpenDiff}
+      />
+    ),
+    [session.id, workCwd, visible, session.busy, reviewUndoLocked, onOpenDiff],
   );
 
   return (
@@ -456,31 +571,12 @@ export const SessionPane = memo(function SessionPane({
               onOpenDiff={onOpenDiff}
               onOpenPlan={openPlan}
               onBuildPlan={buildPlan}
-              onSecondOpinion={
-                onSecondOpinion
-                  ? (harness, turn, model) =>
-                      onSecondOpinion(session.id, harness, turn, model)
-                  : undefined
-              }
-              onHandoff={
-                onHandoff
-                  ? (harness, turn, model) =>
-                      onHandoff(session.id, harness, turn, model)
-                  : undefined
-              }
+              onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}
+              onHandoff={onHandoff ? onHandoffCb : undefined}
               onJumpToBottomChange={setShowJumpToBottom}
               onJumpToBottomReady={onJumpToBottomReady}
               onRevealReady={onRevealReady}
-              latestTurnAccessory={
-                <SessionReview
-                  sessionId={session.id}
-                  cwd={workCwd}
-                  enabled={visible}
-                  busy={!!session.busy}
-                  undoLocked={reviewUndoLocked}
-                  onOpenDiff={onOpenDiff}
-                />
-              }
+              latestTurnAccessory={latestTurnAccessory}
             />
             <PromptOutline
               blocks={session.blocks}

@@ -5343,6 +5343,15 @@ export default function App({
     );
   }, [currentProjectDock, dockVisible]);
 
+  const busyProjectPaths = useMemo(
+    () =>
+      sessions.flatMap((session) =>
+        session.busy && session.cwd ? [session.cwd] : [],
+      ),
+    [sessions],
+  );
+  const onDismissUpdate = useCallback(() => setUpdateNotice(null), []);
+
   const sessionPaneProps = {
     recents,
     hideProjectPicker: true,
@@ -5435,9 +5444,7 @@ export default function App({
         selectedCommitSha={activeTab ? selectedCommitSha(activeTab) : undefined}
         textHarness={pickTextHarness(active?.harness)}
         recents={recents}
-        busyProjectPaths={sessions.flatMap((session) =>
-          session.busy && session.cwd ? [session.cwd] : [],
-        )}
+        busyProjectPaths={busyProjectPaths}
         liveAgents={liveAgents}
         onSelectAgent={onSelectLiveAgent}
         onSelectProject={onSelectProject}
@@ -5462,7 +5469,7 @@ export default function App({
         onCloseSettings={onCloseSettings}
         updateNotice={updateNotice}
         onOpenWhatsNew={onOpenWhatsNew}
-        onDismissUpdate={() => setUpdateNotice(null)}
+        onDismissUpdate={onDismissUpdate}
       />
 
       <div className="body-glass flex min-h-0 min-w-0 flex-1 flex-col">
@@ -5595,10 +5602,11 @@ export default function App({
                           visible={tab.id === activeTabId}
                           layout={tab.layout}
                           sessions={sessions}
-                          editorPanes={[
-                            ...tab.editorPanes,
-                            ...(tab.terminalPanes ?? []),
-                          ]}
+                          editorPanes={
+                            tab.terminalPanes && tab.terminalPanes.length > 0
+                              ? [...tab.editorPanes, ...tab.terminalPanes]
+                              : tab.editorPanes
+                          }
                           dirtyFileIds={dirtyFiles}
                           fileErrorCounts={fileErrorCounts}
                           focusedId={

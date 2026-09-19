@@ -1,5 +1,6 @@
 import { ChevronDown, Lock, LockOpen, Pencil, Sparkles } from "./icons";
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -29,7 +30,7 @@ const ICONS: Record<RuntimeMode, typeof Lock> = {
   "full-access": LockOpen,
 };
 
-export function AccessPicker({
+export const AccessPicker = memo(function AccessPicker({
   value,
   onChange,
   onClose,
@@ -164,4 +165,4 @@ export function AccessPicker({
       ) : null}
     </div>
   );
-}
+});

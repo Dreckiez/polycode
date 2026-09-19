@@ -721,32 +721,47 @@ function VirtualRows({
     paddingBottom: range.padBottom,
   };
 
+  const mouseRafRef = useRef(0);
+  useEffect(() => {
+    return () => {
+      if (mouseRafRef.current) cancelAnimationFrame(mouseRafRef.current);
+    };
+  }, []);
+
+  const handleStageHunk = useCallback(
+    (pos: number) => {
+      onStageHunk?.(fileId, pos);
+    },
+    [fileId, onStageHunk],
+  );
+
+  const handleCommentLine = useCallback(
+    (key: string, line: UnifiedLine, anchor: DOMRect) => {
+      setCommentTarget({ key, line, anchor });
+    },
+    [],
+  );
+
   const renderLane = (lane: Lane) =>
     visible.map((row, index) => {
       const key = diffRowKey(row, range.start + index);
+      const isGutter = lane === "gutter";
+      const isLine = row.type === "line";
+      const canComment = isGutter && isLine && row.line.kind !== "hunk";
+      const canStage = isGutter && isLine && !!row.stage && row.line.pos != null;
       return (
         <DiffLane
           key={`${lane}-${key}`}
           row={row}
           lane={lane}
-          hovered={hoverKey === key}
-          commenting={commentTarget?.key === key}
-          tokens={row.type === "line" ? tokens?.get(row.line) : undefined}
-          onReveal={
-            row.type === "fold"
-              ? (direction) => onReveal(row.id, direction)
-              : undefined
-          }
-          onStage={
-            row.type === "line" && row.stage && row.line.pos != null
-              ? () => onStageHunk?.(fileId, row.line.pos as number)
-              : undefined
-          }
-          onComment={
-            lane === "gutter" && row.type === "line" && row.line.kind !== "hunk"
-              ? (anchor) => setCommentTarget({ key, line: row.line, anchor })
-              : undefined
-          }
+          hovered={isGutter && hoverKey === key}
+          commenting={isGutter && commentTarget?.key === key}
+          tokens={isLine ? tokens?.get(row.line) : undefined}
+          onRevealFold={row.type === "fold" ? onReveal : undefined}
+          stagePos={canStage ? (row.line.pos as number) : undefined}
+          onStageHunk={canStage ? handleStageHunk : undefined}
+          onCommentLine={canComment ? handleCommentLine : undefined}
+          rowKey={canComment ? key : undefined}
         />
       );
     });
@@ -758,9 +773,18 @@ function VirtualRows({
         className="flex"
         onMouseMove={(event) => {
           mouseYRef.current = event.clientY;
-          hoverAtY(event.clientY);
+          if (!mouseRafRef.current) {
+            mouseRafRef.current = window.requestAnimationFrame(() => {
+              mouseRafRef.current = 0;
+              hoverAtY(mouseYRef.current);
+            });
+          }
         }}
         onMouseLeave={() => {
+          if (mouseRafRef.current) {
+            cancelAnimationFrame(mouseRafRef.current);
+            mouseRafRef.current = 0;
+          }
           mouseYRef.current = null;
           hoverAtY(null);
         }}
@@ -801,24 +825,28 @@ function diffRowKey(row: DiffViewRow, index: number) {
   return `${index}-${row.line.kind}-${row.line.oldNumber ?? "x"}-${row.line.newNumber ?? "x"}`;
 }
 
-function DiffLane({
+const DiffLane = memo(function DiffLane({
   row,
   lane,
   hovered,
   commenting,
   tokens,
-  onReveal,
-  onStage,
-  onComment,
+  onRevealFold,
+  stagePos,
+  onStageHunk,
+  onCommentLine,
+  rowKey,
 }: {
   row: DiffViewRow;
   lane: Lane;
   hovered: boolean;
   commenting: boolean;
   tokens?: SyntaxToken[];
-  onReveal?: (direction: "up" | "down" | "all") => void;
-  onStage?: () => void;
-  onComment?: (anchor: DOMRect) => void;
+  onRevealFold?: (foldId: string, direction: "up" | "down" | "all") => void;
+  stagePos?: number;
+  onStageHunk?: (pos: number) => void;
+  onCommentLine?: (key: string, line: UnifiedLine, anchor: DOMRect) => void;
+  rowKey?: string;
 }) {
   if (row.type === "fold") {
     if (lane === "gutter") {
@@ -828,7 +856,10 @@ function DiffLane({
             className="absolute inset-y-0 left-0"
             style={{ width: "var(--unified-body-width, 100%)" }}
           >
-            <FoldBar hidden={row.hidden} onReveal={onReveal!} />
+            <FoldBar
+              hidden={row.hidden}
+              onReveal={(direction) => onRevealFold?.(row.id, direction)}
+            />
           </div>
         </div>
       );
@@ -842,11 +873,13 @@ function DiffLane({
       hovered={hovered}
       commenting={commenting}
       tokens={tokens}
-      onStage={onStage}
-      onComment={onComment}
+      stagePos={stagePos}
+      onStageHunk={onStageHunk}
+      onCommentLine={onCommentLine}
+      rowKey={rowKey}
     />
   );
-}
+});
 
 function FoldBar({
   hidden,
@@ -895,16 +928,20 @@ const DiffLineRow = memo(function DiffLineRow({
   hovered,
   commenting,
   tokens,
-  onStage,
-  onComment,
+  stagePos,
+  onStageHunk,
+  onCommentLine,
+  rowKey,
 }: {
   line: UnifiedLine;
   lane: Lane;
   hovered: boolean;
   commenting: boolean;
   tokens?: SyntaxToken[];
-  onStage?: () => void;
-  onComment?: (anchor: DOMRect) => void;
+  stagePos?: number;
+  onStageHunk?: (pos: number) => void;
+  onCommentLine?: (key: string, line: UnifiedLine, anchor: DOMRect) => void;
+  rowKey?: string;
 }) {
   if (line.kind === "hunk") {
     return (
@@ -951,13 +988,17 @@ const DiffLineRow = memo(function DiffLineRow({
         >
           {number ?? ""}
         </span>
-        {onComment ? (
+        {onCommentLine && rowKey ? (
           <button
             type="button"
             title={`Comment on line ${number ?? ""}`.trim()}
             aria-label={`Comment on line ${number ?? ""}`.trim()}
             onClick={(event) =>
-              onComment(event.currentTarget.getBoundingClientRect())
+              onCommentLine(
+                rowKey,
+                line,
+                event.currentTarget.getBoundingClientRect(),
+              )
             }
             className={`absolute top-0.5 left-0.5 z-10 grid size-4 place-items-center rounded-[3px] bg-content text-background-base outline-none transition-opacity hover:opacity-80 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/50 ${
               hovered || commenting
@@ -968,12 +1009,12 @@ const DiffLineRow = memo(function DiffLineRow({
             <MessageSquarePlus className="size-2.5" strokeWidth={2} />
           </button>
         ) : null}
-        {onStage ? (
+        {stagePos != null && onStageHunk ? (
           <button
             type="button"
             title="Stage hunk"
             aria-label="Stage hunk"
-            onClick={onStage}
+            onClick={() => onStageHunk(stagePos)}
             className={`absolute top-0.5 left-full z-10 ml-0.5 grid size-4 place-items-center rounded-[3px] bg-white text-[11px] font-bold text-black ${
               hovered ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
