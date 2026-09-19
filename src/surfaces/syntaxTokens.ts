@@ -5,11 +5,16 @@ import {
 import { EditorState, type Extension } from "@codemirror/state";
 import { highlightCode } from "@lezer/highlight";
 import type { ColorScheme } from "../lib/appearance";
+import { loadThemePresetId } from "../lib/themePresets";
 import type { UnifiedBlock, UnifiedLine } from "../lib/unifiedDiff";
 import {
   languageForPath,
   syntaxTagHighlighter,
 } from "./editorLanguage";
+import type {
+  SyntaxTokensRequest,
+  SyntaxTokensResponse,
+} from "./syntaxTokens.worker";
 
 type DiffFile = {
   path: string;
@@ -63,6 +68,103 @@ export function highlightSource(
   return lines;
 }
 
+/**
+ * Tokenize both diff sides for one file, resolving the language from the path
+ * first. Pure computation — runs inside the background worker.
+ */
+export async function highlightTexts(
+  path: string,
+  original: string,
+  current: string,
+  scheme: ColorScheme,
+  presetId: string,
+): Promise<{ original: SyntaxToken[][]; current: SyntaxToken[][] }> {
+  const language = await languageForPath(path);
+  return {
+    original: highlightSource(original, language, scheme, presetId),
+    current: highlightSource(current, language, scheme, presetId),
+  };
+}
+
+let syntaxWorker: Worker | null = null;
+let nextWorkerRequestId = 0;
+const workerPendingRequests = new Map<
+  number,
+  {
+    resolve: (result: { original: SyntaxToken[][]; current: SyntaxToken[][] }) => void;
+    reject: (err: Error) => void;
+  }
+>();
+
+function canUseSyntaxWorker(): boolean {
+  return typeof window !== "undefined" && typeof Worker !== "undefined";
+}
+
+function getSyntaxWorker(): Worker | null {
+  if (syntaxWorker) return syntaxWorker;
+  if (!canUseSyntaxWorker()) return null;
+  try {
+    syntaxWorker = new Worker(
+      new URL("./syntaxTokens.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+  } catch (err) {
+    console.error("Failed to create syntax highlight worker:", err);
+    return null;
+  }
+  syntaxWorker.onmessage = (
+    e: MessageEvent<SyntaxTokensResponse>,
+  ) => {
+    const { id, original, current, error } = e.data;
+    const pending = workerPendingRequests.get(id);
+    if (!pending) return;
+    workerPendingRequests.delete(id);
+    if (error) {
+      pending.reject(new Error(error));
+    } else if (original && current) {
+      pending.resolve({ original, current });
+    } else {
+      pending.reject(new Error("Syntax highlight worker returned an empty response"));
+    }
+  };
+  syntaxWorker.onerror = (e) => {
+    console.error("Syntax highlight worker error:", e);
+    const error = new Error("Syntax highlight worker error");
+    for (const pending of workerPendingRequests.values()) {
+      pending.reject(error);
+    }
+    workerPendingRequests.clear();
+    syntaxWorker = null;
+  };
+  return syntaxWorker;
+}
+
+function runSyntaxHighlightInWorker(
+  request: Omit<SyntaxTokensRequest, "id">,
+): Promise<{ original: SyntaxToken[][]; current: SyntaxToken[][] }> {
+  const worker = getSyntaxWorker();
+  if (!worker) {
+    return Promise.reject(new Error("Syntax highlight worker unavailable"));
+  }
+  const id = ++nextWorkerRequestId;
+  return new Promise((resolve, reject) => {
+    workerPendingRequests.set(id, { resolve, reject });
+    worker.postMessage({ ...request, id } satisfies SyntaxTokensRequest);
+  });
+}
+
+export function terminateSyntaxHighlightWorker(): void {
+  if (syntaxWorker) {
+    syntaxWorker.terminate();
+    syntaxWorker = null;
+    const error = new Error("Syntax highlight worker terminated");
+    for (const pending of workerPendingRequests.values()) {
+      pending.reject(error);
+    }
+    workerPendingRequests.clear();
+  }
+}
+
 export async function highlightDiffFile(
   file: DiffFile,
   scheme: ColorScheme,
@@ -96,27 +198,43 @@ export async function highlightDiffFile(
     }
   }
 
-  const language = await languageForPath(file.path);
+  const originalText = original.map((line) => line.text).join("\n");
+  const currentText = current.map((line) => line.text).join("\n");
+  if (!originalText && !currentText) return map;
 
-  const originalTokens = highlightSource(
-    original.map((line) => line.text).join("\n"),
-    language,
-    scheme,
-    presetId,
-  );
-  const currentTokens = highlightSource(
-    current.map((line) => line.text).join("\n"),
-    language,
-    scheme,
-    presetId,
-  );
+  const preset = presetId ?? loadThemePresetId();
+  let result: { original: SyntaxToken[][]; current: SyntaxToken[][] } | null =
+    null;
+  if (canUseSyntaxWorker()) {
+    try {
+      result = await runSyntaxHighlightInWorker({
+        path: file.path,
+        original: originalText,
+        current: currentText,
+        scheme,
+        presetId: preset,
+      });
+    } catch (err) {
+      console.warn("Syntax highlight worker failed, falling back inline:", err);
+      result = null;
+    }
+  }
+  if (!result) {
+    result = await highlightTexts(
+      file.path,
+      originalText,
+      currentText,
+      scheme,
+      preset,
+    );
+  }
   assignLineTokens(
     map,
     original,
-    originalTokens,
+    result.original,
     (line) => line.kind === "del",
   );
-  assignLineTokens(map, current, currentTokens, (line) => line.kind !== "del");
+  assignLineTokens(map, current, result.current, (line) => line.kind !== "del");
   return map;
 }
 

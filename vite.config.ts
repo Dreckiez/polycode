@@ -11,6 +11,9 @@ export default defineConfig(async ({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     clearScreen: false,
+    // Module workers can use dynamic `import()`; the IIFE format forbids the
+    // code-splitting needed to lazily load per-language highlighters.
+    worker: { format: "es" },
     server: {
       port: 1420,
       strictPort: true,
