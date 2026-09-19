@@ -912,7 +912,7 @@ function ProjectCard({
     sortable.toIndex === index &&
     sortable.fromIndex !== null &&
     sortable.toIndex > sortable.fromIndex;
-  const diffEnabled = Boolean(item.path) && item.path !== "~";
+  const diffEnabled = selected && Boolean(item.path) && item.path !== "~";
   const stats = useProjectDiffStats(item.path, diffEnabled);
   const files = stats?.files ?? 0;
   const additions = stats?.additions ?? 0;

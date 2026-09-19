@@ -66,11 +66,14 @@ import {
 } from "../lib/appearance";
 import { generateCommitMessage, generatePrContent } from "../lib/harness";
 import { invalidateWatchedFiles } from "../lib/fileWatch";
+import {
+  subscribeFsChanged,
+  unwatchProjectFs,
+  watchProjectFs,
+} from "../lib/fsWatch";
 import { MOD } from "../lib/platform";
 import { applyProjectDiffStats } from "../hooks/useProjectDiffStats";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
-
-const GIT_POLL_MS = 2000;
 
 function confirmNative(message: string, okLabel?: string): Promise<boolean> {
   return ask(message, {
@@ -1355,16 +1358,18 @@ function useDiffIndex(
     };
 
     void load();
+    void watchProjectFs(cwd);
     const onResume = () => {
       if (!document.hidden) void load();
     };
-    const timer = window.setInterval(onResume, GIT_POLL_MS);
+    const unsubFs = subscribeFsChanged(cwd, onResume);
     window.addEventListener("focus", onResume);
     document.addEventListener("visibilitychange", onResume);
     const unsubGit = subscribeGitChanged(onResume);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      void unwatchProjectFs(cwd);
+      unsubFs();
       window.removeEventListener("focus", onResume);
       document.removeEventListener("visibilitychange", onResume);
       unsubGit();

@@ -3,6 +3,7 @@ use tauri::Manager;
 mod chat_background;
 mod checkpoint;
 mod cursor_store;
+mod file_watch;
 mod fs;
 mod harness;
 #[cfg(target_os = "macos")]
@@ -169,6 +170,7 @@ pub fn run() {
         .manage(harness::HarnessHost::new())
         .manage(pty::PtyHost::new())
         .manage(window_transfer::WindowTransferState::new())
+        .manage(file_watch::FsWatchState::default())
         .setup(|app| {
             harness::reap_orphaned_harness_processes();
             session_store::init(app.handle())?;
@@ -252,6 +254,8 @@ pub fn run() {
             fs::write_attachment,
             fs::read_text_file,
             fs::write_text_file,
+            file_watch::fs_watch_register,
+            file_watch::fs_watch_unregister,
             skills::list_skills,
             skills::import_skill,
             search::search_project,
