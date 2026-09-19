@@ -28,6 +28,7 @@ import {
   type NameIssue,
 } from "../lib/fileName";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import { useVirtualWindow } from "../hooks/useVirtualWindow";
 import {
   createParentOf,
   dirsTouchedByCreate,
@@ -71,6 +72,19 @@ const GIT_STATUS_COLOR: Record<string, string> = {
   untracked: "text-emerald-400",
   deleted: "text-red-400",
 };
+
+const TREE_ROW_PX = 30;
+
+type FlatRow =
+  | {
+      kind: "entry";
+      entry: FsEntry;
+      depth: number;
+      posInSet: number;
+      setSize: number;
+    }
+  | { kind: "placeholder"; id: string; depth: number; text: string }
+  | { kind: "create"; id: number; depth: number; posInSet: number; setSize: number };
 
 type Props = {
   cwd: string;
@@ -188,6 +202,67 @@ async function copyText(text: string) {
   }
 }
 
+function flattenRows(opts: {
+  cwd: string;
+  children: FsEntry[] | null;
+  expanded: Set<string>;
+  creating: Creating | null;
+  dirErrors: Record<string, string>;
+}): FlatRow[] {
+  const { cwd, children, expanded, creating, dirErrors } = opts;
+  const rows: FlatRow[] = [];
+
+  const visit = (path: string, depth: number, entries: FsEntry[]) => {
+    const folders: FsEntry[] = [];
+    const files: FsEntry[] = [];
+    for (const entry of entries) {
+      if (entry.isDir) folders.push(entry);
+      else files.push(entry);
+    }
+    const creatingHere = creating && creating.parent === path ? creating : null;
+    const setSize = folders.length + files.length + (creatingHere ? 1 : 0);
+    let pos = 0;
+    if (creatingHere?.isDir) {
+      pos += 1;
+      rows.push({ kind: "create", id: creatingHere.id, depth, posInSet: pos, setSize });
+    }
+    for (const folder of folders) {
+      pos += 1;
+      rows.push({
+        kind: "entry",
+        entry: folder,
+        depth,
+        posInSet: pos,
+        setSize,
+      });
+      if (expanded.has(folder.path)) {
+        const sub = peekDir(folder.path);
+        if (sub) {
+          visit(folder.path, depth + 1, sub);
+        } else {
+          rows.push({
+            kind: "placeholder",
+            id: `${folder.path}:load`,
+            depth: depth + 1,
+            text: dirErrors[folder.path] ?? "…",
+          });
+        }
+      }
+    }
+    if (creatingHere && !creatingHere.isDir) {
+      pos += 1;
+      rows.push({ kind: "create", id: creatingHere.id, depth, posInSet: pos, setSize });
+    }
+    for (const file of files) {
+      pos += 1;
+      rows.push({ kind: "entry", entry: file, depth, posInSet: pos, setSize });
+    }
+  };
+
+  if (children) visit(cwd, 0, children);
+  return rows;
+}
+
 function explorerItems(
   target: MenuTarget,
   clip: Clip | null,
@@ -299,6 +374,9 @@ export const FileTree = memo(function FileTree({
   const [clip, setClip] = useState<Clip | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
+  const [dirErrors, setDirErrors] = useState<Record<string, string>>({});
+  const [loadedTick, setLoadedTick] = useState(0);
+  const pendingDirLoads = useRef(new Set<string>());
 
   const updateClip = useCallback(
     (nextClip: Clip | null | ((cur: Clip | null) => Clip | null)) => {
@@ -324,6 +402,18 @@ export const FileTree = memo(function FileTree({
   const epoch = useSyncExternalStore(
     store.subscribe,
     useCallback(() => store.getState().epoch, [store]),
+  );
+  const expanded = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().expanded, [store]),
+  );
+  const creating = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().creating, [store]),
+  );
+  const renaming = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().renaming, [store]),
   );
 
   const toggle = useCallback(
@@ -890,6 +980,61 @@ export const FileTree = memo(function FileTree({
     };
   }, [cwd, epoch]);
 
+  useEffect(() => {
+    if (!rootOpen) return;
+    for (const path of expanded) {
+      if (path === cwd) continue;
+      if (pendingDirLoads.current.has(path)) continue;
+      if (peekDir(path) !== null) continue;
+      pendingDirLoads.current.add(path);
+      listCachedDir(path)
+        .then(() => {
+          setLoadedTick((tick) => tick + 1);
+        })
+        .catch((err: unknown) => {
+          setDirErrors((prev) => ({
+            ...prev,
+            [path]: err instanceof Error ? err.message : String(err),
+          }));
+          setLoadedTick((tick) => tick + 1);
+        })
+        .finally(() => {
+          pendingDirLoads.current.delete(path);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rootOpen, expanded, cwd, epoch]);
+
+  const flat = useMemo(
+    () =>
+      flattenRows({
+        cwd,
+        children,
+        expanded,
+        creating,
+        dirErrors,
+      }),
+    [cwd, children, expanded, creating, dirErrors, loadedTick],
+  );
+  const pinnedIndex = useMemo(() => {
+    for (let i = 0; i < flat.length; i += 1) {
+      const row = flat[i];
+      if (!row) continue;
+      if (row.kind === "create") return i;
+      if (row.kind === "entry" && renaming === row.entry.path) return i;
+    }
+    return null;
+  }, [flat, renaming]);
+
+  const vw = useVirtualWindow(flat.length, TREE_ROW_PX);
+  const scrollerRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      lockOverscroll(el);
+      vw.containerRef(el);
+    },
+    [lockOverscroll, vw.containerRef],
+  );
+
   const treeActionsValue = useMemo<TreeActionsValue>(
     () => ({
       onToggle: toggle,
@@ -978,24 +1123,55 @@ export const FileTree = memo(function FileTree({
               </span>
             </button>
           </div>
+          {opError ? (
+            <p className="px-3 py-1 text-[12px] leading-4 text-red-400">
+              {opError}
+            </p>
+          ) : null}
+          {error ? (
+            <p
+              className="truncate px-3 py-1 text-[12px] leading-4 text-content/50"
+              style={{ paddingLeft: 8 }}
+            >
+              {error}
+            </p>
+          ) : null}
+          {rootOpen && children === null && !error ? (
+            <p className="px-3 py-1 text-[12px] leading-4 text-content/50">
+              …
+            </p>
+          ) : null}
           <div
-            ref={lockOverscroll}
+            ref={scrollerRef}
+            onScroll={vw.onScroll}
             className="min-h-0 flex-1 overflow-y-auto overscroll-none"
           >
-            {opError ? (
-              <p className="px-3 py-1 text-[12px] leading-4 text-red-400">
-                {opError}
-              </p>
-            ) : null}
             {rootOpen ? (
-              <div role="tree" aria-label={`${name} files`}>
-                <TreeChildren
-                  parent={cwd}
-                  depth={0}
-                  entries={children}
-                  loading={children === null && !error}
-                  error={error}
-                />
+              <div
+                role="tree"
+                aria-label={`${name} files`}
+                aria-rowcount={flat.length}
+                className="relative min-w-0"
+                style={{ position: "relative", height: vw.totalHeight }}
+              >
+                {pinnedIndex !== null && flat[pinnedIndex] ? (
+                  <TreeRowView
+                    key={flatRowKey(flat[pinnedIndex])}
+                    row={flat[pinnedIndex]}
+                    top={pinnedIndex * TREE_ROW_PX}
+                  />
+                ) : null}
+                {flat.slice(vw.start, vw.end).map((row, sliceIndex) => {
+                  const index = vw.start + sliceIndex;
+                  if (index === pinnedIndex) return null;
+                  return (
+                    <TreeRowView
+                      key={flatRowKey(row)}
+                      row={row}
+                      top={index * TREE_ROW_PX}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </div>
@@ -1048,87 +1224,69 @@ function HeaderIcon({
   );
 }
 
-const TreeChildren = memo(function TreeChildren({
-  parent,
-  depth,
-  entries,
-  loading,
-  error,
-}: {
-  parent: string;
-  depth: number;
-  entries: FsEntry[] | null;
-  loading: boolean;
-  error: string | null;
-}) {
-  const store = useTreeStore();
-  const { onCreateCommit, onCreateCancel } = useTreeActions();
+function flatRowKey(row: FlatRow): string {
+  switch (row.kind) {
+    case "entry":
+      return row.entry.path;
+    case "placeholder":
+      return row.id;
+    case "create":
+      return `create:${row.id}`;
+  }
+}
 
-  const creating = useSyncExternalStore(
-    store.subscribe,
-    useCallback(() => {
-      const c = store.getState().creating;
-      return c?.parent === parent ? c : null;
-    }, [store, parent]),
-  );
-
-  const { folders, files } = useMemo(() => {
-    const folders: FsEntry[] = [];
-    const files: FsEntry[] = [];
-    if (entries) {
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i];
-        if (e.isDir) folders.push(e);
-        else files.push(e);
-      }
-    }
-    return { folders, files };
-  }, [entries]);
-
-  const show = creating !== null;
-  const row =
-    show && creating ? (
-      <NameRow
-        key={creating.id}
-        depth={depth}
-        isDir={creating.isDir}
-        siblings={(entries ?? []).map((entry) => entry.name)}
-        onCommit={(raw) => onCreateCommit(creating.id, raw)}
-        onCancel={() => onCreateCancel(creating.id)}
-      />
-    ) : null;
-  const pad = useMemo(() => ({ paddingLeft: 28 + depth * 12 }), [depth]);
-
+function rowsEqual(a: FlatRow, b: FlatRow): boolean {
+  if (a.kind === "entry") {
+    return b.kind === "entry" && a.entry === b.entry && a.depth === b.depth;
+  }
+  if (a.kind === "create") {
+    return b.kind === "create" && a.id === b.id && a.depth === b.depth;
+  }
   return (
-    <>
-      {error ? (
-        <p className="truncate pr-2 text-[12px] text-content/50" style={pad}>
-          {error}
-        </p>
-      ) : null}
-      {show && creating?.isDir ? row : null}
-      {loading && !error ? (
-        <p className="pr-2 text-[12px] text-content/50" style={pad}>
-          …
-        </p>
-      ) : null}
-      {folders.map((child) => (
-        <TreeNode key={child.path} entry={child} depth={depth} />
-      ))}
-      {show && creating && !creating.isDir ? row : null}
-      {files.map((child) => (
-        <TreeNode key={child.path} entry={child} depth={depth} />
-      ))}
-    </>
+    b.kind === "placeholder" && a.id === b.id && a.text === b.text && a.depth === b.depth
   );
-});
+}
 
-const TreeNode = memo(function TreeNode({
+const TreeRowView = memo(
+  function TreeRowView({ row, top }: { row: FlatRow; top: number }) {
+    return (
+      <div
+        className="absolute left-0 right-0"
+        style={{ top, height: TREE_ROW_PX }}
+      >
+        {row.kind === "entry" ? (
+          <EntryRow
+            entry={row.entry}
+            depth={row.depth}
+            posInSet={row.posInSet}
+            setSize={row.setSize}
+          />
+        ) : row.kind === "create" ? (
+          <CreateRow row={row} />
+        ) : (
+          <div
+            className="flex h-full w-full items-center pr-2 text-[12px] leading-4 text-content/50"
+            style={{ paddingLeft: 28 + row.depth * 12 }}
+          >
+            {row.text}
+          </div>
+        )}
+      </div>
+    );
+  },
+  (prev, next) => prev.top === next.top && rowsEqual(prev.row, next.row),
+);
+
+const EntryRow = memo(function EntryRow({
   entry,
   depth,
+  posInSet,
+  setSize,
 }: {
   entry: FsEntry;
   depth: number;
+  posInSet: number;
+  setSize: number;
 }) {
   const store = useTreeStore();
   const {
@@ -1180,46 +1338,17 @@ const TreeNode = memo(function TreeNode({
         : statuses.files.get(entry.path);
     }, [store, entry.isDir, entry.path]),
   );
-  const epoch = useSyncExternalStore(
-    store.subscribe,
-    useCallback(
-      () => (entry.isDir ? store.getState().epoch : 0),
-      [store, entry.isDir],
-    ),
-  );
-
-  const [children, setChildren] = useState<FsEntry[] | null>(() =>
-    entry.isDir ? peekDir(entry.path) : null,
-  );
-  const [error, setError] = useState<string | null>(null);
   const gitColor = gitStatus ? GIT_STATUS_COLOR[gitStatus] : undefined;
 
-  useEffect(() => {
-    if (!entry.isDir || !open) return;
-    const hit = peekDir(entry.path);
-    if (hit) {
-      setChildren(hit);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    void listCachedDir(entry.path)
-      .then((entries) => {
-        if (!cancelled) {
-          setChildren(entries);
-          setError(null);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setChildren([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [entry.isDir, entry.path, open, epoch]);
+  const siblings = useMemo(
+    () =>
+      editing
+        ? (peekDir(parentPath(entry.path)) ?? [])
+            .map((child) => child.name)
+            .filter((name) => name !== entry.name)
+        : [],
+    [editing, entry.path, entry.name],
+  );
 
   const onClick = useCallback(() => {
     if (consumeFileClick()) return;
@@ -1242,77 +1371,85 @@ const TreeNode = memo(function TreeNode({
     [entry, onItemContextMenu],
   );
 
-  const siblings = useMemo(
-    () =>
-      editing
-        ? (peekDir(parentPath(entry.path)) ?? [])
-            .map((child) => child.name)
-            .filter((name) => name !== entry.name)
-        : [],
-    [editing, entry.path, entry.name],
-  );
-
   const rowStyle = useMemo(() => ({ paddingLeft: 8 + depth * 12 }), [depth]);
 
+  if (editing) {
+    return (
+      <NameRow
+        depth={depth}
+        isDir={entry.isDir}
+        initial={entry.name}
+        selectStem={!entry.isDir}
+        siblings={siblings}
+        overlay
+        onCommit={(raw) => onRenameCommit(entry.path, raw)}
+        onCancel={onRenameCancel}
+      />
+    );
+  }
   return (
-    <div>
-      {editing ? (
-        <NameRow
-          depth={depth}
-          isDir={entry.isDir}
-          initial={entry.name}
-          selectStem={!entry.isDir}
-          siblings={siblings}
-          onCommit={(raw) => onRenameCommit(entry.path, raw)}
-          onCancel={onRenameCancel}
-        />
-      ) : (
-        <button
-          type="button"
-          role="treeitem"
-          title={entry.path}
-          aria-expanded={entry.isDir ? open : undefined}
-          onClick={onClick}
-          onPointerDown={onPointerDownHandler}
-          onContextMenu={onContextMenuHandler}
-          style={rowStyle}
-          className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal data-[explorer-dragging]:opacity-50 ${
-            selected
-              ? "bg-content/10 text-content"
-              : "text-content hover:bg-content/5"
-          } ${cut ? "opacity-50" : ""}`}
-        >
-          <span className="grid size-4 shrink-0 place-items-center text-content/50">
-            {entry.isDir ? (
-              open ? (
-                <ChevronDown className="size-3.5" strokeWidth={1.75} />
-              ) : (
-                <ChevronRight className="size-3.5" strokeWidth={1.75} />
-              )
-            ) : null}
-          </span>
-          <span className="shrink-0">
-            <FileTypeIcon name={entry.name} isDir={entry.isDir} isOpen={open} />
-          </span>
-          <span
-            className={`min-w-0 truncate py-0.5 ${
-              entry.ignored ? "italic text-content/50" : (gitColor ?? "")
-            }`}
-          >
-            {entry.name}
-          </span>
-        </button>
-      )}
-      {entry.isDir && open ? (
-        <TreeChildren
-          parent={entry.path}
-          depth={depth + 1}
-          entries={children}
-          loading={children === null && !error}
-          error={error}
-        />
-      ) : null}
-    </div>
+    <button
+      type="button"
+      role="treeitem"
+      title={entry.path}
+      aria-level={depth + 1}
+      aria-posinset={posInSet}
+      aria-setsize={setSize}
+      aria-expanded={entry.isDir ? open : undefined}
+      onClick={onClick}
+      onPointerDown={onPointerDownHandler}
+      onContextMenu={onContextMenuHandler}
+      style={rowStyle}
+      className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal data-[explorer-dragging]:opacity-50 ${
+        selected
+          ? "bg-content/10 text-content"
+          : "text-content hover:bg-content/5"
+      } ${cut ? "opacity-50" : ""}`}
+    >
+      <span className="grid size-4 shrink-0 place-items-center text-content/50">
+        {entry.isDir ? (
+          open ? (
+            <ChevronDown className="size-3.5" strokeWidth={1.75} />
+          ) : (
+            <ChevronRight className="size-3.5" strokeWidth={1.75} />
+          )
+        ) : null}
+      </span>
+      <span className="shrink-0">
+        <FileTypeIcon name={entry.name} isDir={entry.isDir} isOpen={open} />
+      </span>
+      <span
+        className={`min-w-0 truncate py-0.5 ${
+          entry.ignored ? "italic text-content/50" : (gitColor ?? "")
+        }`}
+      >
+        {entry.name}
+      </span>
+    </button>
+  );
+});
+
+const CreateRow = memo(function CreateRow({
+  row,
+}: {
+  row: Extract<FlatRow, { kind: "create" }>;
+}) {
+  const store = useTreeStore();
+  const { onCreateCommit, onCreateCancel } = useTreeActions();
+  const creating = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().creating, [store]),
+  );
+  if (!creating || creating.id !== row.id) return null;
+  return (
+    <NameRow
+      depth={row.depth}
+      isDir={creating.isDir}
+      siblings={(peekDir(creating.parent) ?? []).map((entry) => entry.name)}
+      overlay
+      onCommit={(raw) => onCreateCommit(creating.id, raw)}
+      onCancel={() => onCreateCancel(creating.id)}
+    />
   );
 });
 
@@ -1322,6 +1459,7 @@ function NameRow({
   initial = "",
   selectStem = false,
   siblings,
+  overlay = false,
   onCommit,
   onCancel,
 }: {
@@ -1330,6 +1468,7 @@ function NameRow({
   initial?: string;
   selectStem?: boolean;
   siblings: string[];
+  overlay?: boolean;
   onCommit: (raw: string) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -1383,7 +1522,10 @@ function NameRow({
         (issue.kind === "empty" && attempted)));
 
   return (
-    <div>
+    <div
+      className={overlay ? "relative" : undefined}
+      style={{ height: overlay ? TREE_ROW_PX : undefined }}
+    >
       <div
         style={{ paddingLeft: 8 + depth * 12 }}
         className="flex h-7.5 w-full items-center gap-1 bg-content/10 pr-2"
@@ -1426,7 +1568,12 @@ function NameRow({
         />
       </div>
       {showIssue ? (
-        <NameIssueView depth={depth} issue={issue} fallback={submitError} />
+        <NameIssueView
+          depth={depth}
+          issue={issue}
+          fallback={submitError}
+          overlay={overlay}
+        />
       ) : null}
     </div>
   );
@@ -1436,10 +1583,12 @@ function NameIssueView({
   depth,
   issue,
   fallback,
+  overlay = false,
 }: {
   depth: number;
   issue: NameIssue | null;
   fallback: string | null;
+  overlay?: boolean;
 }) {
   let body: ReactNode = null;
   if (fallback) {
@@ -1478,10 +1627,19 @@ function NameIssueView({
   const error = Boolean(fallback) || !issue || issue.severity === "error";
   return (
     <p
-      className={`pr-2 pb-1 text-[12px] leading-4 ${
+      className={`${overlay ? "absolute top-full left-0 right-0 z-10" : ""} pr-2 pb-1 text-[12px] leading-4 ${
         error ? "text-red-400" : "text-amber-400"
       }`}
-      style={{ paddingLeft: 28 + depth * 12 }}
+      style={
+        overlay
+          ? {
+              paddingTop: 4,
+              paddingLeft: 28 + depth * 12,
+              backgroundColor: "var(--color-background-base)",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.18)",
+            }
+          : { paddingLeft: 28 + depth * 12 }
+      }
     >
       {body}
     </p>

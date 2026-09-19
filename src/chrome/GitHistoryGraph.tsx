@@ -8,6 +8,7 @@ import {
 } from "react";
 import { ChevronDown, ChevronRight, GitBranch } from "./icons";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import { useVirtualWindow } from "../hooks/useVirtualWindow";
 import { suppressTextSelection } from "../lib/drag";
 import {
   gitHistory,
@@ -44,6 +45,14 @@ export function GitHistoryGraph({
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const { commits } = useGitHistory(cwd, enabled && expanded);
   const rows = useMemo(() => layoutGitGraph(commits), [commits]);
+  const vw = useVirtualWindow(rows.length, GRAPH_ROW_PX, 8);
+  const scrollerRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      lockOverscroll(el);
+      vw.containerRef(el);
+    },
+    [lockOverscroll, vw.containerRef],
+  );
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
@@ -73,7 +82,8 @@ export function GitHistoryGraph({
       </button>
       {expanded ? (
         <div
-          ref={lockOverscroll}
+          ref={scrollerRef}
+          onScroll={vw.onScroll}
           className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none"
         >
           {!cwd || cwd === "~" ? (
@@ -81,13 +91,19 @@ export function GitHistoryGraph({
           ) : commits.length === 0 ? (
             <p className="px-3 py-2 text-[12px] text-content/45">No commits yet</p>
           ) : (
-            <ul className="min-w-0 max-w-full">
-              {commits.map((commit, index) => {
-                const row = rows[index];
-                if (!row) return null;
+            <ul
+              className="relative min-w-0 max-w-full"
+              style={{ position: "relative", height: vw.totalHeight }}
+            >
+              {rows.slice(vw.start, vw.end).map((row, sliceIndex) => {
+                const index = vw.start + sliceIndex;
+                const commit = commits[index];
+                if (!commit) return null;
                 return (
                   <HistoryRow
                     key={commit.sha}
+                    index={index}
+                    count={rows.length}
                     commit={commit}
                     row={row}
                     active={selectedSha === commit.sha}
@@ -108,16 +124,25 @@ function HistoryRow({
   row,
   active,
   onOpen,
+  index,
+  count,
 }: {
   commit: GitHistoryCommit;
   row: HistoryItemViewModel;
   active: boolean;
   onOpen: () => void;
+  index: number;
+  count: number;
 }) {
   const graph = historyItemGraph(row);
   const badge = row.refs.find((ref) => ref.color) ?? row.refs[0];
   return (
-    <li className="min-w-0 overflow-visible" style={{ height: GRAPH_ROW_PX }}>
+    <li
+      aria-posinset={index + 1}
+      aria-setsize={count}
+      className="absolute left-0 right-0 min-w-0 overflow-visible"
+      style={{ top: index * GRAPH_ROW_PX, height: GRAPH_ROW_PX }}
+    >
       <button
         type="button"
         title={`${commit.shortSha} ${commit.subject}${commit.author ? ` — ${commit.author}` : ""}`}
