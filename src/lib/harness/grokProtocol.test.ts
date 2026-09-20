@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   askQuestionResponse,
   askQuestionsFromAcp,
-  eventsFromAcpUpdate,
   fallbackGrokModels,
   grokAuthMethodId,
   grokEffort,
@@ -16,9 +15,9 @@ import {
   permissionOptionId,
   permissionRequestFromAcp,
   pickAutoOption,
-  planFromExitPlan,
   sessionIdFromResult,
 } from "./grokProtocol";
+import { eventsFromAcpUpdate, planFromExitPlan } from "./grokTranscript";
 import { harnessSupportsAttachments } from "../session";
 
 describe("grok protocol", () => {

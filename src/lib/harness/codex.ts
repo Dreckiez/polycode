@@ -14,12 +14,14 @@ import {
   buildTurnStartParams,
   buildTurnSteerParams,
   isRecoverableThreadResumeError,
-  mapApprovalRequest,
-  mapCodexNotification,
   stringField,
-  toCodexApprovalDecision,
   type CodexApprovalKind,
 } from "./codexProtocol";
+import {
+  mapApprovalRequest,
+  mapCodexNotification,
+  toCodexApprovalDecision,
+} from "./codexTranscript";
 import { JsonRpcClient, type JsonRpcId } from "./jsonRpc";
 import { codexQuestions, codexQuestionResponse } from "./codexQuestions";
 import { codexMcpConfirmation } from "./codexElicitation";

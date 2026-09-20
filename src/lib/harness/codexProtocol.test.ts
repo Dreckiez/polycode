@@ -4,11 +4,10 @@ import {
   buildTurnStartParams,
   buildTurnSteerParams,
   isRecoverableThreadResumeError,
-  mapApprovalRequest,
-  mapCodexNotification,
   runtimeModeToCodexConfig,
   toCodexApprovalDecision,
 } from "./codexProtocol";
+import { mapApprovalRequest, mapCodexNotification } from "./codexTranscript";
 import { parseCodexModelList } from "./codexCatalog";
 
 describe("runtimeModeToCodexConfig", () => {

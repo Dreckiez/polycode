@@ -10,7 +10,7 @@ import {
   mergeToolPreview,
   titleFromToolInput,
 } from "./preview";
-import { previewFromTool } from "./claudeProtocol";
+import { previewFromTool } from "./claudeTranscript";
 
 describe("tool input change previews", () => {
   it("compares Claude Edit excerpts outside the workspace without inventing file line numbers", () => {

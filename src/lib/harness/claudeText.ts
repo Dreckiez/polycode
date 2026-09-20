@@ -8,13 +8,15 @@ import {
   writeChild,
 } from "./child";
 import {
-  assistantTextBlocks,
   buildClaudeSpawnArgs,
   buildClaudeUserMessage,
   parseJsonLine,
   stringField,
-  turnStatusFromResult,
 } from "./claudeProtocol";
+import {
+  assistantTextBlocks,
+  turnStatusFromResult,
+} from "./claudeTranscript";
 import { mergeStream } from "./streamText";
 
 const TEXT_CHILD_ID = "monocode-claude-text";

@@ -2,38 +2,40 @@ import { describe, expect, it } from "vitest";
 import { modelsForClaudeVersion, modelsFromClaudeListModels } from "./claudeCatalog";
 import {
   applyClaudePromptEffortPrefix,
-  askUserQuestionAllowInput,
   buildClaudeSpawnArgs,
   buildClaudeUserMessage,
-  contextFromResult,
-  contextUsedFromAssistant,
-  extractExitPlanModePlan,
   isClaudeInitMessage,
-  isSubagentMessage,
-  isTodoTool,
   listModelsFromControlResponse,
   normalizeClaudeCliEffort,
-  parseBackgroundAgentTasks,
   parseClaudeVersion,
   parseControlRequest,
   parseControlResponse,
+  resolveClaudeApiModelId,
+  runtimeModeToPermission,
+  sessionIdFromMessage,
+  toClaudePermissionResult,
+} from "./claudeProtocol";
+import {
+  askUserQuestionAllowInput,
+  contextFromResult,
+  contextUsedFromAssistant,
+  extractExitPlanModePlan,
+  isSubagentMessage,
+  isTodoTool,
+  parseBackgroundAgentTasks,
   parseTaskNotification,
   parseTaskProgress,
   parseTaskStarted,
   parseTaskUpdated,
   parseToolProgress,
-  taskListFromTodos,
-  resolveClaudeApiModelId,
-  runtimeModeToPermission,
-  sessionIdFromMessage,
   statusTextFromSystem,
   streamDeltaFromEvent,
-  toClaudePermissionResult,
+  taskListFromTodos,
   toolKindFromName,
   toolStartFromEvent,
   toolTitle,
   turnStatusFromResult,
-} from "./claudeProtocol";
+} from "./claudeTranscript";
 
 describe("runtimeModeToPermission", () => {
   it("maps runtime modes onto Claude permission flags", () => {

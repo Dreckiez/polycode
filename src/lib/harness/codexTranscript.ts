@@ -1,0 +1,746 @@
+import type {
+  TaskListItem,
+  ToolPreview,
+} from "../session";
+import { normalizeTaskListStatus } from "../taskList";
+import {
+  composeToolTitle,
+  extractToolPreview,
+  formatAgentType,
+} from "./preview";
+import { streamTextDelta } from "./streamText";
+import type { HarnessEvent } from "./types";
+import {
+  asRecord,
+  stringField,
+  type CodexApprovalKind,
+} from "./codexProtocol";
+export { toCodexApprovalDecision } from "./codexProtocol";
+
+export type MappedCodexNotification = {
+  events: HarnessEvent[];
+  /** Provider diagnostics for debug logs, excluded from the transcript. */
+  diagnostic?: string;
+  /** When set, the active turn finished. */
+  turnCompleted?: {
+    status: "completed" | "failed" | "interrupted" | "cancelled";
+    error?: string;
+  };
+  activeTurnId?: string | null;
+};
+
+/**
+ * Translate a Codex app-server notification into MonoCode HarnessEvents.
+ * Unknown methods return empty events (non-fatal).
+ */
+export function mapCodexNotification(
+  method: string,
+  params: unknown,
+): MappedCodexNotification {
+  const rec = asRecord(params);
+  if (!rec) return { events: [] };
+
+  if (method === "item/agentMessage/delta") {
+    const delta = streamTextDelta(rec.delta);
+    if (!delta) return { events: [] };
+    return { events: [{ type: "message.delta", text: delta }] };
+  }
+
+  if (method === "item/reasoning/summaryTextDelta") {
+    const delta = streamTextDelta(rec.delta);
+    if (!delta) return { events: [] };
+    return { events: [{ type: "reasoning.delta", text: delta }] };
+  }
+
+  if (method === "item/reasoning/textDelta") {
+    const delta = streamTextDelta(rec.delta);
+    if (!delta) return { events: [] };
+    return { events: [{ type: "reasoning.delta", text: delta }] };
+  }
+
+  if (method === "item/plan/delta") {
+    const delta = streamTextDelta(rec.delta);
+    if (!delta) return { events: [] };
+    return {
+      events: [
+        {
+          type: "plan",
+          text: delta,
+          key: stringField(rec, "itemId"),
+          append: true,
+          streaming: true,
+        },
+      ],
+    };
+  }
+
+  if (method === "turn/plan/updated") {
+    const plan = rec.plan;
+    if (!Array.isArray(plan)) return { events: [] };
+    const items = plan.flatMap((step): TaskListItem[] => {
+      const row = asRecord(step);
+      const body = stringField(row, "step") ?? "";
+      if (!body) return [];
+      return [
+        {
+          text: body,
+          status: normalizeTaskListStatus(stringField(row, "status")),
+        },
+      ];
+    });
+    const key = stringField(rec, "turnId");
+    const explanation = stringField(rec, "explanation");
+    return {
+      events: [
+        {
+          type: "tasks.updated",
+          items,
+          ...(key ? { key } : {}),
+          ...(explanation ? { explanation } : {}),
+        },
+      ],
+    };
+  }
+
+  if (method === "item/started" || method === "item/completed") {
+    return mapItemLifecycle(method, rec);
+  }
+
+  if (method === "item/commandExecution/outputDelta") {
+    const itemId = stringField(rec, "itemId") ?? "";
+    const delta = streamTextDelta(rec.delta);
+    if (!itemId || !delta) return { events: [] };
+    return {
+      events: [
+        {
+          type: "tool.updated",
+          callId: itemId,
+          kind: "execute",
+          detail: delta,
+          status: "in_progress",
+        },
+      ],
+    };
+  }
+
+  if (method === "item/fileChange/patchUpdated") {
+    return mapFileChangePatch(rec);
+  }
+
+  if (method === "thread/tokenUsage/updated") {
+    return mapTokenUsage(rec);
+  }
+
+  if (method === "turn/started") {
+    const turn = asRecord(rec.turn);
+    const turnId = stringField(turn, "id");
+    return {
+      events: [],
+      ...(turnId ? { activeTurnId: turnId } : {}),
+    };
+  }
+
+  if (method === "turn/completed" || method === "turn/aborted") {
+    return mapTurnTerminal(method, rec);
+  }
+
+  if (method === "error") {
+    const errorObj = asRecord(rec.error);
+    const message =
+      stringField(errorObj, "message") ??
+      stringField(rec, "message") ??
+      "Codex error";
+    const willRetry = rec.willRetry === true;
+    if (willRetry) {
+      // Codex owns retrying the request; a status event would persist a row
+      // for every attempt and interrupt any streaming transcript block.
+      return { events: [], diagnostic: message };
+    }
+    return { events: [{ type: "session.error", message }] };
+  }
+
+  if (method === "configWarning" || method === "warning") {
+    const message =
+      stringField(rec, "summary") ??
+      stringField(rec, "message") ??
+      stringField(rec, "details");
+    if (!message) return { events: [] };
+    // Runtime warnings have no structured code. Match only Codex's known
+    // transport fallback notice; configuration and other warnings stay visible.
+    if (
+      method === "warning" &&
+      /^Falling back from WebSockets to HTTPS transport(?:[.:]|$)/.test(
+        message.trimStart(),
+      )
+    ) {
+      return { events: [], diagnostic: message };
+    }
+    return { events: [{ type: "status", text: message }] };
+  }
+
+  return { events: [] };
+}
+
+/** Codex thread items MonoCode already renders elsewhere or that are internal metadata. */
+const SILENT_ITEM_TYPES = new Set([
+  "userMessage",
+  "contextCompaction",
+  "enteredReviewMode",
+]);
+
+/**
+ * Codex reports both `last` (the most recent request) and `total` (cumulative
+ * thread spend). Only `last` describes the context window — `total` keeps
+ * climbing across compactions and would run past 100%.
+ */
+function mapTokenUsage(rec: Record<string, unknown>): MappedCodexNotification {
+  const usage = asRecord(rec.tokenUsage);
+  const last = asRecord(usage?.last);
+  if (!last) return { events: [] };
+  const used = numberField(last, "totalTokens");
+  const window = numberField(usage, "modelContextWindow");
+  if (!used && !window) return { events: [] };
+  return {
+    events: [
+      {
+        type: "context",
+        ...(used > 0 ? { used } : {}),
+        ...(window > 0 ? { window } : {}),
+      },
+    ],
+  };
+}
+
+function numberField(
+  rec: Record<string, unknown> | null | undefined,
+  key: string,
+): number {
+  const value = rec?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function mapTurnTerminal(
+  method: string,
+  rec: Record<string, unknown>,
+): MappedCodexNotification {
+  const turn = asRecord(rec.turn);
+  const statusRaw =
+    stringField(turn, "status") ??
+    (method === "turn/aborted" ? "interrupted" : "completed");
+  const errorObj = asRecord(turn?.error);
+  const error = stringField(errorObj, "message");
+  const status =
+    statusRaw === "failed"
+      ? "failed"
+      : statusRaw === "interrupted" || statusRaw === "cancelled"
+        ? statusRaw === "cancelled"
+          ? "cancelled"
+          : "interrupted"
+        : "completed";
+  const events: HarnessEvent[] = [
+    { type: "message.completed" },
+    { type: "reasoning.completed" },
+  ];
+  if (status === "failed" && error) {
+    events.push({ type: "session.error", message: error });
+  } else if (status === "failed") {
+    events.push({ type: "session.error", message: "Codex turn failed." });
+  }
+  return {
+    events,
+    turnCompleted: { status, ...(error ? { error } : {}) },
+    activeTurnId: null,
+  };
+}
+
+function mapItemLifecycle(
+  method: string,
+  rec: Record<string, unknown>,
+): MappedCodexNotification {
+  const item = asRecord(rec.item);
+  if (!item) return { events: [] };
+  const callId = stringField(item, "id") ?? "";
+  if (!callId) return { events: [] };
+  const itemType = stringField(item, "type") ?? "";
+  const completed = method === "item/completed";
+
+  if (SILENT_ITEM_TYPES.has(itemType)) {
+    return { events: [] };
+  }
+
+  if (itemType === "exitedReviewMode" && completed) {
+    const review = stringField(item, "review");
+    if (review) {
+      return {
+        events: [
+          { type: "message.delta", text: review },
+          { type: "message.completed" },
+        ],
+      };
+    }
+    return { events: [] };
+  }
+
+  if (itemType === "agentMessage") {
+    // Prefer deltas; completed agent messages may carry full text for
+    // non-streaming. A turn can still run after this item — Codex often
+    // emits a short message, then tools, then another message — so this
+    // must not be treated as turn completion.
+    if (completed) {
+      const text = streamTextDelta(item.text);
+      const events: HarnessEvent[] = [];
+      if (text) {
+        events.push(
+          { type: "message.delta", text },
+          { type: "message.completed" },
+        );
+      }
+      return { events };
+    }
+    return { events: [] };
+  }
+
+  if (itemType === "reasoning") {
+    if (completed) {
+      const summary = item.summary;
+      if (Array.isArray(summary)) {
+        const text = summary
+          .map((part) => {
+            if (typeof part === "string") return part;
+            const row = asRecord(part);
+            return stringField(row, "text") ?? "";
+          })
+          .filter(Boolean)
+          .join("\n");
+        if (text) {
+          return {
+            events: [
+              { type: "reasoning.delta", text },
+              { type: "reasoning.completed" },
+            ],
+          };
+        }
+      }
+      return { events: [{ type: "reasoning.completed" }] };
+    }
+    return { events: [] };
+  }
+
+  if (itemType === "plan") {
+    const text = stringField(item, "text");
+    if (text) {
+      return {
+        events: [
+          {
+            type: "plan",
+            text,
+            key: stringField(item, "id"),
+            streaming: false,
+          },
+        ],
+      };
+    }
+    return { events: [] };
+  }
+
+  const mapped = mapToolItem(item, itemType, completed);
+  return mapped ? { events: [mapped] } : { events: [] };
+}
+
+function mapToolItem(
+  item: Record<string, unknown>,
+  itemType: string,
+  completed: boolean,
+): HarnessEvent | null {
+  const callId = stringField(item, "id") ?? "";
+  if (!callId) return null;
+
+  if (itemType === "commandExecution") {
+    const command = stringField(item, "command") ?? "Shell";
+    const status = mapItemStatus(stringField(item, "status"), completed);
+    const output =
+      stringField(item, "aggregatedOutput") ?? stringField(item, "output");
+    const preview: ToolPreview | undefined = undefined;
+    const eventType = completed ? "tool.updated" : "tool.started";
+    if (eventType === "tool.started") {
+      return {
+        type: "tool.started",
+        callId,
+        title: command,
+        kind: "execute",
+        status,
+        preview,
+      };
+    }
+    return {
+      type: "tool.updated",
+      callId,
+      title: command,
+      kind: "execute",
+      status,
+      ...(output ? { detail: output } : {}),
+      preview,
+    };
+  }
+
+  if (itemType === "fileChange") {
+    return mapFileChangeItem(item, callId, completed);
+  }
+
+  if (itemType === "webSearch") {
+    const query = stringField(item, "query") ?? "Search";
+    const status = mapItemStatus(stringField(item, "status"), completed);
+    if (!completed) {
+      return {
+        type: "tool.started",
+        callId,
+        title: composeToolTitle({
+          kind: "search",
+          title: query,
+          query,
+          previewKind: "search",
+        }),
+        kind: "search",
+        status,
+        preview: { kind: "search", query },
+      };
+    }
+    return {
+      type: "tool.updated",
+      callId,
+      title: composeToolTitle({
+        kind: "search",
+        title: query,
+        query,
+        previewKind: "search",
+      }),
+      kind: "search",
+      status,
+      preview: { kind: "search", query },
+    };
+  }
+
+  if (itemType === "mcpToolCall") {
+    const server = stringField(item, "server") ?? "mcp";
+    const tool = stringField(item, "tool") ?? "tool";
+    const title = `${server}:${tool}`;
+    const status = mapItemStatus(stringField(item, "status"), completed);
+    const args = item.arguments;
+    const preview =
+      extractToolPreview(
+        { kind: "other", title, rawInput: args },
+        { kind: "other", title, rawInput: args },
+      ) ?? undefined;
+    if (!completed) {
+      return {
+        type: "tool.started",
+        callId,
+        title,
+        kind: "other",
+        status,
+        preview,
+      };
+    }
+    return {
+      type: "tool.updated",
+      callId,
+      title,
+      kind: "other",
+      status,
+      preview,
+    };
+  }
+
+  if (itemType === "subAgentActivity") {
+    return mapSubAgentActivity(item, callId, completed);
+  }
+
+  if (itemType === "collabAgentToolCall") {
+    return mapCollabAgentToolCall(item, callId, completed);
+  }
+
+  // Unknown item types are ignored; Codex may add new internal kinds over time.
+  void item;
+  void completed;
+  return null;
+}
+
+function mapSubAgentActivity(
+  item: Record<string, unknown>,
+  callId: string,
+  completed: boolean,
+): HarnessEvent {
+  const kind = (stringField(item, "kind") ?? "").toLowerCase();
+  const path =
+    stringField(item, "agentPath") ?? stringField(item, "agent_path");
+  const leaf = path?.split(/[/\\]/).filter(Boolean).pop();
+  const title = leaf ? `${formatAgentType(leaf)} subagent` : "Subagent";
+  if (kind === "interrupted") {
+    return {
+      type: "tool.updated",
+      callId,
+      title,
+      kind: "agent",
+      status: "failed",
+      detail: "Subagent interrupted.",
+    };
+  }
+  if (kind === "interacted") {
+    return {
+      type: completed ? "tool.updated" : "tool.started",
+      callId,
+      title,
+      kind: "agent",
+      status: "in_progress",
+    };
+  }
+  // `started` items are completion-only in app-server v2: the spawn finished,
+  // but the child agent is still running.
+  return {
+    type: "tool.started",
+    callId,
+    title,
+    kind: "agent",
+    status: "in_progress",
+  };
+}
+
+/** Current app-server v2 representation for spawn/send/wait/close calls. */
+function mapCollabAgentToolCall(
+  item: Record<string, unknown>,
+  callId: string,
+  completed: boolean,
+): HarnessEvent {
+  const tool = stringField(item, "tool") ?? "";
+  const rawReceivers = item.receiverThreadIds ?? item.receiver_thread_ids;
+  const receivers = Array.isArray(rawReceivers)
+    ? rawReceivers.filter(
+        (value): value is string => typeof value === "string" && !!value,
+      )
+    : [];
+  const fallbackTitle =
+    tool === "spawnAgent"
+      ? "Spawn subagent"
+      : tool === "sendInput"
+        ? "Message subagent"
+        : tool === "resumeAgent"
+          ? "Resume subagent"
+          : tool === "wait"
+            ? receivers.length > 1
+              ? `Wait for ${receivers.length} subagents`
+              : "Wait for subagent"
+            : tool === "closeAgent"
+              ? "Close subagent"
+              : "Subagent";
+  const prompt = stringField(item, "prompt");
+  const title =
+    tool === "spawnAgent" &&
+    prompt &&
+    !prompt.includes("\n") &&
+    prompt.length <= 160
+      ? prompt
+      : fallbackTitle;
+  const detail = collabAgentFailureDetail(item);
+  const failed = stringField(item, "status") === "failed" || !!detail;
+  return {
+    type: completed ? "tool.updated" : "tool.started",
+    callId,
+    title,
+    kind: "agent",
+    status: completed ? (failed ? "failed" : "completed") : "in_progress",
+    ...(detail ? { detail } : {}),
+  };
+}
+
+function collabAgentFailureDetail(
+  item: Record<string, unknown>,
+): string | undefined {
+  const states = asRecord(item.agentsStates) ?? asRecord(item.agents_states);
+  const errors = Object.values(states ?? {}).flatMap((value) => {
+    const state = asRecord(value);
+    const status = (stringField(state, "status") ?? "").toLowerCase();
+    if (
+      status !== "errored" &&
+      status !== "notfound" &&
+      status !== "not_found"
+    ) {
+      return [];
+    }
+    return [stringField(state, "message") ?? "Subagent failed."];
+  });
+  if (errors.length > 0) return [...new Set(errors)].join("\n");
+  return stringField(item, "status") === "failed"
+    ? "Subagent operation failed."
+    : undefined;
+}
+
+function mapFileChangeItem(
+  item: Record<string, unknown>,
+  callId: string,
+  completed: boolean,
+): HarnessEvent {
+  const changes = Array.isArray(item.changes) ? item.changes : [];
+  const paths = changes
+    .map((change) => stringField(asRecord(change), "path"))
+    .filter((path): path is string => Boolean(path));
+  const first = asRecord(changes[0]);
+  const path = stringField(first, "path");
+  const diff = stringField(first, "diff");
+  const status = mapItemStatus(stringField(item, "status"), completed);
+  const preview = buildDiffPreview(path, diff);
+  const title =
+    composeToolTitle({
+      kind: "edit",
+      title: path ? `Edit ${path}` : "Edit",
+      path,
+      previewKind: "write",
+    }) || "Edit";
+  if (!completed) {
+    return {
+      type: "tool.started",
+      callId,
+      title,
+      kind: "edit",
+      status,
+      preview,
+      ...(paths.length ? { paths } : {}),
+    };
+  }
+  return {
+    type: "tool.updated",
+    callId,
+    title,
+    kind: "edit",
+    status,
+    preview,
+    ...(paths.length ? { paths } : {}),
+  };
+}
+
+function mapFileChangePatch(
+  rec: Record<string, unknown>,
+): MappedCodexNotification {
+  const itemId = stringField(rec, "itemId") ?? "";
+  if (!itemId) return { events: [] };
+  const changes = Array.isArray(rec.changes) ? rec.changes : [];
+  const paths = changes
+    .map((change) => stringField(asRecord(change), "path"))
+    .filter((path): path is string => Boolean(path));
+  const first = asRecord(changes[0]);
+  const path = stringField(first, "path");
+  const diff = stringField(first, "diff") ?? stringField(rec, "diff");
+  const preview = buildDiffPreview(path, diff);
+  const title =
+    composeToolTitle({
+      kind: "edit",
+      title: path ? `Edit ${path}` : "Edit",
+      path,
+      previewKind: "write",
+    }) || "Edit";
+  return {
+    events: [
+      {
+        type: "tool.updated",
+        callId: itemId,
+        title,
+        kind: "edit",
+        status: "in_progress",
+        preview,
+        ...(paths.length ? { paths } : {}),
+      },
+    ],
+  };
+}
+
+function buildDiffPreview(
+  path: string | undefined,
+  diff: string | undefined,
+): ToolPreview | undefined {
+  if (!path && !diff) return undefined;
+  const fake = {
+    kind: "edit",
+    title: path ? `Edit ${path}` : "Edit",
+    content: diff
+      ? [{ type: "diff", path, patch: diff }]
+      : path
+        ? [{ type: "diff", path }]
+        : undefined,
+    locations: path ? [{ path }] : undefined,
+  };
+  return (
+    extractToolPreview(fake, fake) ??
+    (path
+      ? { kind: "write", path, fileName: path.split(/[/\\]/).pop() }
+      : undefined)
+  );
+}
+
+function mapItemStatus(status: string | undefined, completed: boolean): string {
+  if (status === "completed" || status === "failed" || status === "declined") {
+    return status === "declined" ? "failed" : status;
+  }
+  if (status === "inProgress") return "in_progress";
+  return completed ? "completed" : "in_progress";
+}
+
+export function mapApprovalRequest(
+  method: string,
+  params: unknown,
+  requestId: number,
+): {
+  kind: CodexApprovalKind;
+  event: Extract<HarnessEvent, { type: "approval.requested" }>;
+} | null {
+  const rec = asRecord(params);
+  if (!rec) return null;
+
+  if (method === "item/commandExecution/requestApproval") {
+    const command = stringField(rec, "command") ?? "Shell";
+    const callId = stringField(rec, "itemId");
+    const reason = stringField(rec, "reason");
+    return {
+      kind: "command",
+      event: {
+        type: "approval.requested",
+        requestId,
+        title: reason ? `${command} — ${reason}` : command,
+        kind: "execute",
+        callId,
+        preview: undefined,
+      },
+    };
+  }
+
+  if (method === "item/fileChange/requestApproval") {
+    const callId = stringField(rec, "itemId");
+    const reason = stringField(rec, "reason");
+    const title = reason ?? "Approve file changes";
+    return {
+      kind: "file-change",
+      event: {
+        type: "approval.requested",
+        requestId,
+        title,
+        kind: "edit",
+        callId,
+      },
+    };
+  }
+
+  if (method === "item/permissions/requestApproval") {
+    const callId = stringField(rec, "itemId");
+    const reason = stringField(rec, "reason") ?? "Approve permissions";
+    return {
+      kind: "permissions",
+      event: {
+        type: "approval.requested",
+        requestId,
+        title: reason,
+        kind: "other",
+        callId,
+      },
+    };
+  }
+
+  return null;
+}

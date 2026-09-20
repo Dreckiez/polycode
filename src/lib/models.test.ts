@@ -6,7 +6,6 @@ import {
   defaultModelId,
   defaultSessionChoice,
   findModel,
-  getModelEffortBadge,
   hasLiveCatalog,
   isPickerProviderVisible,
   loadDefaultModels,
@@ -30,6 +29,7 @@ import {
   stepModelPickerTab,
   type AgentModel,
 } from "./models";
+import { getModelEffortBadge } from "./modelsCatalog";
 
 const opus: AgentModel = {
   id: "claude:opus-5",

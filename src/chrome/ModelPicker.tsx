@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Gauge, Search, Star, X } from "./icons";
+import { Check, ChevronDown, Gauge } from "./icons";
 import {
   memo,
   useEffect,
@@ -8,7 +8,6 @@ import {
   useState,
   useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from "react";
 import {
   coerceModelPickerTab,
@@ -28,7 +27,6 @@ import {
   type ModelSetting,
 } from "../lib/models";
 import {
-  harnessUnavailableHint,
   hasProbedHarnessAvailability,
   isHarnessAvailable,
   probeHarnessAvailability,
@@ -37,10 +35,10 @@ import {
 } from "../lib/harness/availability";
 import { refreshHarnessCatalogs } from "../lib/harness/registry";
 import { HARNESSES, HARNESS_TITLE, type HarnessId } from "../lib/session";
-import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { LAYER } from "../lib/layers";
 import { HarnessIcon } from "./HarnessIcon";
 import { Popover } from "./Popover";
+import { ModelPickerPanel, RecentModelsMenu } from "./ModelPickerPanel";
 import { MOD } from "../lib/platform";
 
 type Props = {
@@ -135,9 +133,6 @@ export const ModelPicker = memo(function ModelPicker({
   const [favorites, setFavorites] = useState(loadFavoriteModels);
   const recentMenuId = useId();
   const button = useRef<HTMLButtonElement>(null);
-  const search = useRef<HTMLInputElement>(null);
-  const activeOptionRef = useRef<HTMLButtonElement>(null);
-  const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const onCloseRef = useRef(onClose);
   const openRef = useRef(open);
   const recentOpenRef = useRef(recentMenu != null);
@@ -257,10 +252,6 @@ export const ModelPicker = memo(function ModelPicker({
   }, [open, visibleTab, query, current.id]);
 
   useEffect(() => {
-    activeOptionRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeModel]);
-
-  useEffect(() => {
     const inBlockingUi = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       if (target.closest(".monocode-terminal")) return true;
@@ -306,28 +297,6 @@ export const ModelPicker = memo(function ModelPicker({
       window.removeEventListener("open_model_picker", onMenu);
     };
   }, [hotkeys]);
-
-  const onSearchKey = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveModel((index) => Math.min(visibleModels.length - 1, index + 1));
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveModel((index) => Math.max(0, index - 1));
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const item = visibleModels[activeModel];
-      if (item) pickModel(item);
-      return;
-    }
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.stopPropagation();
-    }
-  };
 
   const pickModel = (item: AgentModel) => {
     if (!isHarnessAvailable(item.harness)) return;
@@ -463,235 +432,35 @@ export const ModelPicker = memo(function ModelPicker({
           }}
           className="flex min-h-0 overflow-hidden rounded-xl border border-content/10 bg-background-base font-sans shadow-2xl backdrop-blur-md"
         >
-          {/* Section 1: Provider Navigation Rail */}
-          <nav
-            role="tablist"
-            aria-label="Providers"
-            aria-orientation="vertical"
-            className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-content/10 p-1.5"
-          >
-            <ProviderTabButton
-              title="Favorites"
-              selected={visibleTab === "favorites"}
-              onSelect={() => selectTab("favorites")}
-            >
-              <Star
-                className="size-4"
-                strokeWidth={1.75}
-                fill={visibleTab === "favorites" ? "currentColor" : "none"}
-              />
-            </ProviderTabButton>
-            {pickerHarnesses.map((harnessId) => (
-              <ProviderTabButton
-                key={harnessId}
-                title={HARNESS_TITLE[harnessId]}
-                selected={visibleTab === harnessId}
-                onSelect={() => selectTab(harnessId)}
-              >
-                <HarnessIcon harness={harnessId} className="size-4" />
-              </ProviderTabButton>
-            ))}
-          </nav>
-
-          {/* Section 2: Model Search & List */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <label className="flex shrink-0 items-center gap-2 border-b border-content/10 px-3 py-2.5 text-content/50">
-              <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
-              <input
-                ref={search}
-                type="text"
-                value={query}
-                placeholder="Search models"
-                aria-label="Search models"
-                className="min-w-0 flex-1 bg-transparent text-[13px] text-content outline-none placeholder:text-content/40"
-                onChange={(event) => onQueryChange(event.target.value)}
-                onKeyDown={onSearchKey}
-              />
-              {query ? (
-                <button
-                  type="button"
-                  aria-label="Clear filter"
-                  onClick={() => {
-                    setQuery("");
-                    search.current?.focus();
-                  }}
-                  className="cursor-pointer text-content/40 hover:text-content"
-                >
-                  <X className="size-3" strokeWidth={2} />
-                </button>
-              ) : null}
-            </label>
-
-            <div
-              ref={lockOverscroll}
-              role="listbox"
-              aria-label="Models"
-              className="min-h-0 flex-1 overflow-y-auto overscroll-none p-1.5"
-            >
-              {visibleModels.length === 0 ? (
-                <div className="px-2 py-4 text-center text-[12px] text-content/50">
-                  {visibleTab === "favorites" && !query.trim()
-                    ? "No favorite models"
-                    : visibleTab !== "favorites" &&
-                        !isHarnessAvailable(visibleTab)
-                      ? harnessUnavailableHint(visibleTab)
-                      : "No matching models"}
-                </div>
-              ) : (
-                visibleModels.map((item, index) => {
-                  const selected = item.id === current.id;
-                  const highlighted = index === activeModel;
-                  const favorited = favorites.includes(item.id);
-                  const disabled = !isHarnessAvailable(item.harness);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`group relative flex h-9 items-center rounded-lg px-2 transition-all ${
-                        disabled
-                          ? "cursor-not-allowed border border-transparent text-content/30"
-                          : selected
-                            ? "cursor-pointer border border-accent/25 bg-accent/10 text-content shadow-xs"
-                            : highlighted
-                              ? "cursor-pointer border border-transparent bg-content/10 text-content"
-                              : "cursor-pointer border border-transparent text-content hover:bg-content/5"
-                      }`}
-                      onMouseEnter={() => setActiveModel(index)}
-                      onClick={() => !disabled && pickModel(item)}
-                    >
-                      {/* Left Selection Indicator Bar */}
-                      <div
-                        data-indicator={selected ? "active" : undefined}
-                        className={`mr-1.5 h-4.5 w-1 shrink-0 rounded-full transition-all ${
-                          selected ? "bg-accent/75 opacity-90" : "opacity-0"
-                        }`}
-                      />
-
-                      <button
-                        ref={highlighted ? activeOptionRef : undefined}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        disabled={disabled}
-                        title={
-                          disabled
-                            ? harnessUnavailableHint(item.harness)
-                            : undefined
-                        }
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => pickModel(item)}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-[13px] text-content disabled:cursor-not-allowed"
-                      >
-                        <HarnessIcon
-                          harness={item.harness}
-                          className="size-3.5 shrink-0"
-                        />
-                        <span className="truncate font-medium">
-                          {item.name}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        title={
-                          favorited
-                            ? "Remove from favorites"
-                            : "Add to favorites"
-                        }
-                        aria-label={
-                          favorited
-                            ? "Remove from favorites"
-                            : "Add to favorites"
-                        }
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          toggleFavorite(item.id);
-                        }}
-                        className={`grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-all ${
-                          favorited
-                            ? "text-amber-400 hover:text-amber-300"
-                            : "text-content/35 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-content"
-                        }`}
-                      >
-                        <Star
-                          className="size-3.5"
-                          strokeWidth={1.75}
-                          fill={favorited ? "currentColor" : "none"}
-                        />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <ModelPickerPanel
+            visibleTab={visibleTab}
+            pickerHarnesses={pickerHarnesses}
+            models={visibleModels}
+            current={current}
+            activeModel={activeModel}
+            favorites={favorites}
+            query={query}
+            onQueryChange={onQueryChange}
+            onQueryClear={() => setQuery("")}
+            onPick={pickModel}
+            onToggleFavorite={toggleFavorite}
+            onSelect={selectTab}
+            onActiveChange={setActiveModel}
+          />
         </Popover>
       ) : null}
 
       {recentMenu ? (
-        <Popover
+        <RecentModelsMenu
           anchor={button}
-          side="top"
-          width={280}
-          autoFocus
+          models={recentMenu.models}
+          current={current}
+          active={recentActive}
+          menuId={recentMenuId}
           onDismiss={() => setRecentMenu(null)}
-          role="menu"
-          aria-label="Recently used models"
-          aria-activedescendant={`${recentMenuId}-${recentActive}`}
-          tabIndex={-1}
-          onContextMenu={(event) => event.preventDefault()}
-          data-model-picker
-          className="p-1 font-sans"
-        >
-          {recentMenu.models.map((item, index) => {
-            const selected = item.id === current.id;
-            const highlighted = index === recentActive;
-            const disabled = !isHarnessAvailable(item.harness);
-            return (
-              <button
-                key={item.id}
-                id={`${recentMenuId}-${index}`}
-                type="button"
-                role="menuitemradio"
-                aria-checked={selected}
-                disabled={disabled}
-                title={
-                  disabled ? harnessUnavailableHint(item.harness) : undefined
-                }
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setRecentActive(index)}
-                onClick={() => pickModel(item)}
-                className={`flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left disabled:cursor-not-allowed ${
-                  disabled
-                    ? "text-content/30"
-                    : highlighted
-                      ? "bg-content/10 text-content"
-                      : "text-content hover:bg-content/5"
-                }`}
-              >
-                <HarnessIcon
-                  harness={item.harness}
-                  className="size-4 shrink-0"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] leading-4 font-medium">
-                    {item.name}
-                  </span>
-                  <span className="block truncate text-[11px] leading-4 text-content/45">
-                    {HARNESS_TITLE[item.harness]}
-                  </span>
-                </span>
-                {selected ? (
-                  <Check
-                    className="size-3.5 shrink-0 text-accent"
-                    strokeWidth={2}
-                  />
-                ) : null}
-              </button>
-            );
-          })}
-        </Popover>
+          onActiveChange={setRecentActive}
+          onPick={pickModel}
+        />
       ) : null}
     </>
   );
@@ -834,35 +603,3 @@ export const EffortPicker = memo(function EffortPicker({
     </>
   );
 });
-
-function ProviderTabButton({
-  title,
-  selected,
-  onSelect,
-  children,
-}: {
-  title: string;
-  selected: boolean;
-  onSelect: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      title={title}
-      aria-label={title}
-      aria-selected={selected}
-      onMouseDown={(event) => event.preventDefault()}
-      onMouseEnter={selected ? undefined : onSelect}
-      onClick={onSelect}
-      className={`grid size-8 shrink-0 cursor-pointer place-items-center rounded-md transition-colors ${
-        selected
-          ? "border border-accent/25 bg-accent/10 text-content shadow-xs"
-          : "text-content/45 hover:bg-content/8 hover:text-content"
-      }`}
-    >
-      <span className="shrink-0">{children}</span>
-    </button>
-  );
-}

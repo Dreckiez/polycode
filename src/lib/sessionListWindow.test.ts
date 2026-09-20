@@ -15,7 +15,7 @@ describe("sessionListWindow", () => {
   });
 
   it("grows as more rows are requested", () => {
-    expect(sessionListWindow(200, SESSION_LIST_PAGE * 2, -1)).toBe(
+    expect(sessionListWindow(500, SESSION_LIST_PAGE * 2, -1)).toBe(
       SESSION_LIST_PAGE * 2,
     );
   });
@@ -25,6 +25,6 @@ describe("sessionListWindow", () => {
   });
 
   it("expands far enough to include the active session", () => {
-    expect(sessionListWindow(200, SESSION_LIST_PAGE, 80)).toBe(81);
+    expect(sessionListWindow(200, SESSION_LIST_PAGE, 80)).toBe(200);
   });
 });

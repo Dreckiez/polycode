@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { newSession } from "../session";
-import { previewFromTool } from "./claudeProtocol";
+import { previewFromTool } from "./claudeTranscript";
 import {
   appendUser,
   applyHarnessEvent,

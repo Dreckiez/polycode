@@ -1,5 +1,5 @@
 /** First paint of the sidebar; more rows mount as you scroll. */
-export const SESSION_LIST_PAGE = 32;
+export const SESSION_LIST_PAGE = 200;
 
 /**
  * How many sorted session cards to mount. Always at least one page, and always

@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { previewFromTool } from "../lib/harness/claudeProtocol";
+import { previewFromTool } from "../lib/harness/claudeTranscript";
 import { ToolDiffPreview } from "./ToolDiffPreview";
 import { AgentTranscript } from "../surfaces/AgentTranscript";
 import type { Block } from "../lib/session";

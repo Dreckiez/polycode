@@ -15,7 +15,6 @@ import {
   asRecord,
   contextWindowFromSetup,
   currentModelId,
-  eventsFromAcpUpdate,
   grokAuthError,
   grokAuthMethodId,
   grokEffort,
@@ -25,9 +24,9 @@ import {
   permissionOptionId,
   permissionRequestFromAcp,
   pickAutoOption,
-  planFromExitPlan,
   sessionIdFromResult,
 } from "./grokProtocol";
+import { eventsFromAcpUpdate, planFromExitPlan } from "./grokTranscript";
 import type {
   ApprovalDecision,
   CompactContextInput,
