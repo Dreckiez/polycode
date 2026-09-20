@@ -15,7 +15,6 @@ mod project_logo;
 mod pty;
 mod rate_limits;
 mod reminders;
-mod search;
 mod session_store;
 mod skills;
 mod window;
@@ -258,7 +257,6 @@ pub fn run() {
             file_watch::fs_watch_unregister,
             skills::list_skills,
             skills::import_skill,
-            search::search_project,
             cursor_store::cursor_tool_calls,
             harness::harness_resolve_cursor,
             harness::harness_resolve_codex,

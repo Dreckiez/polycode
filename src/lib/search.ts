@@ -1,28 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
 import { pathKey, slash } from "./paths";
-
-export type ProjectSearchMatch = {
-  path: string;
-  relative: string;
-  line: number;
-  column: number;
-  preview: string;
-};
-
-export type ProjectSearchResult = {
-  matches: ProjectSearchMatch[];
-  truncated: boolean;
-};
-
-export type ProjectSearchOptions = {
-  cwd: string;
-  query: string;
-  caseSensitive?: boolean;
-  wholeWord?: boolean;
-  regex?: boolean;
-  include?: string;
-  exclude?: string;
-};
 
 export type EditorNavigation = {
   line: number;
@@ -51,10 +27,4 @@ export function normalizeEditorPath(path: string): string {
 
 export function editorPathsEqual(a: string, b: string): boolean {
   return pathKey(a) === pathKey(b);
-}
-
-export function searchProject(
-  options: ProjectSearchOptions,
-): Promise<ProjectSearchResult> {
-  return invoke<ProjectSearchResult>("search_project", { options });
 }

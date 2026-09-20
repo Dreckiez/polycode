@@ -557,6 +557,7 @@ export const SessionPane = memo(function SessionPane({
           <>
             <AgentTranscript
               blocks={session.blocks}
+              sessionId={session.id}
               busy={!!session.busy}
               visible={visible}
               cwd={workCwd}

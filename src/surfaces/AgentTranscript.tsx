@@ -51,6 +51,10 @@ import { resolveModel } from "../lib/models";
 import { harnessForTurn } from "../lib/secondOpinion";
 import { Shimmer } from "./Shimmer";
 import {
+  liveTextByBlock,
+  useChatStore,
+} from "../lib/chatStore";
+import {
   hasPendingApproval,
   HARNESS_TITLE,
   type Block,
@@ -103,6 +107,7 @@ const TURN_PAGE_SIZE = 20;
 
 type Props = {
   blocks: Block[];
+  sessionId: string;
   busy?: boolean;
   cwd?: string;
   harness?: HarnessId;
@@ -138,6 +143,7 @@ function sameTurnBlocks(a: Block[], b: Block[]): boolean {
 
 function AgentTranscriptComponent({
   blocks,
+  sessionId,
   busy,
   cwd,
   harness,
@@ -443,6 +449,7 @@ function AgentTranscriptComponent({
               onSecondOpinion={onSecondOpinion}
               onHandoff={onHandoff}
               onSaveNote={onSaveNote}
+              sessionId={sessionId}
             />
           );
         })}
@@ -690,6 +697,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planBusy,
   planHarness,
   planModel,
+  sessionId,
 }: {
   block: Block;
   layout: TranscriptLayout;
@@ -705,7 +713,18 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planBusy?: boolean;
   planHarness?: HarnessId;
   planModel?: string;
+  sessionId: string;
 }) {
+  // For streaming assistant/reasoning blocks, read text from the narrow chatStore selector
+  // so only this block re-renders on token deltas.
+  const isLiveRole = block.role === "assistant" || block.role === "reasoning";
+  const liveText = (isLiveRole && block.streaming && sessionId)
+    ? useChatStore((state) => liveTextByBlock(state, { sessionId, blockId: block.id }))
+    : undefined;
+
+  const displayText = liveText ?? block.text;
+  const isStreaming = isLiveRole && block.streaming;
+
   if (block.role === "user") {
     return (
       <UserMessageBlock
@@ -797,16 +816,16 @@ const TranscriptBlock = memo(function TranscriptBlock({
     );
   }
 
-  if (!block.text && block.streaming) return null;
+  if (!displayText && isStreaming) return null;
 
   return (
     <div
-      data-selectable-agent-response={block.streaming ? undefined : block.id}
+      data-selectable-agent-response={isStreaming ? undefined : block.id}
       className={`min-w-0 px-4 pb-1 text-content ${underLine ? "pt-1" : "pt-3"}`}
     >
       <AgentMarkdown
-        text={block.text}
-        streaming={block.streaming}
+        text={displayText}
+        streaming={isStreaming}
         cwd={cwd}
         onOpenFile={onOpenFile}
       />
@@ -2101,6 +2120,7 @@ type TranscriptTurnProps = {
   onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
   onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
   onSaveNote?: (text: string) => void;
+  sessionId: string;
 };
 
 function areTurnsEqual(
@@ -2186,6 +2206,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
   onSecondOpinion,
   onHandoff,
   onSaveNote,
+sessionId,
 }: TranscriptTurnProps) {
   const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
   const durationMs = userBlock?.durationMs;
@@ -2300,6 +2321,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
         planHarness={harness}
         planModel={model}
         cwd={cwd}
+        sessionId={sessionId}
       />
     );
 

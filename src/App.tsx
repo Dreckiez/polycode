@@ -158,6 +158,14 @@ import {
   type UserQuestionReply,
 } from "./lib/harness";
 import {
+  appendLiveText,
+  clearBlockLiveText,
+  getAndClearSessionLiveText,
+  liveTextByBlock,
+  setLiveText,
+  useChatStore,
+} from "./lib/chatStore";
+import {
   appendPreparingHandoff,
   buildDeterministicHandoff,
   buildHandoffComposerCard,
@@ -864,6 +872,57 @@ export default function App({
         applyApprovalEvent(sessionId, event);
         return;
       }
+
+      // Route streaming text deltas through chatStore to isolate re-renders
+      const role = event.type === "message.delta" ? "assistant" : event.type === "reasoning.delta" ? "reasoning" : null;
+      const isCompleted = event.type === "message.completed" ? "assistant" : event.type === "reasoning.completed" ? "reasoning" : null;
+
+      if (role && (event.type === "message.delta" || event.type === "reasoning.delta")) {
+        // Streaming delta: check if there's an open streaming block for this session+role
+        const session = sessionsRef.current.find((s) => s.id === sessionId);
+        const streamingBlock = session?.blocks
+          .filter((b) => b.role === role && b.streaming)
+          .pop();
+
+        if (streamingBlock) {
+          // Open streaming block exists -> route delta through chatStore only
+          const entry = { sessionId, blockId: streamingBlock.id };
+          const existingStoreText = liveTextByBlock(useChatStore.getState(), entry);
+          if (existingStoreText) {
+            // Store already has content -> append delta
+            appendLiveText(entry, event.text);
+          } else if (streamingBlock.text) {
+            // First delta to store: seed with canonical text + delta
+            setLiveText(entry, streamingBlock.text + event.text);
+          } else {
+            // No canonical text either, just append
+            appendLiveText(entry, event.text);
+          }
+          return;
+        }
+        // No open streaming block -> enqueue normally (will create block on flush)
+      } else if (isCompleted && (event.type === "message.completed" || event.type === "reasoning.completed")) {
+        // Turn completed: flush any accumulated store text to canonical, then seal
+        const session = sessionsRef.current.find((s) => s.id === sessionId);
+        const streamingBlock = session?.blocks
+          .filter((b) => b.role === isCompleted && b.streaming)
+          .pop();
+
+        if (streamingBlock) {
+          const storeText = liveTextByBlock(useChatStore.getState(), { sessionId, blockId: streamingBlock.id });
+          if (storeText) {
+            // Enqueue a final delta with the full accumulated text to update canonical
+            const queued = harnessQueued.current;
+            const events = queued.get(sessionId) ?? [];
+            events.push({ type: `${isCompleted === "assistant" ? "message" : "reasoning"}.delta` as const, text: storeText });
+            queued.set(sessionId, events);
+            // Clear the store entry for this specific block
+            clearBlockLiveText({ sessionId, blockId: streamingBlock.id });
+          }
+          // Fall through to enqueue the completed event
+        }
+      }
+
       const queued = harnessQueued.current;
       const events = queued.get(sessionId);
       if (events) events.push(event);
@@ -871,8 +930,24 @@ export default function App({
       if (!harnessFlush.current) {
         harnessFlush.current = scheduleHarnessFlush(flushHarnessEvents);
       }
+},
+  [applyApprovalEvent, flushHarnessEvents],
+);
+
+  const flushSessionLiveText = useCallback(
+    (sessionId: string, session: Session): Session => {
+      const liveTextMap = getAndClearSessionLiveText(sessionId);
+      if (Object.keys(liveTextMap).length === 0) return session;
+      const blocks = session.blocks.map((block) => {
+        const liveText = liveTextMap[block.id];
+        if (liveText && (block.role === "assistant" || block.role === "reasoning") && block.streaming) {
+          return { ...block, text: liveText, streaming: false };
+        }
+        return block;
+      });
+      return { ...session, blocks };
     },
-    [applyApprovalEvent, flushHarnessEvents],
+    [],
   );
 
   useEffect(() => {
@@ -3955,8 +4030,9 @@ export default function App({
             };
           }
           if (pendingSwitch) {
+            const withLiveText = flushSessionLiveText(next.id, next);
             const sealed = stopStreaming({
-              ...next,
+              ...withLiveText,
               title: titled,
               pendingSwitch: undefined,
             });
@@ -4181,7 +4257,8 @@ export default function App({
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id !== sessionId) return s;
-              const stopped = stopStreaming(s);
+              const withLiveText = flushSessionLiveText(s.id, s);
+              const stopped = stopStreaming(withLiveText);
               const providerFailed =
                 providerFailureSeen ||
                 isProviderFailureText(lastAssistantTextInTurn(stopped));
@@ -4667,7 +4744,8 @@ export default function App({
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id !== sessionId) return s;
-          const stopped = stopStreaming(s);
+          const withLiveText = flushSessionLiveText(s.id, s);
+          const stopped = stopStreaming(withLiveText);
           const completed = isPreparingHandoff(stopped)
             ? completeHandoff(stopped, buildDeterministicHandoff(stopped))
             : stopped;

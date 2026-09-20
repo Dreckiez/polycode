@@ -6,7 +6,6 @@ import {
   filterHitsByProject,
   flattenGrouped,
   groupHits,
-  hitsFromContentMatches,
   hitsFromSessionSearch,
   mergeHits,
   searchConversationTitles,
@@ -209,26 +208,6 @@ describe("hitsFromSessionSearch", () => {
       kind: "message",
       blockId: "u1",
       preview: "search chips",
-    });
-  });
-});
-
-describe("hitsFromContentMatches", () => {
-  it("keeps line and preview", () => {
-    const hits = hitsFromContentMatches([
-      {
-        path: "/tmp/a/App.tsx",
-        relative: "src/App.tsx",
-        line: 12,
-        column: 4,
-        preview: "const searchOpen = true;",
-      },
-    ]);
-    expect(hits[0]).toMatchObject({
-      kind: "content",
-      name: "App.tsx",
-      line: 12,
-      preview: "const searchOpen = true;",
     });
   });
 });

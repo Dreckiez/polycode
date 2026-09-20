@@ -1,37 +1,30 @@
-import {
-  CaseSensitive,
-  ChevronLeft,
-  LoaderCircle,
-  Regex,
-  WholeWord,
-} from "./icons";
+import { ChevronLeft } from "./icons";
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
-import {
-  searchProject,
-  type OpenFileFn,
-  type ProjectSearchMatch,
-} from "../lib/search";
 import { FileTypeIcon } from "./FileTypeIcon";
+import { MatchText } from "./MatchText";
+import {
+  loadProjectFiles,
+  peekProjectFiles,
+  rankProjectFiles,
+  recentOpenedFiles,
+  type RankedFile,
+} from "../lib/fileIndex";
+import { looksLikeProject } from "../lib/recents";
+import type { OpenFileFn } from "../lib/search";
+import { useLockOverscroll } from "../hooks/useLockOverscroll";
 
 type Props = {
   cwd: string;
   focusToken?: number;
   onOpenFile: OpenFileFn;
   onClose: () => void;
-};
-
-type MatchGroup = {
-  path: string;
-  relative: string;
-  name: string;
-  matches: ProjectSearchMatch[];
 };
 
 export function ProjectSearch({
@@ -44,15 +37,10 @@ export function ProjectSearch({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [query, setQuery] = useState("");
-  const [include, setInclude] = useState("");
-  const [exclude, setExclude] = useState("");
-  const [caseSensitive, setCaseSensitive] = useState(false);
-  const [wholeWord, setWholeWord] = useState(false);
-  const [regex, setRegex] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState(0);
+  const [files, setFiles] = useState(() => peekProjectFiles(cwd) ?? []);
+  const [loading, setLoading] = useState(() => peekProjectFiles(cwd) == null);
   const [error, setError] = useState<string | null>(null);
-  const [matches, setMatches] = useState<ProjectSearchMatch[]>([]);
-  const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
     if (!focusToken) return;
@@ -72,77 +60,72 @@ export function ProjectSearch({
   }, []);
 
   useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed || !cwd || cwd === "~") {
-      setMatches([]);
-      setTruncated(false);
-      setError(null);
+    if (!cwd || cwd === "~" || !looksLikeProject(cwd)) {
+      setFiles([]);
       setLoading(false);
       return;
     }
-
     let cancelled = false;
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError(null);
-      void searchProject({
-        cwd,
-        query: trimmed,
-        caseSensitive,
-        wholeWord,
-        regex,
-        include: include.trim() || undefined,
-        exclude: exclude.trim() || undefined,
+    void loadProjectFiles(cwd, true)
+      .then((next) => {
+        if (cancelled) return;
+        setFiles(next);
+        setLoading(false);
       })
-        .then((result) => {
-          if (cancelled) return;
-          setMatches(result.matches);
-          setTruncated(result.truncated);
-          setLoading(false);
-        })
-        .catch((err: unknown) => {
-          if (cancelled) return;
-          setMatches([]);
-          setTruncated(false);
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        });
-    }, 200);
-
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [caseSensitive, cwd, exclude, include, query, regex, wholeWord]);
+  }, [cwd]);
 
-  const groups = useMemo(() => groupMatches(matches), [matches]);
-  const matchCount = matches.length;
-  const fileCount = groups.length;
+  const recents = useMemo(() => recentOpenedFiles(cwd), [cwd]);
 
-  const openMatch = (match: ProjectSearchMatch) => {
-    onOpenFile(
-      match.path,
-      { line: match.line, column: match.column },
-      { exact: true },
+  const results = useMemo(
+    () => rankProjectFiles(files, query, recents),
+    [files, query, recents],
+  );
+
+  useEffect(() => {
+    setActive((index) =>
+      results.length === 0 ? 0 : Math.min(index, results.length - 1),
     );
+  }, [results.length]);
+
+  const pick = (file: RankedFile) => {
+    onOpenFile(file.path, undefined, { exact: true });
+    onClose();
   };
 
   const onQueryKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (results.length === 0) return;
+      setActive((index) => (index + 1) % results.length);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (results.length === 0) return;
+      setActive((index) => (index - 1 + results.length) % results.length);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const file = results[active];
+      if (file) pick(file);
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       onClose();
-      return;
-    }
-    if (event.key === "Enter" && matches[0]) {
-      event.preventDefault();
-      openMatch(matches[0]);
     }
   };
 
   if (!cwd || cwd === "~") {
-    return (
-      <p className="px-3 py-2 text-[12px] text-content/50">No project folder</p>
-    );
+    return <p className="px-3 py-2 text-[12px] text-content/50">No project folder</p>;
   }
 
   return (
@@ -158,221 +141,154 @@ export function ProjectSearch({
           <ChevronLeft className="size-4" strokeWidth={1.75} />
         </button>
         <span className="min-w-0 flex-1 truncate text-[12px] text-content/55">
-          Search in files
+          Search files
         </span>
       </div>
-      <div className="shrink-0 space-y-2 border-b border-content/10 p-2">
+      <div className="shrink-0 border-b border-content/10 p-2">
         <div className="flex items-center gap-1 rounded-md border border-content/10 bg-content/5 px-2 pr-1">
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActive(0);
+            }}
             onKeyDown={onQueryKeyDown}
-            placeholder="Search"
-            aria-label="Search"
+            placeholder="Search file names"
+            aria-label="Search file names"
             spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
             className="min-w-0 flex-1 bg-transparent py-1.5 text-[12px] text-content outline-none placeholder:text-content/35"
           />
-          <Toggle
-            label="Match case"
-            active={caseSensitive}
-            onClick={() => setCaseSensitive((value) => !value)}
-          >
-            <CaseSensitive className="size-3.5" strokeWidth={1.75} />
-          </Toggle>
-          <Toggle
-            label="Match whole word"
-            active={wholeWord}
-            onClick={() => setWholeWord((value) => !value)}
-          >
-            <WholeWord className="size-3.5" strokeWidth={1.75} />
-          </Toggle>
-          <Toggle
-            label="Use regular expression"
-            active={regex}
-            onClick={() => setRegex((value) => !value)}
-          >
-            <Regex className="size-3.5" strokeWidth={1.75} />
-          </Toggle>
         </div>
-        <input
-          value={include}
-          onChange={(event) => setInclude(event.target.value)}
-          placeholder="files to include"
-          aria-label="files to include"
-          spellCheck={false}
-          className="w-full rounded-md border border-content/10 bg-content/5 px-2 py-1.5 text-[11px] text-content outline-none placeholder:text-content/35"
-        />
-        <input
-          value={exclude}
-          onChange={(event) => setExclude(event.target.value)}
-          placeholder="files to exclude"
-          aria-label="files to exclude"
-          spellCheck={false}
-          className="w-full rounded-md border border-content/10 bg-content/5 px-2 py-1.5 text-[11px] text-content outline-none placeholder:text-content/35"
-        />
       </div>
 
       <div className="flex min-h-8 shrink-0 items-center gap-2 px-3 py-1.5 text-[11px] text-content/45">
-        {loading ? (
-          <>
-            <LoaderCircle className="size-3 animate-spin" strokeWidth={1.75} />
-            <span>Searching…</span>
-          </>
-        ) : error ? (
+        {error && results.length === 0 ? (
           <span className="text-red-400">{error}</span>
+        ) : loading && results.length === 0 ? (
+          <span>Indexing files…</span>
         ) : query.trim() ? (
           <span>
-            {matchCount === 0
-              ? "No results"
-              : `${matchCount} result${matchCount === 1 ? "" : "s"} in ${fileCount} file${fileCount === 1 ? "" : "s"}`}
-            {truncated ? " (limited)" : ""}
+            {results.length === 0
+              ? "No matching files"
+              : `${results.length} file${results.length === 1 ? "" : "s"}`}
           </span>
         ) : (
-          <span>Type to search across the project</span>
+          <span>Type a file name to search</span>
         )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
-        {groups.map((group) => (
-          <section key={group.path} className="border-b border-content/8">
-            <div className="flex items-center gap-1.5 px-2 py-1.5">
-              <FileTypeIcon name={group.name} isDir={false} size={16} />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-content">
-                {group.name}
-              </span>
-              <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] tabular-nums text-accent">
-                {group.matches.length}
-              </span>
-            </div>
-            <p
-              className="truncate px-2 pb-1 text-[10px] text-content/40"
-              title={group.relative}
-            >
-              {group.relative}
-            </p>
-            <ul>
-              {group.matches.map((match) => (
-                <li key={`${match.path}:${match.line}:${match.column}`}>
-                  <button
-                    type="button"
-                    onClick={() => openMatch(match)}
-                    className="flex w-full items-start gap-2 px-2 py-1 text-left hover:bg-content/5"
-                  >
-                    <span className="w-7 shrink-0 pt-px text-right font-mono text-[11px] text-content/35 tabular-nums">
-                      {match.line}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-content/80">
-                      <MatchPreview
-                        preview={match.preview.trimEnd()}
-                        query={query.trim()}
-                        caseSensitive={caseSensitive}
-                        regex={regex}
-                      />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        <FileList
+          files={results}
+          active={active}
+          query={query.trim()}
+          onActive={setActive}
+          onPick={pick}
+        />
       </div>
     </div>
   );
 }
 
-function Toggle({
-  label,
+function FileList({
+  files,
   active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={`grid size-6 place-items-center rounded-sm ${
-        active
-          ? "bg-content/15 text-content"
-          : "text-content/40 hover:bg-content/10 hover:text-content/70"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function groupMatches(matches: ProjectSearchMatch[]): MatchGroup[] {
-  const byPath = new Map<string, MatchGroup>();
-  for (const match of matches) {
-    const existing = byPath.get(match.path);
-    if (existing) {
-      existing.matches.push(match);
-      continue;
-    }
-    byPath.set(match.path, {
-      path: match.path,
-      relative: match.relative,
-      name: match.relative.split("/").pop() ?? match.relative,
-      matches: [match],
-    });
-  }
-  return [...byPath.values()];
-}
-
-function MatchPreview({
-  preview,
   query,
-  caseSensitive,
-  regex,
+  onActive,
+  onPick,
 }: {
-  preview: string;
+  files: RankedFile[];
+  active: number;
   query: string;
-  caseSensitive: boolean;
-  regex: boolean;
+  onActive: (index: number) => void;
+  onPick: (file: RankedFile) => void;
 }) {
-  if (!query) return <>{preview}</>;
-  if (regex) {
-    try {
-      const pattern = new RegExp(query, caseSensitive ? "" : "i");
-      const match = preview.match(pattern);
-      if (!match || match.index == null) return <>{preview}</>;
-      const start = match.index;
-      const end = start + match[0].length;
-      return (
-        <>
-          {preview.slice(0, start)}
-          <mark className="rounded-sm bg-accent/35 text-content">
-            {preview.slice(start, end)}
-          </mark>
-          {preview.slice(end)}
-        </>
-      );
-    } catch {
-      return <>{preview}</>;
-    }
-  }
+  const lockOverscroll = useLockOverscroll<HTMLDivElement>();
+  const activeRef = useRef<HTMLButtonElement>(null);
+  const pointer = useRef({ x: Number.NaN, y: Number.NaN, allow: false });
+  const fromPointer = useRef(false);
 
-  const source = caseSensitive ? preview : preview.toLowerCase();
-  const needle = caseSensitive ? query : query.toLowerCase();
-  const index = source.indexOf(needle);
-  if (index < 0) return <>{preview}</>;
-  const end = index + needle.length;
+  useEffect(() => {
+    pointer.current.allow = false;
+  }, [files]);
+
+  useEffect(() => {
+    if (fromPointer.current) {
+      fromPointer.current = false;
+      return;
+    }
+    pointer.current.allow = false;
+    activeRef.current?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  const onListMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.clientX === pointer.current.x && e.clientY === pointer.current.y) {
+      return;
+    }
+    pointer.current = { x: e.clientX, y: e.clientY, allow: true };
+  };
+
+  const onRowEnter = (index: number) => {
+    if (!pointer.current.allow) return;
+    fromPointer.current = true;
+    onActive(index);
+  };
+
   return (
-    <>
-      {preview.slice(0, index)}
-      <mark className="rounded-sm bg-accent/35 text-content">
-        {preview.slice(index, end)}
-      </mark>
-      {preview.slice(end)}
-    </>
+    <div
+      ref={lockOverscroll}
+      role="listbox"
+      aria-label="Files"
+      onMouseMove={onListMouseMove}
+      className="px-1.5 pb-1.5"
+    >
+      {files.map((file, index) => {
+        const highlighted = index === active;
+        const slash = file.relative.lastIndexOf("/");
+        const dir = slash === -1 ? "" : file.relative.slice(0, slash);
+        const nameOffset = slash === -1 ? 0 : slash + 1;
+        return (
+          <button
+            key={file.path}
+            ref={highlighted ? activeRef : undefined}
+            type="button"
+            role="option"
+            aria-selected={highlighted}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => onRowEnter(index)}
+            onClick={() => onPick(file)}
+            className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm leading-normal ${
+              highlighted ? "bg-content/10 text-content" : "text-content"
+            }`}
+          >
+            <span className="shrink-0">
+              <FileTypeIcon name={file.name} isDir={false} />
+            </span>
+            <span className="min-w-0 flex-1 truncate py-0.5">
+              <MatchText
+                text={file.name}
+                positions={file.positions
+                  .filter((pos) => pos >= nameOffset)
+                  .map((pos) => pos - nameOffset)}
+                active={Boolean(query)}
+              />
+            </span>
+            {dir ? (
+              <span className="min-w-0 max-w-[45%] truncate font-mono text-[11px] text-content/40">
+                <MatchText
+                  text={dir}
+                  positions={file.positions.filter((pos) => pos < slash)}
+                  active={Boolean(query)}
+                />
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }

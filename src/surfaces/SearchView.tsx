@@ -19,7 +19,6 @@ import {
   conversationRowsFrom,
   flattenGrouped,
   groupHits,
-  hitsFromContentMatches,
   hitsFromFileRanks,
   hitsFromSessionSearch,
   mergeHits,
@@ -38,7 +37,7 @@ import {
 import { prettyCwd, projectName } from "../lib/paths";
 import { IS_MAC } from "../lib/platform";
 import { looksLikeProject, type RecentProject } from "../lib/recents";
-import { searchProject, type OpenFileFn } from "../lib/search";
+import type { OpenFileFn } from "../lib/search";
 import { type Session } from "../lib/session";
 import { searchSessions, type SessionSummary } from "../lib/sessionStore";
 
@@ -85,8 +84,8 @@ export function SearchView({
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
   const [active, setActive] = useState(0);
-  const [files, setFiles] = useState(() => peekProjectFiles(cwd) ?? []);
-  const [contentHits, setContentHits] = useState<AppSearchHit[]>([]);
+  const peeked = peekProjectFiles(cwd);
+  const [files, setFiles] = useState(() => peeked ?? []);
   const [remoteHits, setRemoteHits] = useState<AppSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +97,6 @@ export function SearchView({
     setQuery("");
     setScope("all");
     setActive(0);
-    setContentHits([]);
     setRemoteHits([]);
     setError(null);
   }, [open]);
@@ -182,7 +180,6 @@ export function SearchView({
   useEffect(() => {
     if (!open || !trimmed) {
       setRemoteHits([]);
-      setContentHits([]);
       setLoading(false);
       setError(null);
       return;
@@ -192,7 +189,6 @@ export function SearchView({
     const timer = window.setTimeout(() => {
       const jobs: Promise<void>[] = [];
       const wantSessions = scope === "all" || scope === "conversations";
-      const wantFiles = scope === "all" || scope === "files";
 
       if (wantSessions) {
         setLoading(true);
@@ -207,27 +203,6 @@ export function SearchView({
         );
       } else {
         setRemoteHits([]);
-      }
-
-      if (wantFiles && looksLikeProject(cwd)) {
-        setLoading(true);
-        jobs.push(
-          searchProject({ cwd, query: trimmed })
-            .then((result) => {
-              if (!cancelled) {
-                setContentHits(hitsFromContentMatches(result.matches));
-                setError(null);
-              }
-            })
-            .catch((err: unknown) => {
-              if (!cancelled) {
-                setContentHits([]);
-                setError(err instanceof Error ? err.message : String(err));
-              }
-            }),
-        );
-      } else {
-        setContentHits([]);
       }
 
       void Promise.all(jobs).then(() => {
@@ -250,14 +225,12 @@ export function SearchView({
           liveMessageHits,
           remoteHits,
           fileHits,
-          contentHits,
           projectHits,
         ),
         scope,
       ),
     );
   }, [
-    contentHits,
     fileHits,
     liveMessageHits,
     projectHits,
@@ -281,12 +254,6 @@ export function SearchView({
     if (!hit) return;
     if (hit.kind === "file") {
       onOpenFile(hit.path, undefined, { exact: true });
-    } else if (hit.kind === "content") {
-      onOpenFile(
-        hit.path,
-        { line: hit.line, column: hit.column },
-        { exact: true },
-      );
     } else if (hit.kind === "conversation" || hit.kind === "message") {
       onOpenSession(hit.sessionId);
     } else onOpenProject(hit.path);
@@ -557,13 +524,6 @@ function rowCopy(
         <MatchText text={hit.name} positions={namePositions(hit)} active />
       ),
       meta: hit.relative,
-    };
-  }
-  if (hit.kind === "content") {
-    return {
-      icon: <FileTypeIcon name={hit.name} isDir={false} size={16} />,
-      title: <Highlight text={hit.preview} query={query} />,
-      meta: `${hit.relative}:${hit.line}`,
     };
   }
   return {

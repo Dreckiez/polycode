@@ -13,7 +13,6 @@ import type {
   SessionSummary,
 } from "./sessionStore";
 import type { RankedFile } from "./fileIndex";
-import type { ProjectSearchMatch } from "./search";
 
 export type SearchScope = "all" | "conversations" | "files" | "projects";
 
@@ -53,17 +52,6 @@ export type FileHit = {
   positions: number[];
 };
 
-export type ContentHit = {
-  id: string;
-  kind: "content";
-  path: string;
-  relative: string;
-  name: string;
-  line: number;
-  column: number;
-  preview: string;
-};
-
 export type ProjectHit = {
   id: string;
   kind: "project";
@@ -77,14 +65,12 @@ export type AppSearchHit =
   | ConversationHit
   | MessageHit
   | FileHit
-  | ContentHit
   | ProjectHit;
 
 export type GroupedHits = {
   conversations: ConversationHit[];
   messages: MessageHit[];
   files: FileHit[];
-  content: ContentHit[];
   projects: ProjectHit[];
 };
 
@@ -92,7 +78,6 @@ const ALL_LIMITS: Record<keyof GroupedHits, number> = {
   conversations: 8,
   messages: 8,
   files: 10,
-  content: 12,
   projects: 6,
 };
 
@@ -102,21 +87,18 @@ const SCOPE_LIMITS: Record<SearchScope, Record<keyof GroupedHits, number>> = {
     conversations: 24,
     messages: 24,
     files: 0,
-    content: 0,
     projects: 0,
   },
   files: {
     conversations: 0,
     messages: 0,
     files: 40,
-    content: 48,
     projects: 0,
   },
   projects: {
     conversations: 0,
     messages: 0,
     files: 0,
-    content: 0,
     projects: 24,
   },
 };
@@ -263,21 +245,6 @@ export function hitsFromFileRanks(files: RankedFile[]): FileHit[] {
   }));
 }
 
-export function hitsFromContentMatches(
-  matches: ProjectSearchMatch[],
-): ContentHit[] {
-  return matches.map((match) => ({
-    id: `content:${match.path}:${match.line}:${match.column}`,
-    kind: "content",
-    path: match.path,
-    relative: match.relative,
-    name: match.relative.split("/").pop() ?? match.relative,
-    line: match.line,
-    column: match.column,
-    preview: match.preview.trimEnd(),
-  }));
-}
-
 export function hitsFromSessionSearch(
   rows: SessionSearchHit[],
 ): AppSearchHit[] {
@@ -380,7 +347,7 @@ export function filterHitsByProject(
 ): AppSearchHit[] {
   if (!cwd || cwd === "~") return hits;
   return hits.filter((hit) => {
-    if (hit.kind === "file" || hit.kind === "content") return true;
+    if (hit.kind === "file") return true;
     if (hit.kind === "project") return sameProjectPath(hit.path, cwd);
     return sameProjectPath(hit.cwd, cwd);
   });
@@ -394,14 +361,12 @@ export function groupHits(
     conversations: [],
     messages: [],
     files: [],
-    content: [],
     projects: [],
   };
   for (const hit of hits) {
     if (hit.kind === "conversation") grouped.conversations.push(hit);
     else if (hit.kind === "message") grouped.messages.push(hit);
     else if (hit.kind === "file") grouped.files.push(hit);
-    else if (hit.kind === "content") grouped.content.push(hit);
     else grouped.projects.push(hit);
   }
   grouped.conversations.sort(byScoreThenRecency);
@@ -414,7 +379,6 @@ export function groupHits(
     conversations: grouped.conversations.slice(0, limits.conversations),
     messages: grouped.messages.slice(0, limits.messages),
     files: grouped.files.slice(0, limits.files),
-    content: grouped.content.slice(0, limits.content),
     projects: grouped.projects.slice(0, limits.projects),
   };
 }
@@ -424,7 +388,6 @@ export function flattenGrouped(grouped: GroupedHits): AppSearchHit[] {
     ...grouped.conversations,
     ...grouped.messages,
     ...grouped.files,
-    ...grouped.content,
     ...grouped.projects,
   ];
 }
@@ -464,7 +427,6 @@ function recencyBonus(updatedAt: number): number {
 }
 
 function scoreOf(hit: AppSearchHit): number {
-  if (hit.kind === "content") return 0;
   return hit.score;
 }
 
