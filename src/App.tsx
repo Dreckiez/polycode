@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask, message } from "@tauri-apps/plugin-dialog";
+import { message } from "@tauri-apps/plugin-dialog";
 import {
   useCallback,
   useEffect,
@@ -60,8 +60,6 @@ import {
   focusedFileTab,
   isolateTerminalPanes,
   isFilesystemTab,
-  isCommitTab,
-  isTerminalTab,
   leaf,
   leafIds,
   movePane,
@@ -85,14 +83,13 @@ import {
   surfacePanes,
   updateTerminalTab,
   withSurfacePanes,
-  type EditorPane,
   type FilePaneTab,
   type FocusDir,
   type PaneEdge,
   type SplitDir,
   type WorkspaceTab,
 } from "./lib/layout";
-import { releaseNotesForVersion, releaseNotesTitle } from "./lib/releaseNotes";
+import { releaseNotesForVersion } from "./lib/releaseNotes";
 import { mergeOrderedSubset, orderByIds } from "./lib/reorder";
 import {
   addTerminalToDock,
@@ -124,7 +121,6 @@ import {
 } from "./lib/terminalClose";
 import {
   listRunningTerminals,
-  terminalTabLabel,
   type TerminalMetaPatch,
 } from "./lib/terminalTab";
 import { killPty } from "./lib/pty";
@@ -185,16 +181,12 @@ import {
   wrapHandoffPrompt,
 } from "./lib/handoff";
 import { requestOutgoingHandoff } from "./lib/handoffTurn";
-import { isEditTool } from "./lib/harness/preview";
 import {
   beginSessionTurn,
-  captureSessionCheckpoint,
   flushSessionCheckpoint,
   keepSessionChanges,
   notifyReviewChanged,
-  prepareSessionCheckpoint,
 } from "./lib/checkpoint";
-import { notifyDirsChanged } from "./lib/fileTree";
 import { nudgeWatchedFiles } from "./lib/fileWatch";
 import { type EditorNavigationTarget, type OpenFileFn } from "./lib/search";
 import {
@@ -211,11 +203,9 @@ import {
   planTurnPrompt,
 } from "./lib/plan";
 import {
-  displayPath,
   isEqualOrInside,
   projectName,
   rebasePath,
-  resolveWorkspacePath,
 } from "./lib/paths";
 import { removeProjectData } from "./lib/projectData";
 import {
@@ -262,7 +252,6 @@ import {
   type HarnessId,
   type PlanBuildTarget,
   type RuntimeMode,
-  type PlanStatus,
   type SecondOpinionMeta,
   type Session,
   type TurnIntent,
@@ -273,7 +262,6 @@ import {
   dequeueQueuedMessage,
   queuedMessageForSubmit,
 } from "./lib/messageQueue";
-import { dropContextWindow } from "./lib/contextUsage";
 import {
   deleteSession,
   getSession,
@@ -333,7 +321,6 @@ import {
 import {
   ADD_NOTE_TO_CHAT_EVENT,
   composeNoteMessage,
-  noteCardMeta,
   type NoteComposerCard,
 } from "./lib/notes";
 import {
@@ -407,172 +394,37 @@ import {
   type ResumedWorkspace,
 } from "./lib/appLifecycle";
 
-function withPlanStatus(
-  session: Session,
-  blockId: string,
-  status: PlanStatus,
-): Session {
-  return {
-    ...session,
-    blocks: session.blocks.map((block) =>
-      block.id === blockId && block.role === "plan"
-        ? {
-            ...block,
-            plan: { ...(block.plan ?? { status: "ready" }), status },
-          }
-        : block,
-    ),
-  };
-}
-
-function lastAssistantTextInTurn(session: Session): string {
-  for (let index = session.blocks.length - 1; index >= 0; index -= 1) {
-    const block = session.blocks[index];
-    if (block.role === "user") return "";
-    if (block.role === "assistant" && block.text.trim()) return block.text;
-  }
-  return "";
-}
-
-function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a.size !== b.size) return false;
-  for (const value of a) {
-    if (!b.has(value)) return false;
-  }
-  return true;
-}
-
-type ScheduledFlush = { kind: "raf" | "timeout"; id: number };
-
-function cancelScheduledFlush(handle: ScheduledFlush | null) {
-  if (!handle) return;
-  if (handle.kind === "raf") cancelAnimationFrame(handle.id);
-  else clearTimeout(handle.id);
-}
-
-function scheduleHarnessFlush(run: () => void): ScheduledFlush {
-  if (document.hidden) {
-    return { kind: "timeout", id: window.setTimeout(run, 32) };
-  }
-  return { kind: "raf", id: requestAnimationFrame(run) };
-}
-
-function userTurnCards(
-  noteCard: NoteComposerCard | undefined,
-  secondOpinion?: SecondOpinionMeta,
-) {
-  if (!noteCard && !secondOpinion) return undefined;
-  return {
-    ...(secondOpinion ? { secondOpinion } : {}),
-    ...(noteCard ? { noteCard: noteCardMeta(noteCard) } : {}),
-  };
-}
-
-function withHarnessChoice(
-  session: Session,
-  harness: HarnessId,
-  model: string,
-  modelSettings: Record<string, string>,
-): Session {
-  return {
-    ...session,
-    harness,
-    model,
-    modelSettings,
-    title:
-      session.blocks.length === 0
-        ? HARNESS_LABEL[harness]
-        : formatSessionTitle(
-            harness,
-            sessionDisplayTitle(session.title, session.harness),
-          ),
-    ...(session.model === model
-      ? {}
-      : { context: dropContextWindow(session.context) }),
-    ...(session.harness === harness
-      ? {}
-      : { providerSessionId: undefined, providerAccountId: undefined }),
-  };
-}
-
-function withPlanBuildTarget(
-  session: Session,
-  target: PlanBuildTarget,
-): Session {
-  const resolved = resolveModel(target.harness, target.model);
-  const modelSettings = preferredModelSettings(resolved, session.modelSettings);
-  const plan = planComposerSwitch(session, target.harness);
-  const next = withHarnessChoice(
-    session,
-    target.harness,
-    resolved.id,
-    modelSettings,
-  );
-
-  if (plan.kind === "arm") {
-    return { ...next, pendingSwitch: plan.pending };
-  }
-  if (plan.kind === "revert") {
-    return {
-      ...next,
-      pendingSwitch: undefined,
-      ...(plan.restoreProviderSessionId
-        ? { providerSessionId: plan.restoreProviderSessionId }
-        : { providerSessionId: undefined }),
-      ...(plan.restoreProviderAccountId
-        ? { providerAccountId: plan.restoreProviderAccountId }
-        : { providerAccountId: undefined }),
-    };
-  }
-  if (plan.kind === "empty") {
-    return { ...next, pendingSwitch: undefined };
-  }
-  return next;
-}
-
-function openSessionIds(tabs: WorkspaceTab[]): Set<string> {
-  const ids = new Set<string>();
-  for (const tab of tabs) {
-    for (const id of leafIds(tab.layout)) ids.add(id);
-  }
-  return ids;
-}
-
-function filesInWorkspaceTabs(tabs: readonly WorkspaceTab[]): FilePaneTab[] {
-  return tabs.flatMap((tab) => [
-    ...tab.editorPanes.flatMap((pane) => pane.files),
-    ...(tab.terminalPanes ?? []).flatMap((pane) => pane.files),
-  ]);
-}
-
-/** Native sheet. `window.confirm` is swallowed when a macOS menu accelerator fires. */
-function confirmDiscardUnsaved(message: string): Promise<boolean> {
-  return ask(message, { title: "MonoCode", kind: "warning" });
-}
-
-function titleTabsEqual(a: TitleTab[], b: TitleTab[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((tab, index) => {
-    const other = b[index];
-    return (
-      other != null &&
-      tab.id === other.id &&
-      tab.project === other.project &&
-      tab.title === other.title &&
-      tab.sessionCount === other.sessionCount &&
-      tab.dirty === other.dirty &&
-      tab.more.join("\u0000") === other.more.join("\u0000") &&
-      tab.harnesses.join("\u0000") === other.harnesses.join("\u0000") &&
-      tab.busyHarnesses.join("\u0000") === other.busyHarnesses.join("\u0000") &&
-      tab.files.join("\u0000") === other.files.join("\u0000") &&
-      tab.multiPane === other.multiPane &&
-      tab.fileFocused === other.fileFocused &&
-      tab.blank === other.blank &&
-      tab.terminal === other.terminal &&
-      tab.groupId === other.groupId
-    );
-  });
-}
+import { confirmDiscardUnsaved } from "./lib/appConfirm";
+import {
+  cancelScheduledFlush,
+  scheduleHarnessFlush,
+  type ScheduledFlush,
+} from "./lib/appFlush";
+import {
+  dropOpenFiles,
+  filesInWorkspaceTabs,
+  isBlankWorkspaceTab,
+  lastUserBlockId,
+  openSessionIds,
+  providerSignInRequestKey,
+  selectedChangeKind,
+  selectedChangePath,
+  selectedCommitSha,
+  titleTabsEqual,
+  toTitleTab,
+} from "./lib/appTabs";
+import {
+  lastAssistantTextInTurn,
+  nudgeOpenEditors,
+  nudgeWorkspace,
+  sameSettings,
+  setsEqual,
+  trackSessionEdits,
+  userTurnCards,
+  withHarnessChoice,
+  withPlanBuildTarget,
+  withPlanStatus,
+} from "./lib/appSession";
 
 // Register capabilities before composer hooks choose their discovery strategy.
 registerBuiltinHarnesses();
@@ -5822,271 +5674,4 @@ export default function App({
       ) : null}
     </div>
   );
-}
-
-function conversationTitle(session: Session): string {
-  const title = sessionDisplayTitle(session.title, session.harness);
-  return title === "New session" ? "" : title;
-}
-
-function lastUserBlockId(session: Session): string | undefined {
-  for (let i = session.blocks.length - 1; i >= 0; i--) {
-    if (session.blocks[i]?.role === "user") return session.blocks[i]?.id;
-  }
-  return undefined;
-}
-
-function providerSignInRequestKey(session: Session): string {
-  const lastBlockId = session.blocks[session.blocks.length - 1]?.id;
-  return `${session.id}:${lastUserBlockId(session) ?? lastBlockId ?? "auth"}`;
-}
-
-function selectedChangePath(
-  tab: WorkspaceTab,
-  gitCwd?: string,
-): string | undefined {
-  const file = focusedFileTab(tab);
-  if (!file || !isFilesystemTab(file) || !file.review) return undefined;
-  return displayPath(file.path, gitCwd || file.cwd);
-}
-
-function selectedChangeKind(tab: WorkspaceTab): GitFileDiffKind | undefined {
-  const file = focusedFileTab(tab);
-  return file?.review ? file.changeKind : undefined;
-}
-
-function selectedCommitSha(tab: WorkspaceTab): string | undefined {
-  const focused = focusedFileTab(tab);
-  if (focused && isCommitTab(focused)) return focused.commit.sha;
-  for (const pane of tab.editorPanes) {
-    const file = pane.files.find((entry) => entry.id === pane.activeFileId);
-    if (file && isCommitTab(file)) return file.commit.sha;
-  }
-}
-
-function isBlankWorkspaceTab(tab: WorkspaceTab, sessions: Session[]): boolean {
-  if (tab.editorPanes.some((pane) => pane.files.length > 0)) return false;
-  if ((tab.terminalPanes ?? []).some((pane) => pane.files.length > 0))
-    return false;
-  const ids = leafIds(tab.layout);
-  if (ids.length !== 1) return false;
-  return isBlankSession(sessions.find((entry) => entry.id === ids[0]));
-}
-
-function toTitleTab(
-  tab: WorkspaceTab,
-  sessions: Session[],
-  dirtyFiles: Set<string>,
-): TitleTab {
-  const paneIds = leafIds(tab.layout);
-  const multiPane = paneIds.length > 1;
-  const tabSessions = paneIds
-    .map((id) => sessions.find((session) => session.id === id))
-    .filter((session): session is Session => session != null);
-  const sessionFocused = tabSessions.some(
-    (session) => session.id === tab.focusedId,
-  );
-  const fileFocused =
-    !sessionFocused &&
-    (tab.editorPanes.some((pane) => pane.id === tab.focusedId) ||
-      (tab.terminalPanes ?? []).some((pane) => pane.id === tab.focusedId));
-  const focused =
-    sessions.find((session) => session.id === tab.focusedId) ?? tabSessions[0];
-
-  const seen = new Set<HarnessId>();
-  const harnesses: HarnessId[] = [];
-  const busySeen = new Set<HarnessId>();
-  const busyHarnesses: HarnessId[] = [];
-  const ordered = focused
-    ? [focused, ...tabSessions.filter((session) => session.id !== focused.id)]
-    : tabSessions;
-  for (const session of ordered) {
-    if (
-      session.busy &&
-      !sessionNeedsInput(session) &&
-      !busySeen.has(session.harness)
-    ) {
-      busySeen.add(session.harness);
-      busyHarnesses.push(session.harness);
-    }
-    if (seen.has(session.harness)) continue;
-    seen.add(session.harness);
-    harnesses.push(session.harness);
-  }
-
-  const files: string[] = [];
-  const seenKeys = new Set<string>();
-  const pushFile = (file: FilePaneTab) => {
-    const key = file.terminal
-      ? `terminal:${file.id}`
-      : file.plan
-        ? `plan:${file.plan.blockId}`
-        : file.releaseNotes
-          ? `release-notes:${file.releaseNotes.version}`
-          : file.path;
-    if (seenKeys.has(key)) return;
-    seenKeys.add(key);
-    files.push(
-      file.plan?.title?.trim() ||
-        (file.releaseNotes
-          ? releaseNotesTitle(file.releaseNotes.version)
-          : file.terminal
-            ? terminalTabLabel(file)
-            : basename(file.path)),
-    );
-  };
-  const focusedPane =
-    tab.editorPanes.find((pane) => pane.id === tab.focusedId) ??
-    (tab.terminalPanes ?? []).find((pane) => pane.id === tab.focusedId);
-  const otherPanes = [
-    ...tab.editorPanes.filter((pane) => pane.id !== focusedPane?.id),
-    ...(tab.terminalPanes ?? []).filter((pane) => pane.id !== focusedPane?.id),
-  ];
-  const panes = focusedPane ? [focusedPane, ...otherPanes] : otherPanes;
-  for (const pane of panes) {
-    const active = pane.files.find((file) => file.id === pane.activeFileId);
-    if (active) pushFile(active);
-  }
-  for (const pane of panes) {
-    for (const file of pane.files) pushFile(file);
-  }
-
-  const more = tabSessions
-    .filter((session) => session.id !== focused?.id)
-    .map(conversationTitle)
-    .filter(Boolean);
-
-  const hasTerminal = (tab.terminalPanes ?? []).some((pane) =>
-    pane.files.some(isTerminalTab),
-  );
-  const focusedFile = focusedFileTab(tab);
-
-  return {
-    id: tab.id,
-    project: focused
-      ? projectName(focused.cwd)
-      : focusedFile
-        ? projectName(focusedFile.cwd)
-        : "~",
-    title: focused ? conversationTitle(focused) : "",
-    more,
-    sessionCount: tabSessions.length,
-    harnesses,
-    busyHarnesses,
-    files,
-    multiPane,
-    fileFocused,
-    blank: isBlankWorkspaceTab(tab, sessions),
-    dirty: tab.editorPanes.some((pane) =>
-      pane.files.some(
-        (file) => isFilesystemTab(file) && dirtyFiles.has(file.id),
-      ),
-    ),
-    terminal: hasTerminal && harnesses.length === 0,
-    groupId: tab.groupId,
-  };
-}
-
-function dropOpenFiles(
-  tab: WorkspaceTab,
-  shouldDrop: (path: string) => boolean,
-): WorkspaceTab {
-  let layout = tab.layout;
-  let focusedId = tab.focusedId;
-  const editorPanes: EditorPane[] = [];
-  for (const pane of tab.editorPanes) {
-    const files = pane.files.filter(
-      (file) => !isFilesystemTab(file) || !shouldDrop(file.path),
-    );
-    if (files.length === 0) {
-      const sibling = siblingLeafId(layout, pane.id);
-      const withoutPane = removePane(layout, pane.id);
-      if (withoutPane) {
-        layout = withoutPane;
-        if (focusedId === pane.id)
-          focusedId = sibling ?? firstLeafId(withoutPane);
-      }
-      continue;
-    }
-    editorPanes.push({
-      ...pane,
-      files,
-      activeFileId: files.some((file) => file.id === pane.activeFileId)
-        ? pane.activeFileId
-        : files[0].id,
-    });
-  }
-  return { ...tab, layout, focusedId, editorPanes };
-}
-
-function trackSessionEdits(
-  sessionId: string,
-  cwd: string,
-  event: HarnessEvent,
-) {
-  if (event.type !== "tool.started" && event.type !== "tool.updated") return;
-  if (!isEditTool(event.kind, event.title, event.preview)) return;
-  const paths = [
-    ...(event.paths ?? []),
-    ...(event.preview?.path ? [event.preview.path] : []),
-  ].filter((path, index, all) => all.indexOf(path) === index);
-  if (paths.length === 0 || cwd === "~") return;
-  const completed =
-    event.type === "tool.updated" &&
-    (event.status === "completed" || event.status === "success");
-  if (!completed) {
-    void prepareSessionCheckpoint(sessionId, cwd, paths).catch(() => undefined);
-    return;
-  }
-  void captureSessionCheckpoint(sessionId, cwd, paths)
-    .catch(() => undefined)
-    .then(() => notifyReviewChanged(sessionId));
-}
-
-function nudgeWorkspace(cwd?: string) {
-  invalidateProjectFiles(cwd);
-  notifyDirsChanged();
-}
-
-function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
-  if (event.type !== "tool.updated") return;
-  const completed = event.status === "completed" || event.status === "success";
-
-  const kind = event.kind?.trim().toLowerCase();
-  if (kind === "execute" || event.preview?.kind === "shell") {
-    if (!completed) return;
-    nudgeWatchedFiles();
-    window.setTimeout(() => nudgeWatchedFiles(), 150);
-    notifyGitChanged();
-    nudgeWorkspace(cwd);
-    window.setTimeout(() => nudgeWorkspace(cwd), 150);
-    return;
-  }
-
-  if (!isEditTool(event.kind, event.title, event.preview)) return;
-  const raw = event.preview?.path;
-  const resolved = raw ? (resolveWorkspacePath(raw, cwd) ?? raw) : undefined;
-  if (resolved) {
-    nudgeWatchedFiles([resolved]);
-  } else if (completed) {
-    nudgeWatchedFiles();
-  }
-  if (completed) {
-    window.setTimeout(() => nudgeWatchedFiles(), 150);
-    notifyGitChanged();
-    nudgeWorkspace(cwd);
-  }
-}
-
-function sameSettings(
-  a: Record<string, string> | undefined,
-  b: Record<string, string> | undefined,
-): boolean {
-  const left = a ?? {};
-  const right = b ?? {};
-  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
-  for (const key of keys) {
-    if (left[key] !== right[key]) return false;
-  }
-  return true;
 }
