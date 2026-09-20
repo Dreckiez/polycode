@@ -1,7 +1,15 @@
 import { nativeModelId } from "../models";
 import type { RuntimeMode } from "../session";
 import { promptBlocks } from "../attachments";
-import { isTaskListToolName, taskListFromToolInput } from "../taskList";
+import { isTaskListToolName } from "../taskList";
+import {
+  mapCursorSessionUpdate,
+  mapCursorTask,
+  mapCursorTodoUpdate,
+  needsCursorToolEnrichment,
+  toolLabel,
+  type CursorLiveState,
+} from "./cursorTranscript";
 import { AcpClient, type AcpHandlers } from "./acp";
 import {
   killChild,
@@ -29,14 +37,11 @@ import {
   type UserQuestionReply,
 } from "../userQuestion";
 import {
-  agentToolTitle,
   composeToolTitle,
   extractSearchQuery,
   extractShellCommand,
   extractSkillName,
   extractToolPreview,
-  isAgentTool,
-  isAgentToolName,
   isWeakToolTitle,
   mergeToolPreview,
 } from "./preview";
@@ -52,7 +57,7 @@ type SessionSetupResult = {
   configOptions?: unknown;
 };
 
-type PendingToolEnrichment = {
+export type PendingToolEnrichment = {
   kind?: string;
   attempts: number;
 };
@@ -445,11 +450,11 @@ async function prompt(live: Live, input: SendTurnInput): Promise<void> {
 
 function handleNotification(live: Live, method: string, params: unknown) {
   if (method === "session/update") {
-    handleSessionUpdate(live, params);
+    mapCursorSessionUpdate(params, cursorLiveState(live));
     return;
   }
   if (isCursorTodoUpdate(method)) {
-    emitCursorTodoUpdate(live, params);
+    mapCursorTodoUpdate(params, cursorLiveState(live));
   }
 }
 
@@ -475,12 +480,12 @@ async function handleRequest(
     return;
   }
   if (isCursorTodoUpdate(method)) {
-    emitCursorTodoUpdate(live, params);
+    mapCursorTodoUpdate(params, cursorLiveState(live));
     await live.acp.respond(id, {}).catch(() => undefined);
     return;
   }
   if (method === "cursor/task") {
-    handleCursorTask(live, params);
+    mapCursorTask(params, cursorLiveState(live));
     await live.acp.respond(id, {}).catch(() => undefined);
     return;
   }
@@ -491,54 +496,18 @@ function isCursorTodoUpdate(method: string): boolean {
   return method === "cursor/update_todos" || method === "_cursor/update_todos";
 }
 
-function emitCursorTodoUpdate(live: Live, params: unknown): void {
-  const rec = asRecord(params);
-  const callId = rec
-    ? (stringField(rec, "toolCallId") ?? stringField(rec, "tool_call_id"))
-    : undefined;
-  if (callId) {
-    live.taskListTools.add(callId);
-    live.onEvent({ type: "tool.updated", callId, kind: "tasks" });
-  }
-  const items = taskListFromToolInput("updateTodos", params);
-  if (!items) return;
-  live.onEvent({
-    type: "tasks.updated",
-    items,
-    ...(rec?.merge === true ? { merge: true } : {}),
-  });
-}
-
-function handleCursorTask(live: Live, params: unknown): void {
-  const task = asRecord(params);
-  if (!task || !live.promptActive) return;
-  const callId =
-    stringField(task, "toolCallId") ?? stringField(task, "tool_call_id");
-  if (!callId || !live.agentTools.has(callId)) return;
-
-  const agentId = stringField(task, "agentId") ?? stringField(task, "agent_id");
-  const durationMs =
-    numberField(task, "durationMs") ?? numberField(task, "duration_ms");
-  const background =
-    live.backgroundAgentTools.has(callId) ||
-    (!!agentId && durationMs === undefined);
-  if (!background) return;
-
-  const title =
-    stringField(task, "description") ??
-    live.agentTools.get(callId) ??
-    "Subagent";
-  live.agentTools.set(callId, title);
-  live.backgroundAgentTools.add(callId);
-  live.toolStatuses.set(callId, "in_progress");
-  live.onEvent({
-    type: "tool.updated",
-    callId,
-    title,
-    kind: "agent",
-    status: "in_progress",
-    detail: cursorSubagentDetail(task),
-  });
+function cursorLiveState(live: Live): CursorLiveState {
+  return {
+    onEvent: (event) => live.onEvent(event),
+    promptActive: live.promptActive,
+    agentTools: live.agentTools,
+    backgroundAgentTools: live.backgroundAgentTools,
+    taskListTools: live.taskListTools,
+    toolStatuses: live.toolStatuses,
+    pendingToolEnrichments: live.pendingToolEnrichments,
+    enrichedTools: live.enrichedTools,
+    queueEnrichment: (callId, kind) => queueCursorToolEnrichment(live, callId, kind),
+  };
 }
 
 async function handleAskQuestion(live: Live, id: number, params: unknown) {
@@ -718,195 +687,6 @@ async function handlePermission(live: Live, id: number, params: unknown) {
   });
 }
 
-function handleSessionUpdate(live: Live, params: unknown) {
-  const rec = asRecord(params);
-  const update = asRecord(rec?.update) ?? rec;
-  if (!update) return;
-  const kind = String(
-    update.sessionUpdate ?? update.session_update ?? update.type ?? "",
-  );
-
-  if (kind === "agent_message_chunk" || kind === "agent_message") {
-    // Whole-message arrays contain distinct content blocks; chunks are exact deltas.
-    const text = textFromContent(
-      update.content ?? update.text,
-      kind === "agent_message" ? "\n" : "",
-    );
-    if (text) live.onEvent({ type: "message.delta", text });
-    return;
-  }
-  if (kind === "agent_thought_chunk" || kind === "agent_thought") {
-    const text = textFromContent(
-      update.content ?? update.text,
-      kind === "agent_thought" ? "\n" : "",
-    );
-    if (text) live.onEvent({ type: "reasoning.delta", text });
-    return;
-  }
-  if (
-    kind === "tool_call" ||
-    kind === "tool_call_update" ||
-    kind === "tool_call_content_chunk"
-  ) {
-    const tool =
-      asRecord(update.toolCall) ?? asRecord(update.tool_call) ?? update;
-    const callId = String(
-      tool.toolCallId ??
-        tool.tool_call_id ??
-        update.toolCallId ??
-        update.tool_call_id ??
-        "",
-    );
-    if (!callId) return;
-    const reportedKind =
-      coerceMaybeString(update, "kind") ?? coerceMaybeString(tool, "kind");
-    const status =
-      coerceMaybeString(update, "status") ?? coerceMaybeString(tool, "status");
-    const rawTitle = toolLabel(update, tool);
-    const rawInput =
-      update.rawInput ??
-      tool.rawInput ??
-      update.raw_input ??
-      tool.raw_input ??
-      update.input ??
-      tool.input;
-    const agent =
-      live.agentTools.has(callId) ||
-      isAgentTool(reportedKind, rawTitle) ||
-      isCursorAgentInput(rawInput);
-    const taskList =
-      live.taskListTools.has(callId) ||
-      isCursorTaskListInput(rawInput, rawTitle);
-    if (taskList) live.taskListTools.add(callId);
-    const toolKind = agent ? "agent" : taskList ? "tasks" : reportedKind;
-    const detail = toolDetail(update, tool);
-    const preview = extractToolPreview(update, tool);
-    const title = agent
-      ? cursorAgentTitle(rawInput, rawTitle, live.agentTools.get(callId))
-      : composeToolTitle({
-          kind: toolKind,
-          title: rawTitle,
-          command: extractShellCommand(
-            update.rawInput,
-            tool.rawInput,
-            update.raw_input,
-            tool.raw_input,
-            update.input,
-            tool.input,
-          ),
-          skill: extractSkillName(
-            update.rawInput,
-            tool.rawInput,
-            update.raw_input,
-            tool.raw_input,
-            update.input,
-            tool.input,
-          ),
-          path: preview?.path,
-          query: preview?.query ?? extractSearchQuery(rawInput),
-          previewKind: preview?.kind,
-        }) || rawTitle;
-    if (agent && title) live.agentTools.set(callId, title);
-    const background =
-      agent &&
-      status === "completed" &&
-      cursorToolOutputIsBackground(update, tool);
-    if (background) live.backgroundAgentTools.add(callId);
-    const displayedStatus = background ? "in_progress" : status;
-    if (displayedStatus) live.toolStatuses.set(callId, displayedStatus);
-    live.onEvent({
-      type: "tool.updated",
-      callId,
-      title,
-      kind: toolKind,
-      status: displayedStatus,
-      detail,
-      preview,
-    });
-    if (needsCursorToolEnrichment(toolKind, title, preview)) {
-      queueCursorToolEnrichment(live, callId, toolKind);
-    } else if (live.pendingToolEnrichments.has(callId)) {
-      live.pendingToolEnrichments.delete(callId);
-      live.enrichedTools.add(callId);
-    }
-  }
-}
-
-function isCursorAgentInput(value: unknown): boolean {
-  const input = asRecord(value);
-  if (!input) return false;
-  const name =
-    stringField(input, "_toolName") ??
-    stringField(input, "toolName") ??
-    stringField(input, "tool_name") ??
-    stringField(input, "name");
-  return !!name && isAgentToolName(name);
-}
-
-function isCursorTaskListInput(
-  value: unknown,
-  title: string | undefined,
-): boolean {
-  const input = asRecord(value);
-  const name = input
-    ? (stringField(input, "_toolName") ??
-      stringField(input, "toolName") ??
-      stringField(input, "tool_name") ??
-      stringField(input, "name"))
-    : undefined;
-  const normalized = name?.replace(/[\s_-]+/g, "").toLowerCase();
-  return (
-    (!!normalized && isTaskListToolName(normalized)) ||
-    /^update todos\b/i.test(title ?? "")
-  );
-}
-
-function cursorAgentTitle(
-  rawInput: unknown,
-  rawTitle: string | undefined,
-  existing: string | undefined,
-): string {
-  const input = asRecord(rawInput);
-  if (input) return agentToolTitle(input, existing ?? rawTitle ?? "Subagent");
-  if (existing) return existing;
-  const stripped = rawTitle
-    ?.replace(/^(?:agent|task|subagent)\b[\s:·-]*/i, "")
-    .trim();
-  return stripped || "Subagent";
-}
-
-function cursorToolOutputIsBackground(
-  update: Record<string, unknown>,
-  tool: Record<string, unknown>,
-): boolean {
-  for (const value of [
-    update.rawOutput,
-    tool.rawOutput,
-    update.raw_output,
-    tool.raw_output,
-  ]) {
-    const output = asRecord(value);
-    if (output?.isBackground === true || output?.is_background === true) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function cursorSubagentDetail(
-  task: Record<string, unknown>,
-): string | undefined {
-  const type = task.subagentType ?? task.subagent_type;
-  if (typeof type === "string" && type && type !== "unspecified") {
-    return `${type.replace(/[_-]+/g, " ")} subagent`;
-  }
-  const custom = asRecord(type)?.custom;
-  if (typeof custom === "string" && custom.trim()) {
-    return `${custom.trim().replace(/[_-]+/g, " ")} subagent`;
-  }
-  return undefined;
-}
-
 function settleCursorBackgroundAgents(
   live: Live,
   status: "completed" | "failed",
@@ -926,26 +706,6 @@ function settleCursorBackgroundAgents(
 }
 
 const TOOL_ENRICH_MAX_ATTEMPTS = 20;
-
-function needsCursorToolEnrichment(
-  kind: string | undefined,
-  title: string | undefined,
-  preview: ReturnType<typeof extractToolPreview>,
-): boolean {
-  const key = (kind ?? "").toLowerCase();
-  if (
-    key === "execute" ||
-    key === "think" ||
-    key === "fetch" ||
-    key === "skill"
-  )
-    return false;
-  if (preview?.path || preview?.query) return false;
-  if (key === "read" || key === "search" || key === "edit" || key === "write") {
-    return true;
-  }
-  return !title || isWeakToolTitle(title);
-}
 
 function queueCursorToolEnrichment(
   live: Live,
@@ -1197,254 +957,14 @@ function resolveSettingConfigId(
   return undefined;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+export function asRecord(value: unknown): Record<string, unknown> | null {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
   }
   return null;
 }
 
-function toolLabel(
-  update: Record<string, unknown>,
-  tool: Record<string, unknown>,
-): string | undefined {
-  const kind = stringField(update, "kind") ?? stringField(tool, "kind");
-  const named =
-    humanField(update, "title") ??
-    humanField(tool, "title") ??
-    humanField(update, "name") ??
-    humanField(tool, "name") ??
-    humanField(update, "toolName") ??
-    humanField(tool, "toolName") ??
-    humanField(update, "tool_name") ??
-    humanField(tool, "tool_name") ??
-    metaLabel(update._meta ?? tool._meta);
-  const fromInput = inputLabel(
-    update.rawInput ??
-      tool.rawInput ??
-      update.raw_input ??
-      tool.raw_input ??
-      update.input ??
-      tool.input,
-  );
-  const fromLocation =
-    locationLabel(update.locations ?? tool.locations) ??
-    contentPath(update.content ?? tool.content);
-
-  if (named && !isWeakName(named)) return named;
-  if (fromInput) return fromInput;
-  if (fromLocation) return fromLocation;
-  if (named) return named;
-  return kindTitle(kind);
-}
-
-function toolDetail(
-  update: Record<string, unknown>,
-  tool: Record<string, unknown>,
-): string | undefined {
-  const content =
-    textFromContent(update.content, "\n") ||
-    textFromContent(tool.content, "\n");
-  if (content.trim()) return capToolDetail(content);
-  const output = update.rawOutput ?? tool.rawOutput;
-  if (typeof output === "string" && output.trim()) return capToolDetail(output);
-  const outputText = textFromContent(output);
-  if (outputText.trim()) return capToolDetail(outputText);
-  return inputLabel(
-    update.rawInput ?? tool.rawInput ?? update.input ?? tool.input,
-  );
-}
-
-const MAX_TOOL_DETAIL_CHARS = 8_000;
-
-function capToolDetail(value: string): string {
-  const text = value.trim();
-  if (text.length <= MAX_TOOL_DETAIL_CHARS) return text;
-  return `${text.slice(0, MAX_TOOL_DETAIL_CHARS)}\n…`;
-}
-
-function inputLabel(value: unknown): string | undefined {
-  if (typeof value === "string" && value.trim()) {
-    const text = value.trim();
-    if (looksLikeCallId(text)) return undefined;
-    if (text.startsWith("{") || text.startsWith("[")) {
-      try {
-        return inputLabel(JSON.parse(text));
-      } catch {
-        return text;
-      }
-    }
-    return text;
-  }
-  const raw = asRecord(value);
-  if (!raw) return undefined;
-
-  const command = stringField(raw, "command");
-  if (command) return command;
-
-  const from = stringField(raw, "old_path") ?? stringField(raw, "from");
-  const to =
-    stringField(raw, "new_path") ??
-    stringField(raw, "to") ??
-    stringField(raw, "destination");
-  if (from && to) return `${shortPath(from)} → ${shortPath(to)}`;
-
-  const path =
-    stringField(raw, "path") ??
-    stringField(raw, "filePath") ??
-    stringField(raw, "file_path") ??
-    stringField(raw, "targetFile") ??
-    stringField(raw, "target_file") ??
-    stringField(raw, "relative_workspace_path") ??
-    stringField(raw, "uri") ??
-    stringField(raw, "url");
-  if (path) return shortPath(path);
-
-  const query =
-    stringField(raw, "query") ??
-    stringField(raw, "pattern") ??
-    stringField(raw, "glob") ??
-    stringField(raw, "glob_pattern") ??
-    stringField(raw, "globPattern") ??
-    stringField(raw, "search_term") ??
-    stringField(raw, "searchTerm");
-  const name = humanField(raw, "name") ?? humanField(raw, "toolName");
-  if (name && query) return `${name} ${query}`;
-  if (query) return query;
-
-  const nested = inputLabel(
-    raw.arguments ?? raw.args ?? raw.input ?? raw.params,
-  );
-  if (name && nested) return `${name} ${nested}`;
-  if (nested) return nested;
-  if (name) return name;
-  return firstStringArg(raw);
-}
-
-function firstStringArg(raw: Record<string, unknown>): string | undefined {
-  for (const [key, value] of Object.entries(raw)) {
-    if (
-      key === "name" ||
-      key === "toolName" ||
-      key === "kind" ||
-      key === "type"
-    ) {
-      continue;
-    }
-    if (typeof value === "string" && value.trim() && !looksLikeCallId(value)) {
-      const text = value.trim();
-      if (text.length <= 200) return text;
-    }
-  }
-  return undefined;
-}
-
-function contentPath(content: unknown): string | undefined {
-  if (!Array.isArray(content)) {
-    const rec = asRecord(content);
-    const path = rec && stringField(rec, "path");
-    return path ? shortPath(path) : undefined;
-  }
-  for (const item of content) {
-    const rec = asRecord(item);
-    const path =
-      rec && (stringField(rec, "path") ?? contentPath(rec.content ?? rec.diff));
-    if (path) return path;
-  }
-  return undefined;
-}
-
-function locationLabel(locations: unknown): string | undefined {
-  if (!Array.isArray(locations)) return undefined;
-  for (const item of locations) {
-    const rec = asRecord(item);
-    const path =
-      rec &&
-      (stringField(rec, "path") ??
-        stringField(rec, "uri") ??
-        stringField(rec, "file"));
-    if (path) return shortPath(path);
-  }
-  return undefined;
-}
-
-function metaLabel(meta: unknown): string | undefined {
-  const rec = asRecord(meta);
-  if (!rec) return undefined;
-  return (
-    humanField(rec, "toolName") ??
-    humanField(rec, "name") ??
-    humanField(rec, "displayName")
-  );
-}
-
-function humanField(
-  rec: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = stringField(rec, key);
-  if (!value || looksLikeCallId(value)) return undefined;
-  return value;
-}
-
-function kindTitle(kind: string | undefined): string | undefined {
-  if (!kind?.trim()) return undefined;
-  const key = kind.trim().toLowerCase();
-  switch (key) {
-    case "read":
-      return "Read";
-    case "edit":
-      return "Edit";
-    case "delete":
-      return "Delete";
-    case "move":
-      return "Move";
-    case "search":
-      return "Find";
-    case "execute":
-    case "shell":
-    case "bash":
-      return "Shell";
-    case "skill":
-      return "Skill";
-    case "think":
-      return "Think";
-    case "fetch":
-      return "Fetch";
-    case "other":
-      return undefined;
-    default:
-      return key.replace(/^_/, "").replace(/[_-]+/g, " ");
-  }
-}
-
-function isWeakName(value: string): boolean {
-  return isWeakToolTitle(value);
-}
-
-function looksLikeCallId(value: string): boolean {
-  const text = value.trim();
-  return (
-    /^(call[-_]?|tool[-_])[a-z0-9_-]+$/i.test(text) ||
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)
-  );
-}
-
-function shortPath(path: string): string {
-  if (/\s/.test(path)) return path;
-  const parts = path.split(/[/\\]/).filter(Boolean);
-  if (parts.length <= 2) return parts.join("/") || path;
-  return parts.slice(-2).join("/");
-}
-
-function coerceMaybeString(
-  rec: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  return stringField(rec, key);
-}
-
-function stringField(
+export function stringField(
   rec: Record<string, unknown>,
   key: string,
 ): string | undefined {
@@ -1452,7 +972,7 @@ function stringField(
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-function numberField(
+export function numberField(
   rec: Record<string, unknown>,
   key: string,
 ): number | undefined {
@@ -1462,7 +982,7 @@ function numberField(
     : undefined;
 }
 
-function textFromContent(content: unknown, separator = ""): string {
+export function textFromContent(content: unknown, separator = ""): string {
   if (typeof content === "string") return content;
   const rec = asRecord(content);
   if (rec && typeof rec.text === "string") return rec.text;
