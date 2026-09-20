@@ -25,6 +25,6 @@ describe("sessionListWindow", () => {
   });
 
   it("expands far enough to include the active session", () => {
-    expect(sessionListWindow(200, SESSION_LIST_PAGE, 80)).toBe(200);
+    expect(sessionListWindow(200, SESSION_LIST_PAGE, 80)).toBe(81);
   });
 });
