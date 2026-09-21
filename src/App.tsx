@@ -41,6 +41,7 @@ import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
 import { useApprovalHandlers } from "./hooks/useApprovalHandlers";
 import { useFileTracking } from "./hooks/useFileTracking";
 import { useStopEscape } from "./hooks/useStopEscape";
+import { useSidebarNav } from "./hooks/useSidebarNav";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -1926,14 +1927,6 @@ export default function App({
     [projectBranches, sessions, sidebarCwd],
   );
 
-  const onToggleSidebar = useCallback(() => {
-    setProjectRailOpen((open) => {
-      const next = !open;
-      saveProjectRailOpen(next);
-      return next;
-    });
-  }, []);
-
   const onToggleProjectRail = useCallback(() => {
     setProjectRailOpen((open) => {
       const next = !open;
@@ -1941,6 +1934,22 @@ export default function App({
       return next;
     });
   }, []);
+
+  const { onToggleSidebar, onOpenSearch, onRailBack, onRailForward } =
+    useSidebarNav({
+      setProjectRailOpen,
+      saveProjectRailOpen,
+      setFilePickerOpen,
+      setSettingsOpen,
+      setNotesViewOpen,
+      setSearchViewOpen,
+      setSearchViewFocusToken,
+      settingsOpen,
+      searchViewOpen,
+      notesViewOpen,
+      onVisitBack,
+      onVisitForward,
+    });
 
   const onGoToFile = useCallback(() => {
     setSearchViewOpen(false);
@@ -1954,14 +1963,6 @@ export default function App({
     setSidebarTab("files");
     setFilesSearchOpen(true);
     setSearchFocusToken((token) => token + 1);
-  }, []);
-
-  const onOpenSearch = useCallback(() => {
-    setFilePickerOpen(false);
-    setSettingsOpen(false);
-    setNotesViewOpen(false);
-    setSearchViewOpen(true);
-    setSearchViewFocusToken((token) => token + 1);
   }, []);
 
   const onLeaveSearch = useCallback(() => {
@@ -2004,29 +2005,6 @@ export default function App({
     },
     [onSelectHistorySession],
   );
-
-  const onRailBack = useCallback(() => {
-    if (settingsOpen) {
-      setSettingsOpen(false);
-      return;
-    }
-    if (searchViewOpen) {
-      setSearchViewOpen(false);
-      return;
-    }
-    if (notesViewOpen) {
-      setNotesViewOpen(false);
-      return;
-    }
-    onVisitBack();
-  }, [onVisitBack, searchViewOpen, settingsOpen, notesViewOpen]);
-
-  const onRailForward = useCallback(() => {
-    setSearchViewOpen(false);
-    setSettingsOpen(false);
-    setNotesViewOpen(false);
-    onVisitForward();
-  }, [onVisitForward]);
 
   useEffect(() => {
     if (!dockVisible) setProjectTerminalFocused(false);
