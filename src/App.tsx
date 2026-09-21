@@ -28,6 +28,7 @@ import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import { useHarnessEventQueue } from "./hooks/useHarnessEventQueue";
 import { useSessionStreaming } from "./hooks/useSessionStreaming";
 import { useOpenSettings } from "./hooks/useOpenSettings";
+import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -3554,7 +3555,7 @@ export default function App({
       ),
     [sessions],
   );
-  const onDismissUpdate = useCallback(() => setUpdateNotice(null), []);
+  const { onDismissUpdate } = useDismissUpdate({ setUpdateNotice });
 
   const sessionPaneProps = {
     recents,
