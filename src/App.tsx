@@ -22,6 +22,7 @@ import { useProjectBranches } from "./hooks/useProjectBranches";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useProjectTerminal } from "./hooks/useProjectTerminal";
 import { useTabClose } from "./hooks/useTabClose";
+import { useProjectOfTab } from "./hooks/useProjectOfTab";
 import { useSubmitTurn } from "./hooks/useSubmitTurn";
 import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import { useHarnessEventQueue } from "./hooks/useHarnessEventQueue";
@@ -399,10 +400,7 @@ export default function App({
   });
   /** Tab id -> project name, kept in sync with the rendered title tabs. */
   const tabProjectsRef = useRef(new Map<string, string>());
-  const projectOfTab = useCallback(
-    (id: string) => tabProjectsRef.current.get(id),
-    [],
-  );
+  const { projectOfTab } = useProjectOfTab({ tabProjectsRef });
   const [projectRailOpen, setProjectRailOpen] = useState(loadProjectRailOpen);
   const tabCloseScope = "project" as const;
   const currentProjectDock = findProjectTerminal(projectTerminals, projectCwd);
