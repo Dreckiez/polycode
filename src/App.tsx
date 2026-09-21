@@ -38,6 +38,7 @@ import { usePlaceSessionOnPane } from "./hooks/usePlaceSessionOnPane";
 import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
 import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
+import { useFileTracking } from "./hooks/useFileTracking";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -60,12 +61,7 @@ import {
   type GitFileDiffKind,
   type GitHistoryCommit,
 } from "./lib/fs";
-import {
-  invalidateProjectFiles,
-  prefetchProjectFiles,
-  rememberOpenedFile,
-  resolveFileOpenRequest,
-} from "./lib/fileIndex";
+import { prefetchProjectFiles } from "./lib/fileIndex";
 import {
   findSurfacePane,
   focusedFileTab,
@@ -73,7 +69,6 @@ import {
   isFilesystemTab,
   leafIds,
   neighborLeafId,
-  newFileTab,
   newPlanTab,
   newTab,
   openChangesTab,
@@ -121,18 +116,14 @@ import {
 } from "./lib/handoff";
 import { notifyReviewChanged } from "./lib/checkpoint";
 import { nudgeWatchedFiles } from "./lib/fileWatch";
-import { type EditorNavigationTarget, type OpenFileFn } from "./lib/search";
+import { type EditorNavigationTarget } from "./lib/search";
 import {
   mergeModelSettings,
   resolveModel,
   saveLastModelSettings,
 } from "./lib/models";
 import { planTitle } from "./lib/plan";
-import {
-  isEqualOrInside,
-  projectName,
-  rebasePath,
-} from "./lib/paths";
+import { projectName } from "./lib/paths";
 import {
   lastProjectPath,
   loadRecents,
@@ -262,7 +253,6 @@ import {
 } from "./lib/appLifecycle";
 
 import {
-  dropOpenFiles,
   openSessionIds,
   providerSignInRequestKey,
   selectedChangeKind,
@@ -1668,80 +1658,18 @@ export default function App({
     [onSelectProject],
   );
 
-  const onFileMoved = useCallback((from: string, to: string) => {
-    invalidateProjectFiles();
-    setTabs((prev) =>
-      prev.map((tab) => {
-        return {
-          ...tab,
-          editorPanes: tab.editorPanes.map((pane) => ({
-            ...pane,
-            files: pane.files.map((file) =>
-              isFilesystemTab(file)
-                ? { ...file, path: rebasePath(file.path, from, to) }
-                : file,
-            ),
-          })),
-        };
-      }),
-    );
-  }, []);
-
-  const onFileDeleted = useCallback((path: string) => {
-    invalidateProjectFiles();
-    const dropped = new Set<string>();
-    for (const tab of tabsRef.current) {
-      for (const pane of tab.editorPanes) {
-        for (const file of pane.files) {
-          if (isFilesystemTab(file) && isEqualOrInside(file.path, path)) {
-            dropped.add(file.id);
-          }
-        }
-      }
-    }
-    setTabs((prev) =>
-      prev.map((tab) =>
-        dropOpenFiles(tab, (filePath) => isEqualOrInside(filePath, path)),
-      ),
-    );
-    if (dropped.size === 0) return;
-    setDirtyFiles((prev) => {
-      const next = new Set(prev);
-      for (const id of dropped) next.delete(id);
-      return next;
+  const { onFileMoved, onFileDeleted, onOpenFile, onFileDirtyChange } =
+    useFileTracking({
+      activeTabId,
+      tabsRef,
+      gitCwdRef,
+      sidebarCwdRef,
+      editorNavigationToken,
+      setTabs,
+      setDirtyFiles,
+      setEditorNavigation,
+      setComposerFocused,
     });
-  }, []);
-
-  const onOpenFile = useCallback<OpenFileFn>(
-    (path, navigation, options) => {
-      void (async () => {
-        const resolved = await resolveFileOpenRequest(
-          gitCwdRef.current,
-          path,
-          options,
-        );
-        rememberOpenedFile(sidebarCwdRef.current, resolved);
-        const tab = tabsRef.current.find((entry) => entry.id === activeTabId);
-        if (!tab) return;
-        const file = newFileTab(resolved, sidebarCwdRef.current);
-        setTabs((prev) =>
-          prev.map((entry) =>
-            entry.id === tab.id ? openEditorTab(entry, file) : entry,
-          ),
-        );
-        if (navigation) {
-          editorNavigationToken.current += 1;
-          setEditorNavigation({
-            path: resolved,
-            ...navigation,
-            token: editorNavigationToken.current,
-          });
-        }
-        setComposerFocused(false);
-      })();
-    },
-    [activeTabId],
-  );
 
   const onOpenPlan = useCallback(
     (sessionId: string, blockId: string) => {
@@ -1766,16 +1694,6 @@ export default function App({
     },
     [activeTabId],
   );
-
-  const onFileDirtyChange = useCallback((fileId: string, dirty: boolean) => {
-    setDirtyFiles((prev) => {
-      if (prev.has(fileId) === dirty) return prev;
-      const next = new Set(prev);
-      if (dirty) next.add(fileId);
-      else next.delete(fileId);
-      return next;
-    });
-  }, []);
 
   /** The editor reports 0 as it unmounts, so closed tabs drop out on their own. */
   const onFileErrorCountChange = useCallback(
