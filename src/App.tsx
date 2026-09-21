@@ -34,6 +34,7 @@ import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import { useTabLayout } from "./hooks/useTabLayout";
 import { useTabIteration } from "./hooks/useTabIteration";
+import { usePlaceSessionOnPane } from "./hooks/usePlaceSessionOnPane";
 import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
 import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
@@ -84,7 +85,6 @@ import {
   withSurfacePanes,
   type FilePaneTab,
   type FocusDir,
-  type PaneEdge,
   type WorkspaceTab,
 } from "./lib/layout";
 import { releaseNotesForVersion } from "./lib/releaseNotes";
@@ -143,7 +143,6 @@ import {
   sameProjectPath,
 } from "./lib/recents";
 import {
-  applyPlaceSessionOnPane,
   filterTabsForProject,
   planWorkspaceTabClose,
   workspaceTabCwd,
@@ -1454,63 +1453,19 @@ export default function App({
     sessions.map((session) => session.id),
   );
 
-  const onPlaceSessionOnPane = useCallback(
-    async (sessionId: string, targetId: string, edge: PaneEdge) => {
-      if (sessionId === targetId) return;
-      const targetTab = tabsRef.current.find((tab) =>
-        leafIds(tab.layout).includes(targetId),
-      );
-      if (!targetTab) return;
-
-      const alreadyHere = leafIds(targetTab.layout).includes(sessionId);
-      if (!alreadyHere) {
-        const session = await ensureOpenSession(sessionId);
-        if (!session) return;
-      }
-
-      const tab = tabsRef.current.find((entry) => entry.id === targetTab.id);
-      if (!tab || !leafIds(tab.layout).includes(targetId)) return;
-
-      const replaceTarget =
-        !leafIds(tab.layout).includes(sessionId) &&
-        isBlankSession(
-          sessionsRef.current.find((entry) => entry.id === targetId),
-        );
-
-      if (replaceTarget) {
-        lastPersisted.current.delete(targetId);
-        const blank = sessionsRef.current.find(
-          (entry) => entry.id === targetId,
-        );
-        if (blank) void forgetHarnessSession(blank.harness, targetId);
-      }
-
-      const result = applyPlaceSessionOnPane({
-        tabs: tabsRef.current,
-        sessions: sessionsRef.current,
-        sessionId,
-        targetId,
-        edge,
-        replaceTarget,
-        scope: tabCloseScope,
-        createReplacement: (seed) =>
-          newDefaultSession(
-            seed?.cwd ?? projectCwdRef.current,
-            seed?.runtimeMode,
-          ),
-      });
-      if (!result) return;
-
-      sessionsRef.current = result.sessions;
-      tabsRef.current = result.tabs;
-      setSessions(result.sessions);
-      setTabs(result.tabs);
-      setActiveTabId(result.activeTabId);
-      setProjectTerminalFocused(false);
-      setComposerFocused(true);
-    },
-    [ensureOpenSession, tabCloseScope],
-  );
+  const { onPlaceSessionOnPane } = usePlaceSessionOnPane({
+    ensureOpenSession,
+    lastPersisted,
+    projectCwdRef,
+    sessionsRef,
+    setActiveTabId,
+    setComposerFocused,
+    setProjectTerminalFocused,
+    setSessions,
+    setTabs,
+    tabCloseScope,
+    tabsRef,
+  });
 
   const onRenameHistorySession = useCallback(
     async (sessionId: string, displayTitle: string) => {
