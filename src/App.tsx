@@ -25,6 +25,7 @@ import { useTabClose } from "./hooks/useTabClose";
 import { useSubmitTurn } from "./hooks/useSubmitTurn";
 import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import { useHarnessEventQueue } from "./hooks/useHarnessEventQueue";
+import { useSessionStreaming } from "./hooks/useSessionStreaming";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -571,21 +572,9 @@ export default function App({
     [flushHarnessEvents],
   );
 
-  const flushSessionLiveText = useCallback(
-    (sessionId: string, session: Session): Session => {
-      const liveTextMap = getAndClearSessionLiveText(sessionId);
-      if (Object.keys(liveTextMap).length === 0) return session;
-      const blocks = session.blocks.map((block) => {
-        const liveText = liveTextMap[block.id];
-        if (liveText && (block.role === "assistant" || block.role === "reasoning") && block.streaming) {
-          return { ...block, text: liveText, streaming: false };
-        }
-        return block;
-      });
-      return { ...session, blocks };
-    },
-    [],
-  );
+  const { flushSessionLiveText } = useSessionStreaming({
+    getAndClearSessionLiveText,
+  });
 
   useEffect(() => {
     if (resumed?.sessions.length) bindResumedSessions(resumed.sessions);
