@@ -23,6 +23,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useProjectTerminal } from "./hooks/useProjectTerminal";
 import { useTabClose } from "./hooks/useTabClose";
 import { useSubmitTurn } from "./hooks/useSubmitTurn";
+import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -207,7 +208,6 @@ import {
 import {
   deleteSession,
   getSession,
-  listSessionsByProject,
   persistFingerprint,
   replaceInFlightSessions,
   saveWorkspaceSnapshot,
@@ -287,7 +287,6 @@ import { openFindInActiveEditor } from "./surfaces/editorSearch";
 import {
   mergeHistorySummary,
   mergeProjectHistorySummary,
-  replaceProjectHistory,
   historyWithLiveSessions,
   summaryFromSession,
 } from "./lib/sessionHistory";
@@ -332,7 +331,6 @@ import {
 import {
   dropOpenFiles,
   filesInWorkspaceTabs,
-  lastUserBlockId,
   openSessionIds,
   providerSignInRequestKey,
   selectedChangeKind,
@@ -562,22 +560,6 @@ export default function App({
   const harnessFlush = useRef<ScheduledFlush | null>(null);
   const skipForgetSessionIds = useRef(new Set<string>());
   const importedSessionsApplied = useRef(false);
-
-  useEffect(() => {
-    if (importedSessionsApplied.current) return;
-    const imported = windowTransfer?.sessions ?? resumed?.sessions;
-    if (!imported?.length) return;
-    importedSessionsApplied.current = true;
-    for (const session of imported) {
-      observedSessions.current.set(session.id, session);
-      lastPersisted.current.set(session.id, persistFingerprint(session));
-      const userId = lastUserBlockId(session);
-      if (userId) lastPersistedUserBlock.current.set(session.id, userId);
-      if (session.providerSessionId) {
-        lastBoundProvider.current.set(session.id, session.providerSessionId);
-      }
-    }
-  }, [windowTransfer, resumed]);
 
   const flushHarnessEvents = useCallback(() => {
     cancelScheduledFlush(harnessFlush.current);
@@ -1058,123 +1040,29 @@ export default function App({
     };
   }, [flushHarnessEvents, readProjectReturnMemory]);
 
-  const refreshHistory = useCallback(async (cwd: string) => {
-    if (!cwd || cwd === "~") return;
-    // `history` holds every visited project's rows and the sidebar filters it
-    // by cwd, so a project loaded once paints from cache on the way back and
-    // revalidates quietly underneath the cards already on screen. Whether the
-    // first load is still pending is derived from `loadedProjects`, not
-    // tracked here — a status set from this effect lands a render too late to
-    // suppress the empty state.
-    const key = normalizeProjectPath(cwd);
-    setHistoryErrorCwd((prev) => (prev === key ? null : prev));
-    try {
-      const rows = await listSessionsByProject(cwd);
-      if (cwd !== sidebarCwdRef.current) return;
-      setHistory((current) => replaceProjectHistory(current, cwd, rows));
-      setLoadedProjects((prev) =>
-        prev.has(key) ? prev : new Set(prev).add(key),
-      );
-    } catch {
-      if (cwd !== sidebarCwdRef.current) return;
-      // A failed revalidate keeps the cached cards rather than replacing a
-      // good list with an error.
-      if (!loadedProjectsRef.current.has(key)) setHistoryErrorCwd(key);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshHistory(sidebarCwd);
-  }, [sidebarCwd, refreshHistory]);
-
-
+  const { refreshHistory, persistSession } = useSessionPersistence({
+    importedSessionsApplied,
+    lastBoundProvider,
+    lastPersisted,
+    lastPersistedUserBlock,
+    loadedProjectsRef,
+    observedSessions,
+    pendingPersist,
+    removingSessionIds,
+    resumed,
+    setHistory,
+    setHistoryErrorCwd,
+    setLoadedProjects,
+    sessions,
+    sidebarCwd,
+    sidebarCwdRef,
+    tabsRef,
+    windowTransfer,
+  });
 
   useEffect(() => {
     prefetchProjectFiles(sidebarCwd);
   }, [sidebarCwd]);
-
-  const persistSession = useCallback((session: Session | undefined) => {
-    if (
-      !session ||
-      !shouldPersistSession(session) ||
-      removingSessionIds.current.has(session.id)
-    )
-      return;
-    const fingerprint = persistFingerprint(session);
-    void upsertSession(session)
-      .then((summary) => {
-        if (!summary) return;
-        lastPersisted.current.set(session.id, fingerprint);
-        if (summary.cwd === sidebarCwdRef.current) {
-          setHistory((current) => mergeProjectHistorySummary(current, summary));
-        }
-      })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    const liveIds = new Set(sessions.map((session) => session.id));
-    const visibleIds = openSessionIds(tabsRef.current);
-    for (const session of sessions) {
-      if (removingSessionIds.current.has(session.id)) continue;
-      if (observedSessions.current.get(session.id) === session) continue;
-      observedSessions.current.set(session.id, session);
-      const parked = !visibleIds.has(session.id);
-      const newlyBound =
-        !!session.providerSessionId &&
-        lastBoundProvider.current.get(session.id) !== session.providerSessionId;
-      const lastUserId = lastUserBlockId(session);
-      const newUserTurn =
-        !!lastUserId &&
-        lastPersistedUserBlock.current.get(session.id) !== lastUserId;
-      if (newlyBound && session.providerSessionId) {
-        lastBoundProvider.current.set(session.id, session.providerSessionId);
-      }
-      if (newUserTurn && lastUserId) {
-        lastPersistedUserBlock.current.set(session.id, lastUserId);
-      }
-      if ((newlyBound || newUserTurn) && shouldPersistSession(session)) {
-        persistSession(session);
-      }
-      if (
-        shouldPersistSession(session) &&
-        (!session.busy ||
-          parked ||
-          newlyBound ||
-          newUserTurn ||
-          !lastPersisted.current.has(session.id))
-      ) {
-        pendingPersist.current.set(session.id, session);
-      }
-    }
-    for (const sessionId of observedSessions.current.keys()) {
-      if (liveIds.has(sessionId)) continue;
-      observedSessions.current.delete(sessionId);
-      pendingPersist.current.delete(sessionId);
-    }
-    if (pendingPersist.current.size === 0) return;
-
-    const timer = window.setTimeout(() => {
-      const dirty = [...pendingPersist.current.values()];
-      pendingPersist.current.clear();
-      void Promise.all(
-        dirty.map(async (session) => {
-          if (removingSessionIds.current.has(session.id)) return;
-          const fingerprint = persistFingerprint(session);
-          if (lastPersisted.current.get(session.id) === fingerprint) return;
-          const summary = await upsertSession(session).catch(() => null);
-          if (!summary) return;
-          lastPersisted.current.set(session.id, fingerprint);
-          if (summary.cwd === sidebarCwdRef.current) {
-            setHistory((current) =>
-              mergeProjectHistorySummary(current, summary),
-            );
-          }
-        }),
-      );
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [persistSession, sessions]);
 
   useEffect(() => {
     const refs = inFlightRefs(sessions, tabs);
