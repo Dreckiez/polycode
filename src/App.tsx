@@ -27,6 +27,7 @@ import { useSubmitTurn } from "./hooks/useSubmitTurn";
 import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import { useHarnessEventQueue } from "./hooks/useHarnessEventQueue";
 import { useSessionStreaming } from "./hooks/useSessionStreaming";
+import { useOpenSettings } from "./hooks/useOpenSettings";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -3333,21 +3334,13 @@ export default function App({
     setNotesViewOpen(false);
   }, []);
 
-  const openSettings = useCallback(
-    (section?: SettingsSectionId) => {
-      setFilePickerOpen(false);
-      setSearchViewOpen(false);
-      setNotesViewOpen(false);
-      if (section) {
-        setSettingsSection(section);
-        saveSettingsSection(section);
-      }
-      setSettingsOpen(true);
-    },
-    [],
-  );
-
-  const onOpenSettings = useCallback(() => openSettings(), [openSettings]);
+  const { onOpenSettings, openSettings } = useOpenSettings({
+    setFilePickerOpen,
+    setSearchViewOpen,
+    setNotesViewOpen,
+    setSettingsSection,
+    setSettingsOpen,
+  });
 
   const onCloseSettings = useCallback(() => {
     setSettingsOpen(false);
