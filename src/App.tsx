@@ -32,6 +32,7 @@ import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import { useTabLayout } from "./hooks/useTabLayout";
+import { useMultiSession } from "./hooks/useMultiSession";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -96,10 +97,7 @@ import { insertTabBesideActive } from "./lib/tabGroups";
 import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { listRunningTerminals } from "./lib/terminalTab";
 import {
-  applyHarnessEvent,
   cancelHarnessTurn,
-  canCompactHarnessContext,
-  compactHarnessContext,
   forgetHarnessSession,
   isLiveHarness,
   probeHarnessAvailability,
@@ -117,13 +115,10 @@ import {
 import { getAndClearSessionLiveText } from "./lib/chatStore";
 import {
   buildDeterministicHandoff,
-  buildHandoffComposerCard,
   completeHandoff,
-  HANDOFF_TITLE,
   isPreparingHandoff,
   planComposerSwitch,
   sessionChildHarnesses,
-  sessionThroughTurn,
 } from "./lib/handoff";
 import { notifyReviewChanged } from "./lib/checkpoint";
 import { nudgeWatchedFiles } from "./lib/fileWatch";
@@ -157,24 +152,18 @@ import {
   workspaceTabCwd,
   focusedWorkspaceTabCwd,
 } from "./lib/workspaceTabGroups";
-import {
-  DEFAULT_PROVIDER_ACCOUNT_ID,
-  selectedProviderAccountId,
-} from "./lib/providerAccounts";
+import { DEFAULT_PROVIDER_ACCOUNT_ID } from "./lib/providerAccounts";
 import {
   supportsHarnessLogin,
   latestTurnNeedsHarnessLogin,
 } from "./lib/harness/auth";
 import type { RateLimitProvider } from "./lib/rateLimits";
 import {
-  HARNESS_TITLE,
   formatSessionTitle,
   sessionNeedsInput,
   newDefaultSession,
   newSession,
-  sessionDisplayTitle,
   sessionWorkCwd,
-  type Block,
   type HarnessId,
   type PlanBuildTarget,
   type RuntimeMode,
@@ -233,15 +222,6 @@ import {
   ADD_NOTE_TO_CHAT_EVENT,
   type NoteComposerCard,
 } from "./lib/notes";
-import {
-  SECOND_OPINION_TITLE,
-  buildSecondOpinionCard,
-  buildSecondOpinionPrompt,
-  harnessForTurn,
-  turnEditedFiles,
-  turnReport,
-  turnUserRequest,
-} from "./lib/secondOpinion";
 import { PaneTree } from "./surfaces/PaneTree";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
 import { SearchView } from "./surfaces/SearchView";
@@ -2307,109 +2287,21 @@ export default function App({
     [onSubmit],
   );
 
-  const openSessionBeside = useCallback(
-    (
-      sourceId: string,
-      session: Session,
-      cwd: string,
-      focusComposer = false,
-    ) => {
-      const nextSessions = [...sessionsRef.current, session];
-      sessionsRef.current = nextSessions;
-      setSessions(nextSessions);
-
-      const tab = tabsRef.current.find((entry) =>
-        leafIds(entry.layout).includes(sourceId),
-      );
-      if (tab) {
-        const nextTabs = tabsRef.current.map((entry) =>
-          entry.id === tab.id
-            ? {
-                ...entry,
-                layout: splitPane(entry.layout, sourceId, "right", session.id),
-                focusedId: session.id,
-                diffFocused: false,
-              }
-            : entry,
-        );
-        tabsRef.current = nextTabs;
-        setTabs(nextTabs);
-        if (tab.id !== activeTabIdRef.current) setActiveTabId(tab.id);
-      } else {
-        const nextTab = newTab(session.id);
-        appendTab(nextTab, cwd);
-        setActiveTabId(nextTab.id);
-      }
-
-      setProjectTerminalFocused(false);
-      setComposerFocused(focusComposer);
-    },
-    [appendTab],
-  );
-
-  const onSecondOpinion = useCallback(
-    (sourceId: string, harness: HarnessId, turn: Block[], model: string) => {
-      const source = sessionsRef.current.find(
-        (session) => session.id === sourceId,
-      );
-      if (!source) return;
-      const cwd = sessionWorkCwd(source);
-      const from = harnessForTurn(source.blocks, turn, source.harness);
-      const userRequest = turnUserRequest(turn);
-      const files = turnEditedFiles(turn, cwd);
-      const prompt = buildSecondOpinionPrompt({
-        from,
-        userRequest,
-        report: turnReport(turn),
-        files,
-      });
-      const session = {
-        ...newSession(harness, cwd, model, source.runtimeMode),
-        title: formatSessionTitle(harness, SECOND_OPINION_TITLE),
-      };
-      openSessionBeside(sourceId, session, cwd);
-      onSubmit(session.id, prompt, [], {
-        secondOpinion: buildSecondOpinionCard({
-          from,
-          to: harness,
-          userRequest,
-          files,
-        }),
-      });
-    },
-    [onSubmit, openSessionBeside],
-  );
-
-  const onHandoff = useCallback(
-    (sourceId: string, harness: HarnessId, turn: Block[], model: string) => {
-      const source = sessionsRef.current.find(
-        (session) => session.id === sourceId,
-      );
-      if (!source) return;
-      const cwd = sessionWorkCwd(source);
-      const from = harnessForTurn(source.blocks, turn, source.harness);
-      const sliced = sessionThroughTurn(source, turn);
-      const userRequest = turnUserRequest(turn);
-      const files = turnEditedFiles(sliced.blocks, cwd);
-      const display = sessionDisplayTitle(source.title, source.harness);
-      const session = {
-        ...newSession(harness, cwd, model, source.runtimeMode),
-        title: formatSessionTitle(
-          harness,
-          display === "New session" ? HANDOFF_TITLE : display,
-        ),
-        handoffCard: buildHandoffComposerCard({
-          from,
-          to: harness,
-          brief: buildDeterministicHandoff(sliced),
-          userRequest,
-          files,
-        }),
-      };
-      openSessionBeside(sourceId, session, cwd, true);
-    },
-    [openSessionBeside],
-  );
+  const { onSecondOpinion, onHandoff, onCompactContext } = useMultiSession({
+    activeTabIdRef,
+    appendTab,
+    enqueueHarnessEvent,
+    flushHarnessEvents,
+    onSubmit,
+    sessionsRef,
+    setActiveTabId,
+    setComposerFocused,
+    setProjectTerminalFocused,
+    setSessions,
+    setTabs,
+    tabsRef,
+    turnGen,
+  });
 
   const autoContinueKey = sessions
     .filter(
@@ -2438,91 +2330,6 @@ export default function App({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [autoContinueKey, onSubmit]);
-
-  const onCompactContext = useCallback(
-    (sessionId: string) => {
-      const current = sessionsRef.current.find(
-        (session) => session.id === sessionId,
-      );
-      if (!current || current.busy) return false;
-      if (!canCompactHarnessContext(current.harness)) {
-        const unsupported = sessionsRef.current.map((session) =>
-          session.id === sessionId
-            ? applyHarnessEvent(session, {
-                type: "status",
-                text: `${HARNESS_TITLE[current.harness]} does not support manual context compaction.`,
-              })
-            : session,
-        );
-        sessionsRef.current = unsupported;
-        syncDockBadge(unsupported);
-        setSessions(unsupported);
-        return true;
-      }
-
-      const gen = (turnGen.current.get(sessionId) ?? 0) + 1;
-      turnGen.current.set(sessionId, gen);
-      const workCwd = sessionWorkCwd(current);
-      const started = sessionsRef.current.map((session) =>
-        session.id === sessionId
-          ? applyHarnessEvent(
-              { ...session, busy: true },
-              { type: "status", text: "Compacting context…" },
-            )
-          : session,
-      );
-      sessionsRef.current = started;
-      syncDockBadge(started);
-      setSessions(started);
-
-      void (async () => {
-        try {
-          await compactHarnessContext({
-            harness: current.harness,
-            sessionId,
-            cwd: workCwd,
-            model: current.model,
-            modelSettings: current.modelSettings,
-            providerAccountId:
-              current.harness === "claude" || current.harness === "codex"
-                ? (current.providerAccountId ??
-                  selectedProviderAccountId(current.harness, current.cwd))
-                : undefined,
-            runtimeMode: current.runtimeMode,
-            onEvent: (event) => {
-              if (turnGen.current.get(sessionId) !== gen) return;
-              enqueueHarnessEvent(sessionId, event);
-            },
-          });
-          if (turnGen.current.get(sessionId) !== gen) return;
-          enqueueHarnessEvent(sessionId, {
-            type: "status",
-            text: "Compacted context",
-          });
-        } catch (error: unknown) {
-          if (turnGen.current.get(sessionId) !== gen) return;
-          enqueueHarnessEvent(sessionId, {
-            type: "session.error",
-            message:
-              error instanceof Error
-                ? error.message
-                : `${current.harness} could not compact this context`,
-          });
-        } finally {
-          if (turnGen.current.get(sessionId) !== gen) return;
-          flushHarnessEvents();
-          const finished = sessionsRef.current.map((session) =>
-            session.id === sessionId ? { ...session, busy: false } : session,
-          );
-          sessionsRef.current = finished;
-          syncDockBadge(finished);
-          setSessions(finished);
-        }
-      })();
-      return true;
-    },
-    [enqueueHarnessEvent, flushHarnessEvents],
-  );
 
   const onStop = useCallback(
     (sessionId: string) => {
