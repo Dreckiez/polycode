@@ -28,6 +28,7 @@ import { useSessionPersistence } from "./hooks/useSessionPersistence";
 import { useHarnessEventQueue } from "./hooks/useHarnessEventQueue";
 import { useSessionStreaming } from "./hooks/useSessionStreaming";
 import { useOpenSettings } from "./hooks/useOpenSettings";
+import { usePaneManagement } from "./hooks/usePaneManagement";
 import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
@@ -64,7 +65,6 @@ import {
   resolveFileOpenRequest,
 } from "./lib/fileIndex";
 import {
-  closeLeaf,
   findSurfacePane,
   focusedFileTab,
   isolateTerminalPanes,
@@ -79,13 +79,11 @@ import {
   openEditorTab,
   replaceLeafId,
   setSplitRatio,
-  splitPane,
   surfacePanes,
   withSurfacePanes,
   type FilePaneTab,
   type FocusDir,
   type PaneEdge,
-  type SplitDir,
   type WorkspaceTab,
 } from "./lib/layout";
 import { releaseNotesForVersion } from "./lib/releaseNotes";
@@ -1175,29 +1173,6 @@ export default function App({
     );
   }, []);
 
-  const onSplit = useCallback(
-    (dir: SplitDir) => {
-      if (!activeTab) return;
-      const session = newDefaultSession(
-        sessionDefaults?.cwd ?? projectCwd,
-        sessionDefaults?.runtimeMode,
-      );
-      setSessions((prev) => [...prev, session]);
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== activeTab.id) return t;
-          return {
-            ...t,
-            layout: splitPane(t.layout, t.focusedId, dir, session.id),
-            focusedId: session.id,
-          };
-        }),
-      );
-      setComposerFocused(true);
-    },
-    [activeTab, projectCwd, sessionDefaults?.cwd, sessionDefaults?.runtimeMode],
-  );
-
   const projectTerminal = useProjectTerminal({
     active,
     activeTab,
@@ -1243,74 +1218,32 @@ export default function App({
     tabsRef,
   });
 
-  const onCloseOtherTabs = useCallback(() => {
-    const current = tabsRef.current;
-    const activeId = activeTabIdRef.current;
-    if (!current.some((tab) => tab.id === activeId)) return;
-    onCloseTabs(
-      current.filter((tab) => tab.id !== activeId).map((tab) => tab.id),
-      activeId,
-    );
-  }, [onCloseTabs]);
-
-  const onClosePane = useCallback(
-    (sessionId?: string) => {
-      // The project terminal is shared by every workspace tab in the project.
-      // Keep the global close command scoped to workspace tabs and panes even
-      // while the dock has focus; terminal tabs have their own close buttons.
-      if (!activeTab) return;
-      const focusedSurface = findSurfacePane(activeTab, activeTab.focusedId);
-      if (sessionId === undefined && focusedSurface) {
-        onCloseFile(focusedSurface.pane.id, focusedSurface.pane.activeFileId);
-        return;
-      }
-      const closingId = sessionId ?? activeTab.focusedId;
-      const ids = leafIds(activeTab.layout);
-      const sessionIds = ids.filter((paneId) =>
-        sessionsRef.current.some((session) => session.id === paneId),
-      );
-      if (!sessionIds.includes(closingId)) return;
-      const nextTab = closeLeaf(activeTab, closingId);
-      if (!nextTab) {
-        const closePlan = planWorkspaceTabClose({
-          tabs: tabsRef.current,
-          sessions: sessionsRef.current,
-          closingTabId: activeTab.id,
-          scope: tabCloseScope,
-        });
-        if (closePlan.action === "keep") onClearTabSession(activeTab.id);
-        else onCloseTab(activeTab.id);
-        return;
-      }
-      persistSession(sessionsRef.current.find((s) => s.id === closingId));
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === activeTab.id
-            ? { ...t, layout: nextTab.layout, focusedId: nextTab.focusedId }
-            : t,
-        ),
-      );
-      if (closingId === activeTab.focusedId) {
-        setComposerFocused(
-          nextTab &&
-            sessionsRef.current.some(
-              (session) => session.id === nextTab.focusedId,
-            ),
-        );
-      }
-      void refreshHistory(sidebarCwd);
-    },
-    [
-      activeTab,
-      onCloseFile,
-      onCloseTab,
-      onClearTabSession,
-      persistSession,
-      refreshHistory,
-      sidebarCwd,
-      tabCloseScope,
-    ],
-  );
+  const {
+    onSplit,
+    onCloseOtherTabs,
+    onClosePane,
+    onFocusPane,
+  } = usePaneManagement({
+    activeTab,
+    activeTabId,
+    activeTabIdRef,
+    tabsRef,
+    sessionsRef,
+    projectCwd,
+    sidebarCwd,
+    tabCloseScope,
+    sessionDefaults,
+    setTabs,
+    setSessions,
+    setComposerFocused,
+    setProjectTerminalFocused,
+    onCloseTab,
+    onCloseTabs,
+    onCloseFile,
+    onClearTabSession,
+    persistSession,
+    refreshHistory,
+  });
 
   const onCloseTitleTab = useCallback(
     (id: string) => {
@@ -1371,23 +1304,6 @@ export default function App({
       if (tab) activateTab(tab.id);
     },
     [activateTab, deckProjectTabs],
-  );
-
-  const onFocusPane = useCallback(
-    (paneId: string) => {
-      setProjectTerminalFocused(false);
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === activeTabId
-            ? { ...t, focusedId: paneId, diffFocused: false }
-            : t,
-        ),
-      );
-      setComposerFocused(
-        sessionsRef.current.some((session) => session.id === paneId),
-      );
-    },
-    [activeTabId],
   );
 
   const onOpenWorkingTreeDiff = useCallback(
