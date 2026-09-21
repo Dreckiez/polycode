@@ -34,6 +34,7 @@ import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import { useTabLayout } from "./hooks/useTabLayout";
 import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
+import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -167,11 +168,6 @@ import {
   type Session,
 } from "./lib/session";
 
-import {
-  canDispatchQueuedHead,
-  dequeueQueuedMessage,
-  queuedMessageForSubmit,
-} from "./lib/messageQueue";
 import {
   getSession,
   persistFingerprint,
@@ -2066,154 +2062,19 @@ export default function App({
     [onSubmit],
   );
 
-  useEffect(() => {
-    const timers: number[] = [];
-    const scheduled = new Set<string>();
-    for (const session of sessions) {
-      const queued = session.queuedMessages ?? [];
-      if (session.busy || queued.length === 0) continue;
-
-      if (session.queueStatus === "resuming") {
-        setSessions((prev) =>
-          prev.map((entry) =>
-            entry.id === session.id
-              ? { ...entry, queueStatus: "active" }
-              : entry,
-          ),
-        );
-        continue;
-      }
-      if (
-        !canDispatchQueuedHead(session) ||
-        queueDispatchingRef.current.has(session.id)
-      ) {
-        continue;
-      }
-
-      const next = queued[0];
-      if (!next) continue;
-      queueDispatchingRef.current.add(session.id);
-      scheduled.add(session.id);
-      timers.push(
-        window.setTimeout(() => {
-          queueDispatchingRef.current.delete(session.id);
-          const latest = sessionsRef.current.find(
-            (entry) => entry.id === session.id,
-          );
-          const head = latest?.queuedMessages?.[0];
-          if (
-            !latest ||
-            !head ||
-            head.id !== next.id ||
-            !canDispatchQueuedHead(latest)
-          ) {
-            return;
-          }
-          onSubmit(session.id, head.text, head.attachments, {
-            queuedMessageId: head.id,
-            noteCard: head.noteCard,
-            handoffCard: head.handoffCard,
-            intent: head.intent,
-          });
-        }, 0),
-      );
-    }
-    return () => {
-      for (const timer of timers) window.clearTimeout(timer);
-      for (const id of scheduled) queueDispatchingRef.current.delete(id);
-    };
-  }, [onSubmit, sessions]);
-
-  const onDeleteQueuedMessage = useCallback(
-    (sessionId: string, messageId: string) => {
-      setSessions((prev) =>
-        prev.map((session) =>
-          session.id === sessionId
-            ? dequeueQueuedMessage(session, messageId)
-            : session,
-        ),
-      );
-    },
-    [],
-  );
-
-  const onQueuedMessageEditingChange = useCallback(
-    (sessionId: string, messageId?: string) => {
-      setSessions((prev) =>
-        prev.map((session) =>
-          session.id === sessionId
-            ? { ...session, editingQueuedMessageId: messageId }
-            : session,
-        ),
-      );
-    },
-    [],
-  );
-
-  const onEditQueuedMessage = useCallback(
-    (sessionId: string, messageId: string, text: string) => {
-      setSessions((prev) =>
-        prev.map((session) =>
-          session.id === sessionId
-            ? {
-                ...session,
-                queuedMessages: session.queuedMessages?.map((message) =>
-                  message.id === messageId ? { ...message, text } : message,
-                ),
-                editingQueuedMessageId: undefined,
-              }
-            : session,
-        ),
-      );
-    },
-    [],
-  );
-
-  const onSteerQueuedMessage = useCallback(
-    (sessionId: string, messageId: string) => {
-      const session = sessionsRef.current.find(
-        (entry) => entry.id === sessionId,
-      );
-      const message = session
-        ? queuedMessageForSubmit(session, messageId, "steer")
-        : undefined;
-      if (!session || !message) return;
-      onSubmit(sessionId, message.text, message.attachments, {
-        followUpBehavior: "steer",
-        queuedMessageId: message.id,
-        noteCard: message.noteCard,
-        handoffCard: message.handoffCard,
-      });
-    },
-    [onSubmit],
-  );
-
-  const onResumeQueue = useCallback(
-    (sessionId: string) => {
-      const session = sessionsRef.current.find(
-        (entry) => entry.id === sessionId,
-      );
-      if (
-        !session ||
-        session.busy ||
-        session.queueStatus !== "paused" ||
-        !session.queuedMessages?.length
-      ) {
-        return;
-      }
-      setSessions((prev) =>
-        prev.map((entry) =>
-          entry.id === sessionId
-            ? { ...entry, queueStatus: "resuming" }
-            : entry,
-        ),
-      );
-      onSubmit(sessionId, CONTINUE_PROMPT, [], {
-        followUpBehavior: "steer",
-      });
-    },
-    [onSubmit],
-  );
+  const {
+    onDeleteQueuedMessage,
+    onQueuedMessageEditingChange,
+    onEditQueuedMessage,
+    onSteerQueuedMessage,
+    onResumeQueue,
+  } = useRunCheckCommand({
+    queueDispatchingRef,
+    sessions,
+    sessionsRef,
+    setSessions,
+    onSubmit,
+  });
 
   const { onSecondOpinion, onHandoff, onCompactContext } = useMultiSession({
     activeTabIdRef,
