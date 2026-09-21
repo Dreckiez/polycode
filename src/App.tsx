@@ -33,6 +33,7 @@ import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import { useTabLayout } from "./hooks/useTabLayout";
 import { useMultiSession } from "./hooks/useMultiSession";
+import { useModelSettings } from "./hooks/useModelSettings";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -117,7 +118,6 @@ import {
   buildDeterministicHandoff,
   completeHandoff,
   isPreparingHandoff,
-  planComposerSwitch,
   sessionChildHarnesses,
 } from "./lib/handoff";
 import { notifyReviewChanged } from "./lib/checkpoint";
@@ -125,10 +125,8 @@ import { nudgeWatchedFiles } from "./lib/fileWatch";
 import { type EditorNavigationTarget, type OpenFileFn } from "./lib/search";
 import {
   mergeModelSettings,
-  preferredModelSettings,
   resolveModel,
   saveLastModelSettings,
-  saveRecentModelChoice,
 } from "./lib/models";
 import { planTitle } from "./lib/plan";
 import {
@@ -166,7 +164,6 @@ import {
   sessionWorkCwd,
   type HarnessId,
   type PlanBuildTarget,
-  type RuntimeMode,
   type Session,
 } from "./lib/session";
 
@@ -287,7 +284,6 @@ import {
   nudgeWorkspace,
   sameSettings,
   setsEqual,
-  withHarnessChoice,
 } from "./lib/appSession";
 
 // Register capabilities before composer hooks choose their discovery strategy.
@@ -1991,76 +1987,8 @@ export default function App({
     setComposerFocused(false);
   }, []);
 
-  const onModelChange = useCallback(
-    (sessionId: string, harness: HarnessId, model: string) => {
-      const current = sessionsRef.current.find((s) => s.id === sessionId);
-      if (!current) return;
-      if (isPreparingHandoff(current)) return;
-      const resolved = resolveModel(harness, model);
-      saveRecentModelChoice(resolved.harness, resolved.id);
-      if (current.modelSettings) {
-        saveLastModelSettings(current.modelSettings, "fill");
-      }
-      const modelSettings = preferredModelSettings(
-        resolved,
-        current.modelSettings,
-      );
-      const plan = planComposerSwitch(current, harness);
-      if (plan.kind === "empty") {
-        void forgetHarnessSession(plan.forget, sessionId);
-      }
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== sessionId) return s;
-          const next = withHarnessChoice(
-            s,
-            harness,
-            resolved.id,
-            modelSettings,
-          );
-          if (plan.kind === "arm") {
-            return { ...next, pendingSwitch: plan.pending };
-          }
-          if (plan.kind === "revert") {
-            return {
-              ...next,
-              pendingSwitch: undefined,
-              ...(plan.restoreProviderSessionId
-                ? { providerSessionId: plan.restoreProviderSessionId }
-                : { providerSessionId: undefined }),
-              ...(plan.restoreProviderAccountId
-                ? { providerAccountId: plan.restoreProviderAccountId }
-                : { providerAccountId: undefined }),
-            };
-          }
-          if (plan.kind === "empty") {
-            return { ...next, pendingSwitch: undefined };
-          }
-          return next;
-        }),
-      );
-    },
-    [],
-  );
-
-  const onModelSettingsChange = useCallback(
-    (sessionId: string, modelSettings: Record<string, string>) => {
-      saveLastModelSettings(modelSettings);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, modelSettings } : s)),
-      );
-    },
-    [],
-  );
-
-  const onRuntimeModeChange = useCallback(
-    (sessionId: string, runtimeMode: RuntimeMode) => {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, runtimeMode } : s)),
-      );
-    },
-    [],
-  );
+  const { onModelChange, onModelSettingsChange, onRuntimeModeChange } =
+    useModelSettings({ sessionsRef, setSessions });
 
   const { onSubmit } = useSubmitTurn({
     activeSessionIdRef,
