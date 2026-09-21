@@ -39,6 +39,7 @@ import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
 import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
 import { useFileTracking } from "./hooks/useFileTracking";
+import { useStopEscape } from "./hooks/useStopEscape";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -102,20 +103,13 @@ import {
   respondHarnessQuestion,
   keepHarnessQuestionOpen,
   startHarnessBridge,
-  stopStreaming,
   pickTextHarness,
   type ApprovalDecision,
   type UserQuestionReply,
 } from "./lib/harness";
 import { getAndClearSessionLiveText } from "./lib/chatStore";
-import {
-  buildDeterministicHandoff,
-  completeHandoff,
-  isPreparingHandoff,
-  sessionChildHarnesses,
-} from "./lib/handoff";
+import { sessionChildHarnesses } from "./lib/handoff";
 import { notifyReviewChanged } from "./lib/checkpoint";
-import { nudgeWatchedFiles } from "./lib/fileWatch";
 import { type EditorNavigationTarget } from "./lib/search";
 import {
   mergeModelSettings,
@@ -175,12 +169,7 @@ import {
 } from "./lib/notifications";
 import { useInputNotifications } from "./hooks/useInputNotifications";
 import { archiveFocusedSession } from "./lib/archiveShortcut";
-import {
-  adjacentItemId,
-  deferUnhandledEscape,
-  focusedBusyAgentSessionId,
-  shouldStopFocusedTurnOnEscape,
-} from "./lib/tabKeys";
+import { adjacentItemId } from "./lib/tabKeys";
 import {
   canTabVisitBack,
   canTabVisitForward,
@@ -261,11 +250,7 @@ import {
   titleTabsEqual,
   toTitleTab,
 } from "./lib/appTabs";
-import {
-  nudgeWorkspace,
-  sameSettings,
-  setsEqual,
-} from "./lib/appSession";
+import { sameSettings, setsEqual } from "./lib/appSession";
 
 // Register capabilities before composer hooks choose their discovery strategy.
 registerBuiltinHarnesses();
@@ -1863,85 +1848,16 @@ export default function App({
     return () => window.clearTimeout(timer);
   }, [autoContinueKey, onSubmit]);
 
-  const onStop = useCallback(
-    (sessionId: string) => {
-      const session = sessionsRef.current.find((s) => s.id === sessionId);
-      turnGen.current.set(sessionId, (turnGen.current.get(sessionId) ?? 0) + 1);
-      flushHarnessEvents();
-      if (session) {
-        for (const id of sessionChildHarnesses(session)) {
-          void cancelHarnessTurn(id, sessionId);
-        }
-      }
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== sessionId) return s;
-          const withLiveText = flushSessionLiveText(s.id, s);
-          const stopped = stopStreaming(withLiveText);
-          const completed = isPreparingHandoff(stopped)
-            ? completeHandoff(stopped, buildDeterministicHandoff(stopped))
-            : stopped;
-          return completed.queuedMessages?.length
-            ? { ...completed, queueStatus: "paused" }
-            : completed;
-        }),
-      );
-      if (session) {
-        notifyReviewChanged(sessionId);
-        nudgeWorkspace(sessionWorkCwd(session));
-        notifyGitChanged();
-        nudgeWatchedFiles();
-        window.setTimeout(() => nudgeWatchedFiles(), 150);
-      } else {
-        notifyReviewChanged(sessionId);
-      }
-    },
-    [flushHarnessEvents],
-  );
-
-  useEffect(() => {
-    const onEscape = (event: KeyboardEvent) => {
-      const target = event.target instanceof Element ? event.target : null;
-      const inTerminal = Boolean(target?.closest(".monocode-terminal"));
-      const activeTabId = activeTabIdRef.current;
-      const sessionId = focusedBusyAgentSessionId(
-        activeTabId,
-        tabsRef.current,
-        sessionsRef.current,
-        projectTerminalFocusedRef.current,
-      );
-      if (
-        !sessionId ||
-        !shouldStopFocusedTurnOnEscape(event, {
-          inTerminal,
-          focusedSessionBusy: true,
-        })
-      ) {
-        return;
-      }
-
-      // Other surfaces (drag/reorder included) can claim Escape later in the
-      // same keydown dispatch. Defer the destructive stop until every handler
-      // has had a chance to preventDefault, then verify focus did not move.
-      deferUnhandledEscape(event, () => {
-        const stillFocusedSessionId = focusedBusyAgentSessionId(
-          activeTabIdRef.current,
-          tabsRef.current,
-          sessionsRef.current,
-          projectTerminalFocusedRef.current,
-        );
-        if (
-          activeTabIdRef.current !== activeTabId ||
-          stillFocusedSessionId !== sessionId
-        ) {
-          return;
-        }
-        onStop(sessionId);
-      });
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [onStop]);
+  const { onStop } = useStopEscape({
+    sessionsRef,
+    turnGen,
+    flushHarnessEvents,
+    setSessions,
+    flushSessionLiveText,
+    activeTabIdRef,
+    tabsRef,
+    projectTerminalFocusedRef,
+  });
 
   const onApproval = useCallback(
     (sessionId: string, requestId: number, decision: ApprovalDecision) => {
