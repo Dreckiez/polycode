@@ -31,6 +31,7 @@ import { useOpenSettings } from "./hooks/useOpenSettings";
 import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
+import { useTabLayout } from "./hooks/useTabLayout";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -58,7 +59,6 @@ import {
   prefetchProjectFiles,
   rememberOpenedFile,
   resolveFileOpenRequest,
-  resolveOpenablePath,
 } from "./lib/fileIndex";
 import {
   closeLeaf,
@@ -67,7 +67,6 @@ import {
   isolateTerminalPanes,
   isFilesystemTab,
   leafIds,
-  movePane,
   neighborLeafId,
   newFileTab,
   newPlanTab,
@@ -75,7 +74,6 @@ import {
   openChangesTab,
   openCommitTab,
   openEditorTab,
-  openSessionChangesTab,
   replaceLeafId,
   setSplitRatio,
   splitPane,
@@ -88,16 +86,13 @@ import {
   type WorkspaceTab,
 } from "./lib/layout";
 import { releaseNotesForVersion } from "./lib/releaseNotes";
-import { mergeOrderedSubset, orderByIds } from "./lib/reorder";
+import { orderByIds } from "./lib/reorder";
 import {
   applyDockGridStyle,
   findProjectTerminal,
   type ProjectTerminalDock as ProjectTerminal,
 } from "./lib/projectTerminal";
-import {
-  applyGroupedReorder,
-  insertTabBesideActive,
-} from "./lib/tabGroups";
+import { insertTabBesideActive } from "./lib/tabGroups";
 import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { listRunningTerminals } from "./lib/terminalTab";
 import {
@@ -224,8 +219,6 @@ import {
   emptyTabVisitHistory,
   pruneTabVisitHistory,
   recordTabVisit,
-  tabVisitBack,
-  tabVisitForward,
   type TabVisitHistory,
 } from "./lib/tabVisitHistory";
 import { warmNativeSkills } from "./lib/skills";
@@ -257,7 +250,6 @@ import { NotesView } from "./surfaces/NotesView";
 import {
   loadLiveAgentsEnabled,
   loadNotesEnabled,
-  loadDiffViewer,
   loadSettingsSection,
   saveSettingsSection,
   subscribeLiveAgentsEnabled,
@@ -1373,50 +1365,30 @@ export default function App({
     return filterTabsForProject(tabs, sessions, projectCwd);
   }, [activeTabId, tabs, sessions, projectCwd]);
 
-  const onNext = useCallback(() => {
-    const index = deckProjectTabs.findIndex((t) => t.id === activeTabId);
-    if (index >= 0)
-      activateTab(deckProjectTabs[(index + 1) % deckProjectTabs.length].id);
-  }, [activateTab, activeTabId, deckProjectTabs]);
-
-  const onPrev = useCallback(() => {
-    const index = deckProjectTabs.findIndex((t) => t.id === activeTabId);
-    if (index >= 0) {
-      activateTab(
-        deckProjectTabs[
-          (index - 1 + deckProjectTabs.length) % deckProjectTabs.length
-        ].id,
-      );
-    }
-  }, [activateTab, activeTabId, deckProjectTabs]);
-
-  const onVisitBack = useCallback(() => {
-    const openIds = new Set(tabsRef.current.map((tab) => tab.id));
-    const pruned = pruneTabVisitHistory(
-      tabVisitRef.current,
-      openIds,
-      activeTabIdRef.current,
-    );
-    const next = tabVisitBack(pruned);
-    if (!next || !openIds.has(next.current)) return;
-    tabVisitFromHistoryRef.current = true;
-    commitTabVisit(next);
-    activateTab(next.current);
-  }, [activateTab, commitTabVisit]);
-
-  const onVisitForward = useCallback(() => {
-    const openIds = new Set(tabsRef.current.map((tab) => tab.id));
-    const pruned = pruneTabVisitHistory(
-      tabVisitRef.current,
-      openIds,
-      activeTabIdRef.current,
-    );
-    const next = tabVisitForward(pruned);
-    if (!next || !openIds.has(next.current)) return;
-    tabVisitFromHistoryRef.current = true;
-    commitTabVisit(next);
-    activateTab(next.current);
-  }, [activateTab, commitTabVisit]);
+  const {
+    onNext,
+    onPrev,
+    onVisitBack,
+    onVisitForward,
+    onOpenDiff,
+    onReorderTabs,
+    onMovePane,
+  } = useTabLayout({
+    deckProjectTabs,
+    activeTabId,
+    activeTabIdRef,
+    tabsRef,
+    tabVisitRef,
+    tabVisitFromHistoryRef,
+    gitCwdRef,
+    sidebarCwdRef,
+    activateTab,
+    commitTabVisit,
+    projectOfTab,
+    setTabs,
+    setSidebarTab,
+    setComposerFocused,
+  });
 
   const onActivate = useCallback(
     (slot: number) => {
@@ -1442,51 +1414,6 @@ export default function App({
       setComposerFocused(
         sessionsRef.current.some((session) => session.id === paneId),
       );
-    },
-    [activeTabId],
-  );
-
-  const onOpenDiff = useCallback(
-    (
-      path?: string,
-      session?: { sessionId: string; cwd: string },
-      changeKind?: GitFileDiffKind,
-    ) => {
-      void (async () => {
-        const diffCwd = session?.cwd ?? gitCwdRef.current;
-        const resolved = path
-          ? ((await resolveOpenablePath(diffCwd, path)) ?? path)
-          : undefined;
-        if (resolved) rememberOpenedFile(diffCwd, resolved);
-        setTabs((prev) =>
-          prev.map((tab) => {
-            if (tab.id !== activeTabId) return tab;
-            if (session) {
-              return openSessionChangesTab(
-                tab,
-                session.cwd,
-                session.sessionId,
-                resolved,
-              );
-            }
-            if (loadDiffViewer() === "unified") {
-              return openChangesTab(
-                tab,
-                sidebarCwdRef.current,
-                resolved,
-                changeKind,
-              );
-            }
-            if (!resolved) return tab;
-            return openEditorTab(
-              tab,
-              newFileTab(resolved, sidebarCwdRef.current, true, changeKind),
-            );
-          }),
-        );
-        setSidebarTab("changes");
-        setComposerFocused(false);
-      })();
     },
     [activeTabId],
   );
@@ -1534,26 +1461,6 @@ export default function App({
     onShowSourceControl();
   }, [onShowSourceControl]);
 
-  const onReorderTabs = useCallback(
-    (ids: string[], movedId?: string) => {
-      setTabs((prev) => {
-        const visibleIds = new Set(ids);
-        const visibleTabs = prev.filter((tab) => visibleIds.has(tab.id));
-        if (movedId) {
-          const reordered = applyGroupedReorder(
-            visibleTabs,
-            ids,
-            movedId,
-            projectOfTab,
-          );
-          return reordered ? mergeOrderedSubset(prev, reordered) : prev;
-        }
-        return mergeOrderedSubset(prev, orderByIds(visibleTabs, ids));
-      });
-    },
-    [projectOfTab],
-  );
-
   const onReorderFiles = useCallback((paneId: string, ids: string[]) => {
     setTabs((prev) =>
       prev.map((tab) => {
@@ -1571,23 +1478,6 @@ export default function App({
       }),
     );
   }, []);
-
-  const onMovePane = useCallback(
-    (fromId: string, toId: string, edge: PaneEdge) => {
-      setTabs((prev) =>
-        prev.map((tab) => {
-          return leafIds(tab.layout).includes(fromId)
-            ? {
-                ...tab,
-                layout: movePane(tab.layout, fromId, toId, edge),
-                focusedId: fromId,
-              }
-            : tab;
-        }),
-      );
-    },
-    [],
-  );
 
   const focusOpenSession = useCallback((sessionId: string) => {
     const tab = tabsRef.current.find((entry) =>
