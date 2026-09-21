@@ -30,6 +30,7 @@ import { useSessionStreaming } from "./hooks/useSessionStreaming";
 import { useOpenSettings } from "./hooks/useOpenSettings";
 import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
+import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -96,8 +97,6 @@ import {
 import {
   applyGroupedReorder,
   insertTabBesideActive,
-  removeTabFromGroup,
-  tabGroupProject,
 } from "./lib/tabGroups";
 import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { listRunningTerminals } from "./lib/terminalTab";
@@ -131,10 +130,7 @@ import {
   sessionChildHarnesses,
   sessionThroughTurn,
 } from "./lib/handoff";
-import {
-  keepSessionChanges,
-  notifyReviewChanged,
-} from "./lib/checkpoint";
+import { notifyReviewChanged } from "./lib/checkpoint";
 import { nudgeWatchedFiles } from "./lib/fileWatch";
 import { type EditorNavigationTarget, type OpenFileFn } from "./lib/search";
 import {
@@ -150,10 +146,7 @@ import {
   projectName,
   rebasePath,
 } from "./lib/paths";
-import { removeProjectData } from "./lib/projectData";
 import {
-  archiveProject,
-  forgetProject,
   lastProjectPath,
   loadRecents,
   looksLikeProject,
@@ -286,7 +279,6 @@ import {
 } from "./lib/inFlight";
 import {
   isBlankSession,
-  planProjectReturn,
   reconcileProjectReturn,
   type ProjectReturnMemory,
 } from "./lib/projectReturn";
@@ -1907,79 +1899,32 @@ export default function App({
     [],
   );
 
-  const onCwdChange = useCallback(
-    (sessionId: string, cwd: string) => {
-      const normalized = normalizeProjectPath(cwd);
-      const current = sessionsRef.current.find((s) => s.id === sessionId);
-      const previous = current?.cwd;
-      // Threads stay bound to their project. Switching from the composer opens a
-      // new tab instead of retargeting the conversation.
-      if (
-        current &&
-        previous &&
-        looksLikeProject(previous) &&
-        !sameProjectPath(previous, normalized) &&
-        !isBlankSession(current)
-      ) {
-        setProjectCwd(normalized);
-        setRecents(rememberProject(normalized));
-        const session = newSession(
-          current.harness,
-          normalized,
-          current.model,
-          current.runtimeMode,
-          current.modelSettings,
-        );
-        const tab = newTab(session.id);
-        setSessions((prev) => [...prev, session]);
-        appendTab(tab, normalized);
-        setActiveTabId(tab.id);
-        setComposerFocused(true);
-        return;
-      }
-      if (
-        previous &&
-        !sameProjectPath(previous, normalized) &&
-        previous !== "~"
-      ) {
-        void keepSessionChanges(sessionId, previous).catch(() => undefined);
-      }
-      setProjectCwd(normalized);
-      setRecents(rememberProject(normalized));
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId
-            ? {
-                ...s,
-                cwd: normalized,
-                branch: undefined,
-                worktreeCwd: undefined,
-              }
-            : s,
-        ),
-      );
-      // The session's project just moved in place; a group only holds tabs that
-      // share one project, so drop this tab out if it no longer matches.
-      setTabs((prev) => {
-        const tab = prev.find((t) => leafIds(t.layout).includes(sessionId));
-        // The tab's visible project follows its focused pane; a background
-        // pane changing project doesn't change what the group check should see.
-        if (!tab?.groupId || tab.focusedId !== sessionId) return prev;
-        const newProject = projectName(normalized);
-        const othersProject = tabGroupProject(
-          prev.filter((t) => t.id !== tab.id),
-          tab.groupId,
-          projectOfTab,
-        );
-        if (othersProject && newProject && othersProject !== newProject) {
-          return removeTabFromGroup(prev, tab.id);
-        }
-        return prev;
-      });
-      notifyReviewChanged(sessionId);
-    },
-    [appendTab, projectOfTab],
-  );
+  const { onCwdChange, onSelectProject, onRemoveProject } =
+    useProjectNavigation({
+      activeTabId,
+      activeTabIdRef,
+      appendTab,
+      activateTab,
+      lastPersisted,
+      pendingPersist,
+      persistSession,
+      projectCwdRef,
+      projectOfTab,
+      readProjectReturnMemory,
+      sessionsRef,
+      setActiveTabId,
+      setComposerFocused,
+      setDirtyFiles,
+      setNotesViewOpen,
+      setProjectCwd,
+      setProjectTerminals,
+      setRecents,
+      setSearchViewOpen,
+      setSessions,
+      setTabs,
+      tabsRef,
+      turnGen,
+    });
 
   const onBranchChange = useCallback(
     (sessionId: string) => {
@@ -2000,68 +1945,6 @@ export default function App({
       notifyReviewChanged(sessionId);
     },
     [persistSession],
-  );
-
-  const onSelectProject = useCallback(
-    (path: string) => {
-      setSearchViewOpen(false);
-      setNotesViewOpen(false);
-      const normalized = normalizeProjectPath(path);
-      if (!looksLikeProject(normalized)) return;
-
-      const activeWorkspace = tabsRef.current.find(
-        (entry) => entry.id === activeTabIdRef.current,
-      );
-      const current = activeWorkspace
-        ? sessionsRef.current.find(
-            (session) => session.id === activeWorkspace.focusedId,
-          )
-        : undefined;
-      const decision = planProjectReturn({
-        memory: readProjectReturnMemory(),
-        tabs: tabsRef.current,
-        sessions: sessionsRef.current,
-        activeTabId: activeTabIdRef.current,
-        projectPath: normalized,
-      });
-      switch (decision.action) {
-        case "keep":
-          setProjectCwd(normalized);
-          setRecents(rememberProject(normalized));
-          return;
-        case "reuse-blank":
-          onCwdChange(decision.sessionId, normalized);
-          return;
-        case "activate":
-          setProjectCwd(normalized);
-          setRecents(rememberProject(normalized));
-          activateTab(decision.tabId, decision.paneId);
-          return;
-        case "create":
-          break;
-        default: {
-          const exhaustive: never = decision;
-          return exhaustive;
-        }
-      }
-
-      const seed = current ?? sessionsRef.current[0];
-      const session = newSession(
-        seed?.harness ?? "claude",
-        normalized,
-        seed?.model,
-        seed?.runtimeMode,
-        seed?.modelSettings,
-      );
-      const tab = newTab(session.id);
-      setProjectCwd(normalized);
-      setRecents(rememberProject(normalized));
-      setSessions((prev) => [...prev, session]);
-      appendTab(tab, normalized);
-      setActiveTabId(tab.id);
-      setComposerFocused(true);
-    },
-    [activateTab, appendTab, onCwdChange, readProjectReturnMemory],
   );
 
   const pickProject = useCallback(async () => {
@@ -2088,111 +1971,6 @@ export default function App({
       );
     },
     [],
-  );
-
-  const onRemoveProject = useCallback(
-    (path: string, options: { purgeData: boolean }) => {
-      const normalized = normalizeProjectPath(path);
-      const wasCurrent = sameProjectPath(projectCwdRef.current, normalized);
-      const remaining = options.purgeData
-        ? forgetProject(normalized)
-        : archiveProject(normalized);
-      setRecents(remaining);
-
-      const tabs = tabsRef.current;
-      const sessions = sessionsRef.current;
-      const projectTabs = filterTabsForProject(tabs, sessions, normalized);
-      const projectTabIds = new Set(projectTabs.map((tab) => tab.id));
-      const projectSessions = sessions.filter((session) =>
-        sameProjectPath(session.cwd, normalized),
-      );
-      const projectSessionIds = new Set(
-        projectSessions.map((session) => session.id),
-      );
-
-      if (options.purgeData) {
-        for (const session of projectSessions) {
-          pendingPersist.current.delete(session.id);
-          if (session.busy) {
-            turnGen.current.set(
-              session.id,
-              (turnGen.current.get(session.id) ?? 0) + 1,
-            );
-            for (const id of sessionChildHarnesses(session)) {
-              void cancelHarnessTurn(id, session.id);
-            }
-          }
-          for (const id of sessionChildHarnesses(session)) {
-            void forgetHarnessSession(id, session.id);
-          }
-          lastPersisted.current.delete(session.id);
-        }
-        void removeProjectData(normalized);
-      } else {
-        for (const session of projectSessions) {
-          if (session.busy) continue;
-          persistSession(session);
-          pendingPersist.current.delete(session.id);
-          for (const id of sessionChildHarnesses(session)) {
-            void forgetHarnessSession(id, session.id);
-          }
-        }
-      }
-
-      let nextTabs = tabs.filter((tab) => !projectTabIds.has(tab.id));
-      let nextSessions = sessions.filter((session) => {
-        if (!projectSessionIds.has(session.id)) return true;
-        return !options.purgeData && session.busy;
-      });
-      let nextActiveTabId = activeTabIdRef.current;
-
-      if (nextTabs.length === 0) {
-        const fallback = nextSessions[0];
-        const session = newDefaultSession("~", fallback?.runtimeMode);
-        const tab = newTab(session.id);
-        nextSessions = [...nextSessions, session];
-        nextTabs = [tab];
-        nextActiveTabId = tab.id;
-      } else if (projectTabIds.has(nextActiveTabId)) {
-        nextActiveTabId = nextTabs[0]?.id ?? nextActiveTabId;
-      }
-
-      sessionsRef.current = nextSessions;
-      tabsRef.current = nextTabs;
-      activeTabIdRef.current = nextActiveTabId;
-      setSessions(nextSessions);
-      setTabs(nextTabs);
-      if (nextActiveTabId !== activeTabId) {
-        setActiveTabId(nextActiveTabId);
-      }
-      setDirtyFiles((prev) => {
-        const updated = new Set(prev);
-        for (const tab of projectTabs) {
-          for (const file of [
-            ...tab.editorPanes.flatMap((pane) => pane.files),
-            ...(tab.terminalPanes ?? []).flatMap((pane) => pane.files),
-          ]) {
-            updated.delete(file.id);
-          }
-        }
-        return updated;
-      });
-      setProjectTerminals((prev) =>
-        prev.filter((dock) => !sameProjectPath(dock.projectPath, normalized)),
-      );
-
-      if (wasCurrent) {
-        const next = remaining.find((item) => looksLikeProject(item.path));
-        if (next) {
-          onSelectProject(next.path);
-          setProjectCwd(next.path);
-        } else {
-          setProjectCwd("~");
-          setComposerFocused(true);
-        }
-      }
-    },
-    [activeTabId, onSelectProject, persistSession],
   );
 
   const onRestoreProject = useCallback(
