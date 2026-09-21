@@ -38,6 +38,7 @@ import { usePlaceSessionOnPane } from "./hooks/usePlaceSessionOnPane";
 import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
 import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
+import { useApprovalHandlers } from "./hooks/useApprovalHandlers";
 import { useFileTracking } from "./hooks/useFileTracking";
 import { useStopEscape } from "./hooks/useStopEscape";
 import {
@@ -99,13 +100,8 @@ import {
   probeHarnessAvailability,
   refreshHarnessCatalogs,
   registerBuiltinHarnesses,
-  respondHarnessApproval,
-  respondHarnessQuestion,
-  keepHarnessQuestionOpen,
   startHarnessBridge,
   pickTextHarness,
-  type ApprovalDecision,
-  type UserQuestionReply,
 } from "./lib/harness";
 import { getAndClearSessionLiveText } from "./lib/chatStore";
 import { sessionChildHarnesses } from "./lib/handoff";
@@ -1859,31 +1855,10 @@ export default function App({
     projectTerminalFocusedRef,
   });
 
-  const onApproval = useCallback(
-    (sessionId: string, requestId: number, decision: ApprovalDecision) => {
-      const session = sessionsRef.current.find((s) => s.id === sessionId);
-      if (!session) return;
-      respondHarnessApproval(session.harness, sessionId, requestId, decision);
-    },
-    [],
-  );
-
-  const onQuestionReply = useCallback(
-    (sessionId: string, requestId: number, reply: UserQuestionReply) => {
-      const session = sessionsRef.current.find((s) => s.id === sessionId);
-      if (!session) return;
-      respondHarnessQuestion(session.harness, sessionId, requestId, reply);
-    },
-    [],
-  );
-
-  const onQuestionInteraction = useCallback(
-    (sessionId: string, requestId: number) => {
-      const session = sessionsRef.current.find((s) => s.id === sessionId);
-      if (session) keepHarnessQuestionOpen(session.harness, sessionId, requestId);
-    },
-    [],
-  );
+  const { onApproval, onQuestionReply, onQuestionInteraction } =
+    useApprovalHandlers({
+      sessionsRef,
+    });
 
   const onOpenApprovalSession = useCallback(
     (sessionId: string) => {
