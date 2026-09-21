@@ -33,6 +33,7 @@ import { useDismissUpdate } from "./hooks/useDismissUpdate";
 import { useSessionLifecycle } from "./hooks/useSessionLifecycle";
 import { useProjectNavigation } from "./hooks/useProjectNavigation";
 import { useTabLayout } from "./hooks/useTabLayout";
+import { useTabIteration } from "./hooks/useTabIteration";
 import { useMultiSession } from "./hooks/useMultiSession";
 import { useModelSettings } from "./hooks/useModelSettings";
 import { useRunCheckCommand } from "./hooks/useRunCheckCommand";
@@ -93,7 +94,6 @@ import {
   findProjectTerminal,
   type ProjectTerminalDock as ProjectTerminal,
 } from "./lib/projectTerminal";
-import { insertTabBesideActive } from "./lib/tabGroups";
 import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { listRunningTerminals } from "./lib/terminalTab";
 import {
@@ -154,12 +154,10 @@ import {
   supportsHarnessLogin,
   latestTurnNeedsHarnessLogin,
 } from "./lib/harness/auth";
-import type { RateLimitProvider } from "./lib/rateLimits";
 import {
   formatSessionTitle,
   sessionNeedsInput,
   newDefaultSession,
-  newSession,
   sessionWorkCwd,
   type HarnessId,
   type PlanBuildTarget,
@@ -1043,59 +1041,15 @@ export default function App({
     commitTabVisit(pruneTabVisitHistory(next, openIds, activeTabId));
   }, [activeTabId, commitTabVisit, tabs]);
 
-  /** `cwd` scopes group inheritance: a tab from another project starts alone. */
-  const appendTab = useCallback(
-    (tab: WorkspaceTab, cwd?: string) => {
-      setTabs((prev) =>
-        insertTabBesideActive(prev, tab, activeTabIdRef.current, (id) =>
-          id === tab.id
-            ? cwd
-              ? projectName(cwd)
-              : undefined
-            : projectOfTab(id),
-        ),
-      );
-    },
-    [projectOfTab],
-  );
-
-  const onSelectProviderAccount = useCallback(
-    (provider: RateLimitProvider, accountId: string) => {
-      if (!active || active.harness !== provider) return;
-      const currentId = active.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
-      if (currentId === accountId) return;
-
-      if (active.blocks.length === 0 && !active.busy) {
-        setSessions((current) =>
-          current.map((session) =>
-            session.id === active.id
-              ? { ...session, providerAccountId: accountId }
-              : session,
-          ),
-        );
-        return;
-      }
-
-      // Provider thread ids are account-owned. Keep the current conversation
-      // pinned to its account and open a clean one for the selected profile.
-      const session = {
-        ...newSession(
-          active.harness,
-          active.cwd,
-          active.model,
-          active.runtimeMode,
-          active.modelSettings,
-        ),
-        providerAccountId: accountId,
-      };
-      const tab = newTab(session.id);
-      setSessions((current) => [...current, session]);
-      appendTab(tab, active.cwd);
-      setActiveTabId(tab.id);
-      setComposerFocused(true);
-    },
-    [active, appendTab],
-  );
+  const { appendTab, onSelectProviderAccount } = useTabIteration({
+    active,
+    activeTabIdRef,
+    projectOfTab,
+    setActiveTabId,
+    setComposerFocused,
+    setSessions,
+    setTabs,
+  });
 
   const onOpenWhatsNew = useCallback((version: string) => {
     const document = releaseNotesForVersion(version);
