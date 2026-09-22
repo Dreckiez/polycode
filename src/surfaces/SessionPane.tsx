@@ -11,6 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Composer } from "../chrome/Composer";
+import { ErrorBoundary } from "../chrome/ErrorBoundary";
 import { SessionReview } from "../chrome/SessionReview";
 import { PromptOutline } from "../chrome/PromptOutline";
 import {
@@ -555,30 +556,35 @@ export const SessionPane = memo(function SessionPane({
           />
         ) : (
           <>
-            <AgentTranscript
-              blocks={session.blocks}
-              sessionId={session.id}
-              busy={!!session.busy}
-              visible={visible}
-              cwd={workCwd}
-              harness={session.harness}
-              model={session.model}
-              pendingQuestion={!!session.pendingQuestion}
-              onApproval={approve}
-              onAddToChat={addSelectionToChat}
-              onSaveNote={notesEnabled ? saveNote : undefined}
-              onSaveSelectionNote={notesEnabled ? saveSelectionNote : undefined}
-              onOpenFile={onOpenFile}
-              onOpenDiff={onOpenDiff}
-              onOpenPlan={openPlan}
-              onBuildPlan={buildPlan}
-              onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}
-              onHandoff={onHandoff ? onHandoffCb : undefined}
-              onJumpToBottomChange={setShowJumpToBottom}
-              onJumpToBottomReady={onJumpToBottomReady}
-              onRevealReady={onRevealReady}
-              latestTurnAccessory={latestTurnAccessory}
-            />
+            <ErrorBoundary
+              title="Failed to render session transcript"
+              description="A rendering error occurred in this chat conversation. You can retry or continue messaging below."
+            >
+              <AgentTranscript
+                blocks={session.blocks}
+                sessionId={session.id}
+                busy={!!session.busy}
+                visible={visible}
+                cwd={workCwd}
+                harness={session.harness}
+                model={session.model}
+                pendingQuestion={!!session.pendingQuestion}
+                onApproval={approve}
+                onAddToChat={addSelectionToChat}
+                onSaveNote={notesEnabled ? saveNote : undefined}
+                onSaveSelectionNote={notesEnabled ? saveSelectionNote : undefined}
+                onOpenFile={onOpenFile}
+                onOpenDiff={onOpenDiff}
+                onOpenPlan={openPlan}
+                onBuildPlan={buildPlan}
+                onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}
+                onHandoff={onHandoff ? onHandoffCb : undefined}
+                onJumpToBottomChange={setShowJumpToBottom}
+                onJumpToBottomReady={onJumpToBottomReady}
+                onRevealReady={onRevealReady}
+                latestTurnAccessory={latestTurnAccessory}
+              />
+            </ErrorBoundary>
             <PromptOutline
               blocks={session.blocks}
               scope={transcriptScope}

@@ -22,6 +22,7 @@ import {
 } from "../lib/layout";
 import { sameProjectPath, type RecentProject } from "../lib/recents";
 import type { TerminalMetaPatch } from "../lib/terminalTab";
+import { ErrorBoundary } from "../chrome/ErrorBoundary";
 import {
   sessionWorkCwd,
   type Attachment,
@@ -332,75 +333,85 @@ function PaneTreeComponent({
               <PaneDropHint edge={drop.edge} />
             ) : null}
             {editorPane ? (
-              <FilePane
-                pane={editorPane}
-                focused={focusedId === editorPane.id}
-                dirtyFileIds={dirtyFileIds}
-                fileErrorCounts={fileErrorCounts}
-                sessions={sessions}
-                onFocus={onFocus}
-                onSelectFile={onSelectFile}
-                onCloseFile={onCloseFile}
-                onCloseOtherFiles={onCloseOtherFiles}
-                onReorderFiles={onReorderFiles}
-                onDirtyChange={onFileDirtyChange}
-                onErrorCountChange={onFileErrorCountChange}
-                onOpenFile={onOpenFile}
-                onUpdatePlan={onUpdatePlan}
-                onBuildPlan={onBuildPlan}
-                editorNavigation={editorNavigation}
-                onPaneDragStart={onPaneDragStart}
-                onTerminalMetaChange={onTerminalMetaChange}
-              />
+              <ErrorBoundary
+                title="Editor pane error"
+                description="This file pane encountered an error and could not be displayed."
+              >
+                <FilePane
+                  pane={editorPane}
+                  focused={focusedId === editorPane.id}
+                  dirtyFileIds={dirtyFileIds}
+                  fileErrorCounts={fileErrorCounts}
+                  sessions={sessions}
+                  onFocus={onFocus}
+                  onSelectFile={onSelectFile}
+                  onCloseFile={onCloseFile}
+                  onCloseOtherFiles={onCloseOtherFiles}
+                  onReorderFiles={onReorderFiles}
+                  onDirtyChange={onFileDirtyChange}
+                  onErrorCountChange={onFileErrorCountChange}
+                  onOpenFile={onOpenFile}
+                  onUpdatePlan={onUpdatePlan}
+                  onBuildPlan={onBuildPlan}
+                  editorNavigation={editorNavigation}
+                  onPaneDragStart={onPaneDragStart}
+                  onTerminalMetaChange={onTerminalMetaChange}
+                />
+              </ErrorBoundary>
             ) : session ? (
-              <SessionPane
-                session={session}
-                reviewUndoLocked={sessions.some(
-                  (other) =>
-                    other.id !== session.id &&
-                    other.busy &&
-                    sameProjectPath(
-                      sessionWorkCwd(other),
-                      sessionWorkCwd(session),
-                    ),
-                )}
-                visible={visible}
-                focused={focusedId === session.id}
-                addToChatTarget={addToChatSessionId === session.id}
-                inSplit={inSplit}
-                composerFocused={composerFocused}
-                recents={recents}
-                hideProjectPicker={hideProjectPicker}
-                onFocus={onFocus}
-                onClose={onClose}
-                onCwdChange={onCwdChange}
-                onBranchChange={onBranchChange}
-                onModelChange={onModelChange}
-                onModelSettingsChange={onModelSettingsChange}
-                onRuntimeModeChange={onRuntimeModeChange}
-                onSubmit={onSubmit}
-                onStop={onStop}
-                onCompactContext={onCompactContext}
-                onPlaceSessionInFolder={onPlaceSessionInFolder}
-                onDeleteQueuedMessage={onDeleteQueuedMessage}
-                onEditQueuedMessage={onEditQueuedMessage}
-                onQueuedMessageEditingChange={onQueuedMessageEditingChange}
-                onSteerQueuedMessage={onSteerQueuedMessage}
-                onResumeQueue={onResumeQueue}
-                onNoteCardDismiss={onNoteCardDismiss}
-                onHandoffCardDismiss={onHandoffCardDismiss}
-                onApproval={onApproval}
-                onQuestionReply={onQuestionReply}
-                onQuestionInteraction={onQuestionInteraction}
-                onOpenFile={onOpenFile}
-                onOpenDiff={onOpenDiff}
-                onOpenPlan={onOpenPlan}
-                onBuildPlan={onBuildPlan}
-                onSecondOpinion={onSecondOpinion}
-                onHandoff={onHandoff}
-                onNewTerminal={onNewTerminal}
-                onPaneDragStart={onPaneDragStart}
-              />
+              <ErrorBoundary
+                title="Session pane error"
+                description="This session encountered an error and could not be displayed."
+              >
+                <SessionPane
+                  session={session}
+                  reviewUndoLocked={sessions.some(
+                    (other) =>
+                      other.id !== session.id &&
+                      other.busy &&
+                      sameProjectPath(
+                        sessionWorkCwd(other),
+                        sessionWorkCwd(session),
+                      ),
+                  )}
+                  visible={visible}
+                  focused={focusedId === session.id}
+                  addToChatTarget={addToChatSessionId === session.id}
+                  inSplit={inSplit}
+                  composerFocused={composerFocused}
+                  recents={recents}
+                  hideProjectPicker={hideProjectPicker}
+                  onFocus={onFocus}
+                  onClose={onClose}
+                  onCwdChange={onCwdChange}
+                  onBranchChange={onBranchChange}
+                  onModelChange={onModelChange}
+                  onModelSettingsChange={onModelSettingsChange}
+                  onRuntimeModeChange={onRuntimeModeChange}
+                  onSubmit={onSubmit}
+                  onStop={onStop}
+                  onCompactContext={onCompactContext}
+                  onPlaceSessionInFolder={onPlaceSessionInFolder}
+                  onDeleteQueuedMessage={onDeleteQueuedMessage}
+                  onEditQueuedMessage={onEditQueuedMessage}
+                  onQueuedMessageEditingChange={onQueuedMessageEditingChange}
+                  onSteerQueuedMessage={onSteerQueuedMessage}
+                  onResumeQueue={onResumeQueue}
+                  onNoteCardDismiss={onNoteCardDismiss}
+                  onHandoffCardDismiss={onHandoffCardDismiss}
+                  onApproval={onApproval}
+                  onQuestionReply={onQuestionReply}
+                  onQuestionInteraction={onQuestionInteraction}
+                  onOpenFile={onOpenFile}
+                  onOpenDiff={onOpenDiff}
+                  onOpenPlan={onOpenPlan}
+                  onBuildPlan={onBuildPlan}
+                  onSecondOpinion={onSecondOpinion}
+                  onHandoff={onHandoff}
+                  onNewTerminal={onNewTerminal}
+                  onPaneDragStart={onPaneDragStart}
+                />
+              </ErrorBoundary>
             ) : null}
           </div>
         );
