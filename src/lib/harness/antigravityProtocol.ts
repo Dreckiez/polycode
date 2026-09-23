@@ -81,6 +81,7 @@ export function buildAgySpawnArgs(input: {
   effort?: string;
   resume?: string;
   mode?: string;
+  cwd?: string;
 }): string[] {
   const args = [
     "--input-format",
@@ -89,6 +90,9 @@ export function buildAgySpawnArgs(input: {
     "stream-json",
     "--dangerously-skip-permissions",
   ];
+  if (input.cwd && input.cwd.trim() && input.cwd !== "~") {
+    args.push("--add-dir", input.cwd);
+  }
   if (input.resume) {
     args.push("--conversation", input.resume);
   }

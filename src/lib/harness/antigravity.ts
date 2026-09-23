@@ -1,4 +1,5 @@
 import type { RuntimeMode } from "../session";
+import { sameProjectPath } from "../recents";
 import {
   killChild,
   resolveAntigravityBinary,
@@ -177,7 +178,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
 
   if (
     existing &&
-    existing.cwd === input.cwd &&
+    sameProjectPath(existing.cwd, input.cwd) &&
     existing.model === input.model &&
     (existingEffort ?? "high") === (currentEffort ?? "high") &&
     existing.planning === planning
@@ -188,14 +189,14 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   }
 
   if (existing) {
-    if (existing.cwd !== input.cwd) {
+    if (!sameProjectPath(existing.cwd, input.cwd)) {
       resumeByThread.delete(input.sessionId);
     }
     await stopAntigravitySession(input.sessionId);
   }
 
   const resume = resumeByThread.get(input.sessionId);
-  if (resume && resume.cwd !== input.cwd) {
+  if (resume && !sameProjectPath(resume.cwd, input.cwd)) {
     resumeByThread.delete(input.sessionId);
   }
 
@@ -247,6 +248,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     effort: currentEffort,
     resume: resume?.conversationId,
     mode: planning ? "plan" : undefined,
+    cwd: input.cwd,
   });
 
   await spawnChild(input.sessionId, path, spawnArgs, input.cwd);

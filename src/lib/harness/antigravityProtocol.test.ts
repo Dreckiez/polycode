@@ -62,6 +62,24 @@ describe("buildAgySpawnArgs", () => {
     expect(args[modelIdx + 1]).toBe("gemini-3.8-flash");
     expect(args[effortIdx + 1]).toBe("low");
   });
+
+  it("adds --add-dir when cwd is a project path", () => {
+    const args = buildAgySpawnArgs({ cwd: "D:/Repo/flask-login" });
+    const idx = args.indexOf("--add-dir");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(args[idx + 1]).toBe("D:/Repo/flask-login");
+  });
+
+  it("omits --add-dir when cwd is ~ or empty", () => {
+    const argsHome = buildAgySpawnArgs({ cwd: "~" });
+    expect(argsHome).not.toContain("--add-dir");
+
+    const argsEmpty = buildAgySpawnArgs({ cwd: "" });
+    expect(argsEmpty).not.toContain("--add-dir");
+
+    const argsNone = buildAgySpawnArgs({});
+    expect(argsNone).not.toContain("--add-dir");
+  });
 });
 
 describe("buildAgyUserMessage", () => {
