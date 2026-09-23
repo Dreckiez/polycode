@@ -50,6 +50,7 @@ type Props = {
   onBuildPlan?: (blockId: string, target?: PlanBuildTarget) => void;
   onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
   onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
+  onRegenerate?: (turn: Block[]) => void;
   onJumpToBottomChange?: (show: boolean) => void;
   onJumpToBottomReady?: (jump: () => void) => void;
   /** Passes a function that renders the turn that holds a block. The render completes before the function returns. */
@@ -86,6 +87,7 @@ function AgentTranscriptComponent({
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
+  onRegenerate,
   onJumpToBottomChange,
   onJumpToBottomReady,
   onRevealReady,
@@ -376,6 +378,7 @@ function AgentTranscriptComponent({
               onSecondOpinion={onSecondOpinion}
               onHandoff={onHandoff}
               onSaveNote={onSaveNote}
+              onRegenerate={onRegenerate}
               sessionId={sessionId}
             />
           );

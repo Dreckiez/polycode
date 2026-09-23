@@ -4,6 +4,8 @@ import {
   ChevronRight,
   MessageMultiple,
   Replace,
+  Search,
+  X,
   type IconComponent,
 } from "./icons";
 import {
@@ -53,8 +55,8 @@ type Props = {
 };
 
 const MENU_WIDTH = 240;
-const SUBMENU_WIDTH = 240;
-const SUBMENU_MAX_HEIGHT = 288;
+const SUBMENU_WIDTH = 280;
+const SUBMENU_MAX_HEIGHT = 320;
 /** The flyout tucks under the parent menu's edge rather than floating free. */
 const SUBMENU_OVERLAP = -4;
 /** Neither menu is inside the other, so a click in one is not a click away. */
@@ -62,17 +64,20 @@ const SELF = "[data-provider-target]";
 
 export function HandoffButton({
   from,
+  fromModel,
   onPick,
-}: Pick<Props, "from" | "onPick">) {
+}: Pick<Props, "from" | "onPick"> & { fromModel?: string }) {
   return (
     <SecondOpinionButton
       from={from}
+      fromModel={fromModel}
       onPick={onPick}
       icon={Replace}
       title="Handoff"
-      disabledTitle="Install another provider to hand off"
+      disabledTitle="No providers available to hand off"
       description="Hand this session to another agent to continue the work."
       menuLabel="Hand this session to another agent"
+      includeCurrent
     />
   );
 }
@@ -100,7 +105,7 @@ export function BuildTargetButton({
       menuLabel="Build this plan with another model or provider"
       includeCurrent
       disabled={disabled}
-      triggerClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-r-md border-l border-background-base/20 bg-content text-background-base hover:bg-content/90 disabled:pointer-events-none disabled:opacity-40"
+      triggerClassName="cursor-pointer flex h-6 w-6 shrink-0 items-center justify-center rounded-r-md border-l border-background-base/20 bg-content text-background-base hover:bg-content/90 disabled:pointer-events-none disabled:opacity-40"
     />
   );
 }
@@ -111,10 +116,10 @@ export function SecondOpinionButton({
   onPick,
   icon: Icon = MessageMultiple,
   title = "Second opinion",
-  disabledTitle = "Install another provider for a second opinion",
+  disabledTitle = "No providers available for a second opinion",
   description = "Send this turn to another agent to review the work.",
   menuLabel = "Send this turn to another agent",
-  includeCurrent = false,
+  includeCurrent = true,
   disabled: disabledByCaller = false,
   triggerClassName,
 }: Props) {
@@ -137,7 +142,10 @@ export function SecondOpinionButton({
   const [active, setActive] = useState(0);
   const [modelActive, setModelActive] = useState(0);
   const [inSubmenu, setInSubmenu] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
   const button = useRef<HTMLButtonElement>(null);
+  const modelSearchInput = useRef<HTMLInputElement>(null);
+  const activeModelOptionRef = useRef<HTMLButtonElement | null>(null);
   const [activeRow, setActiveRow] = useState<HTMLButtonElement | null>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
 
@@ -165,6 +173,15 @@ export function SecondOpinionButton({
         : preferredModelId(activeHarness)
       : undefined;
 
+  const filteredModels = useMemo(() => {
+    const q = modelSearch.trim().toLowerCase();
+    if (!q) return models;
+    return models.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
+    );
+  }, [models, modelSearch]);
+
   useEffect(() => {
     if (!open) return;
     void probeHarnessAvailability();
@@ -178,16 +195,25 @@ export function SecondOpinionButton({
   useEffect(() => {
     setActive(0);
     setInSubmenu(false);
+    setModelSearch("");
   }, [open, targets.join(",")]);
+
+  useEffect(() => {
+    setModelSearch("");
+  }, [activeHarness]);
 
   useEffect(() => {
     if (!activeHarness) {
       setModelActive(0);
       return;
     }
-    const index = models.findIndex((model) => model.id === preferred);
+    const index = filteredModels.findIndex((model) => model.id === preferred);
     setModelActive(index >= 0 ? index : 0);
-  }, [activeHarness, preferred, models]);
+  }, [activeHarness, preferred, filteredModels]);
+
+  useEffect(() => {
+    activeModelOptionRef.current?.scrollIntoView({ block: "nearest" });
+  }, [modelActive]);
 
   useEffect(() => {
     if (!open) return;
@@ -224,8 +250,10 @@ export function SecondOpinionButton({
   };
 
   const moveModel = (dir: 1 | -1) => {
-    if (models.length === 0) return;
-    setModelActive((index) => (index + dir + models.length) % models.length);
+    if (filteredModels.length === 0) return;
+    setModelActive(
+      (index) => (index + dir + filteredModels.length) % filteredModels.length,
+    );
   };
 
   const onMenuKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -243,7 +271,10 @@ export function SecondOpinionButton({
     }
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      if (!inSubmenu && models.length > 0) setInSubmenu(true);
+      if (!inSubmenu && models.length > 0) {
+        setInSubmenu(true);
+        modelSearchInput.current?.focus();
+      }
       return;
     }
     if (event.key === "ArrowLeft") {
@@ -255,7 +286,7 @@ export function SecondOpinionButton({
       event.preventDefault();
       if (!activeHarness) return;
       if (inSubmenu) {
-        const model = models[modelActive];
+        const model = filteredModels[modelActive];
         if (model) pick(activeHarness, model.id);
         return;
       }
@@ -283,7 +314,7 @@ export function SecondOpinionButton({
         disabled={disabled}
         className={
           triggerClassName ??
-          `rounded-md p-1 disabled:pointer-events-none disabled:opacity-40 ${
+          `cursor-pointer rounded-md p-1 disabled:pointer-events-none disabled:opacity-40 ${
             open
               ? "bg-content/8 text-content/70"
               : "text-content/40 hover:bg-content/8 hover:text-content/70"
@@ -348,7 +379,7 @@ export function SecondOpinionButton({
                       if (!available && probed) return;
                       pickPreferred(harness);
                     }}
-                    className={`flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] leading-none ${
+                    className={`cursor-pointer flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] leading-none ${
                       !available && probed
                         ? "text-content/30"
                         : highlighted
@@ -375,7 +406,6 @@ export function SecondOpinionButton({
             <Popover
               // Remounting per row re-measures the flyout against that row.
               key={active}
-              ref={lockOverscroll}
               anchor={activeRow}
               side="right"
               gap={SUBMENU_OVERLAP}
@@ -386,39 +416,107 @@ export function SecondOpinionButton({
               aria-label={`${HARNESS_TITLE[activeHarness]} models`}
               onMouseEnter={() => setInSubmenu(true)}
               data-provider-target
-              className="overflow-y-auto overscroll-none p-1"
+              className="flex flex-col overscroll-none p-1 font-sans"
             >
-              {models.map((model, index) => {
-                const highlighted = index === modelActive;
-                return (
-                  <button
-                    key={model.id}
-                    type="button"
-                    role="menuitem"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onMouseEnter={() => {
-                      setInSubmenu(true);
-                      setModelActive(index);
+              <div className="mb-1 shrink-0 p-0.5">
+                <label className="flex items-center gap-1.5 rounded-lg bg-content/6 px-2 py-1.5 text-content/40 focus-within:bg-content/10 focus-within:text-content/70">
+                  <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
+                  <input
+                    ref={modelSearchInput}
+                    type="text"
+                    value={modelSearch}
+                    placeholder={`Search ${models.length} models…`}
+                    aria-label={`Search ${HARNESS_TITLE[activeHarness]} models`}
+                    className="min-w-0 flex-1 bg-transparent text-[12px] leading-tight text-content outline-none placeholder:text-content/35 font-sans"
+                    onChange={(event) => {
+                      setModelSearch(event.target.value);
+                      setModelActive(0);
                     }}
-                    onClick={() => pick(activeHarness, model.id)}
-                    className={`flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] leading-none ${
-                      highlighted
-                        ? "bg-content/10 text-content"
-                        : "text-content hover:bg-content/5"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {model.name}
-                    </span>
-                    {model.id === preferred ? (
-                      <Check
-                        className="size-3 shrink-0 text-content/45"
-                        strokeWidth={2}
-                      />
-                    ) : null}
-                  </button>
-                );
-              })}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        moveModel(1);
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        moveModel(-1);
+                      } else if (event.key === "Enter") {
+                        event.preventDefault();
+                        const model = filteredModels[modelActive];
+                        if (model && activeHarness) pick(activeHarness, model.id);
+                      } else if (event.key === "ArrowLeft") {
+                        event.preventDefault();
+                        setInSubmenu(false);
+                      } else if (event.key === "Escape") {
+                        if (modelSearch) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setModelSearch("");
+                        }
+                      }
+                    }}
+                  />
+                  {modelSearch ? (
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setModelSearch("");
+                        modelSearchInput.current?.focus();
+                      }}
+                      className="cursor-pointer text-content/40 hover:text-content"
+                    >
+                      <X className="size-3" strokeWidth={2} />
+                    </button>
+                  ) : null}
+                </label>
+              </div>
+
+              <div
+                ref={lockOverscroll}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-none"
+              >
+                {filteredModels.length === 0 ? (
+                  <div className="px-2.5 py-3 text-center text-[11px] text-content/40">
+                    No models match &ldquo;{modelSearch}&rdquo;
+                  </div>
+                ) : (
+                  filteredModels.map((model, index) => {
+                    const highlighted = index === modelActive;
+                    return (
+                      <button
+                        key={model.id}
+                        ref={highlighted ? activeModelOptionRef : undefined}
+                        type="button"
+                        role="menuitem"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => {
+                          setInSubmenu(true);
+                          setModelActive(index);
+                        }}
+                        onClick={() => pick(activeHarness, model.id)}
+                        className={`cursor-pointer flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] leading-none ${
+                          highlighted
+                            ? "bg-content/10 text-content"
+                            : "text-content hover:bg-content/5"
+                        }`}
+                      >
+                        <span
+                          className="min-w-0 flex-1 truncate"
+                          title={model.name}
+                        >
+                          {model.name}
+                        </span>
+                        {model.id === preferred ? (
+                          <Check
+                            className="size-3 shrink-0 text-content/45"
+                            strokeWidth={2}
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </Popover>
           ) : null}
         </>

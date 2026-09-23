@@ -8,6 +8,7 @@ import {
 import type { ApprovalDecision } from "../lib/harness";
 import type { TranscriptLayout } from "../lib/appearance";
 import { AttachmentChip } from "../chrome/AttachmentChip";
+import { AlertCircle, RotateCcw } from "../chrome/icons";
 import { HarnessIcon } from "../chrome/HarnessIcon";
 import { NoteMiniCard } from "../chrome/NoteMiniCard";
 import { PlanPreview } from "../chrome/PlanPreview";
@@ -35,6 +36,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planHarness,
   planModel,
   sessionId,
+  onRetry,
 }: {
   block: Block;
   layout: TranscriptLayout;
@@ -51,6 +53,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planHarness?: HarnessId;
   planModel?: string;
   sessionId: string;
+  onRetry?: () => void;
 }) {
   // For streaming assistant/reasoning blocks, read text from the narrow chatStore selector
   // so only this block re-renders on token deltas.
@@ -143,10 +146,16 @@ const TranscriptBlock = memo(function TranscriptBlock({
     return <HandoffDivider block={block} />;
   }
 
-  if (block.role === "system") {
+  if (block.role === "system" || block.notice === "error") {
+    if (
+      block.notice !== "interrupt" &&
+      (block.notice === "error" || !isSystemStatus(block.text))
+    ) {
+      return <GenerationErrorBanner text={block.text} onRetry={onRetry} />;
+    }
     return (
       <div className="px-4 py-2 text-content/50">
-        <pre className="min-w-0 whitespace-pre-wrap break-words">
+        <pre className="min-w-0 whitespace-pre-wrap break-words font-sans text-xs">
           {block.text}
         </pre>
       </div>
@@ -169,6 +178,59 @@ const TranscriptBlock = memo(function TranscriptBlock({
     </div>
   );
 });
+
+function isSystemStatus(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  return (
+    lower.startsWith("retrying") ||
+    lower.startsWith("compact") ||
+    lower.startsWith("waiting")
+  );
+}
+
+function GenerationErrorBanner({
+  text,
+  onRetry,
+}: {
+  text: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="px-4 py-2">
+      <div
+        role="alert"
+        className="rounded-2xl border border-rose-500/20 bg-rose-950/30 px-4 py-3 text-rose-200"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <AlertCircle
+              className="size-4.5 shrink-0 text-rose-400"
+              strokeWidth={2}
+            />
+            <span className="font-medium text-sm text-rose-200">
+              Generation stopped
+            </span>
+          </div>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-rose-400 transition-colors hover:text-rose-200"
+            >
+              <RotateCcw className="size-3.5" strokeWidth={2} />
+              <span>Retry</span>
+            </button>
+          ) : null}
+        </div>
+        {text ? (
+          <p className="mt-1 pl-7 text-xs leading-relaxed text-rose-400/80 whitespace-pre-wrap break-words">
+            {text}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function UserMessageBlock({
   block,

@@ -107,6 +107,7 @@ export function applyHarnessEvent(
       return appendBlock(failStreaming(session), {
         id: crypto.randomUUID(),
         role: "system",
+        notice: "error",
         text: event.message,
       });
     case "session.providerBound":

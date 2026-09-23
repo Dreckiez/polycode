@@ -68,6 +68,7 @@ type TranscriptTurnProps = {
   onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
   onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
   onSaveNote?: (text: string) => void;
+  onRegenerate?: (turn: Block[]) => void;
   sessionId: string;
 };
 
@@ -278,7 +279,8 @@ function areTurnsEqual(
       prev.onBuildPlan === next.onBuildPlan &&
       prev.onSecondOpinion === next.onSecondOpinion &&
       prev.onHandoff === next.onHandoff &&
-      prev.onSaveNote === next.onSaveNote
+      prev.onSaveNote === next.onSaveNote &&
+      prev.onRegenerate === next.onRegenerate
     );
   }
 
@@ -298,7 +300,8 @@ function areTurnsEqual(
     prev.onBuildPlan === next.onBuildPlan &&
     prev.onSecondOpinion === next.onSecondOpinion &&
     prev.onHandoff === next.onHandoff &&
-    prev.onSaveNote === next.onSaveNote
+    prev.onSaveNote === next.onSaveNote &&
+    prev.onRegenerate === next.onRegenerate
   );
 }
 
@@ -331,7 +334,8 @@ const TranscriptTurn = memo(function TranscriptTurn({
   onSecondOpinion,
   onHandoff,
   onSaveNote,
-sessionId,
+  onRegenerate,
+  sessionId,
 }: TranscriptTurnProps) {
   const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
   const durationMs = userBlock?.durationMs;
@@ -400,6 +404,10 @@ sessionId,
     [onHandoff, turn],
   );
 
+  const handleRegenerate = useCallback(() => {
+    onRegenerate?.(turn);
+  }, [onRegenerate, turn]);
+
   const copyOutput = useMemo(() => turnCopyText(turn), [turn]);
 
   const renderItem = (item: TurnItem, itemIndex: number) =>
@@ -447,6 +455,7 @@ sessionId,
         planModel={model}
         cwd={cwd}
         sessionId={sessionId}
+        onRetry={onRegenerate ? handleRegenerate : undefined}
       />
     );
 
@@ -525,8 +534,11 @@ sessionId,
           onSaveNote={onSaveNote}
           harness={turnHarness}
           fromHarness={turnHarness}
+          fromModel={turnModel?.id ?? model}
           onSecondOpinion={onSecondOpinion ? handleSecondOpinion : undefined}
           onHandoff={onHandoff ? handleHandoff : undefined}
+          onRegenerate={onRegenerate ? handleRegenerate : undefined}
+          regenerateBusy={busy}
         />
       ) : null}
     </div>

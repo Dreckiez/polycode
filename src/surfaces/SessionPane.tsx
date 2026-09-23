@@ -32,6 +32,7 @@ import {
   type TurnIntent,
 } from "../lib/session";
 import { AgentTranscript } from "./AgentTranscript";
+import { turnUserBlock } from "./transcriptShared";
 import { EmptySession } from "./EmptySession";
 import { MOD } from "../lib/platform";
 import {
@@ -369,6 +370,15 @@ export const SessionPane = memo(function SessionPane({
     },
     [onSubmit, session.id],
   );
+  const onRegenerateTurn = useCallback(
+    (turn: Block[]) => {
+      if (session.busy) return;
+      const userBlock = turnUserBlock(turn);
+      if (!userBlock) return;
+      onSubmitCb(userBlock.text, userBlock.attachments ?? []);
+    },
+    [onSubmitCb, session.busy],
+  );
   const onStopCb = useCallback(() => {
     onStop(session.id);
   }, [onStop, session.id]);
@@ -579,6 +589,7 @@ export const SessionPane = memo(function SessionPane({
                 onBuildPlan={buildPlan}
                 onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}
                 onHandoff={onHandoff ? onHandoffCb : undefined}
+                onRegenerate={onRegenerateTurn}
                 onJumpToBottomChange={setShowJumpToBottom}
                 onJumpToBottomReady={onJumpToBottomReady}
                 onRevealReady={onRevealReady}

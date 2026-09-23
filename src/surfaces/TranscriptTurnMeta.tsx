@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, FilePlusCorner } from "../chrome/icons";
+import { Check, Copy, FilePlusCorner, RotateCcw } from "../chrome/icons";
 import { HarnessIcon } from "../chrome/HarnessIcon";
 import { Shimmer } from "./Shimmer";
 import {
@@ -54,8 +54,11 @@ export function TurnDuration({
   copyText: output,
   onSaveNote,
   fromHarness,
+  fromModel,
   onSecondOpinion,
   onHandoff,
+  onRegenerate,
+  regenerateBusy = false,
 }: {
   elapsedMs: number | null;
   /** True when the fold line above already keeps the time for this turn. */
@@ -66,8 +69,11 @@ export function TurnDuration({
   copyText?: string;
   onSaveNote?: (text: string) => void;
   fromHarness?: HarnessId;
+  fromModel?: string;
   onSecondOpinion?: (harness: HarnessId, model: string) => void;
   onHandoff?: (harness: HarnessId, model: string) => void;
+  onRegenerate?: () => void;
+  regenerateBusy?: boolean;
 }) {
   const label = formatWorkingDuration(elapsedMs, true, false, modelName);
   const dot = (
@@ -88,15 +94,37 @@ export function TurnDuration({
             {onSaveNote ? (
               <SaveNoteButton text={output} onSave={onSaveNote} />
             ) : null}
+            {onRegenerate ? (
+              <RegenerateButton
+                onRegenerate={onRegenerate}
+                busy={regenerateBusy}
+              />
+            ) : null}
           </>
         ) : (
-          <Check className="size-3.5" strokeWidth={1.75} />
+          <>
+            <Check className="size-3.5" strokeWidth={1.75} />
+            {onRegenerate ? (
+              <RegenerateButton
+                onRegenerate={onRegenerate}
+                busy={regenerateBusy}
+              />
+            ) : null}
+          </>
         )}
         {fromHarness && onHandoff ? (
-          <HandoffButton from={fromHarness} onPick={onHandoff} />
+          <HandoffButton
+            from={fromHarness}
+            fromModel={fromModel}
+            onPick={onHandoff}
+          />
         ) : null}
         {fromHarness && onSecondOpinion ? (
-          <SecondOpinionButton from={fromHarness} onPick={onSecondOpinion} />
+          <SecondOpinionButton
+            from={fromHarness}
+            fromModel={fromModel}
+            onPick={onSecondOpinion}
+          />
         ) : null}
       </span>
 
@@ -208,6 +236,48 @@ function SaveNoteButton({
       ) : (
         <FilePlusCorner className="size-3.5" strokeWidth={1.75} />
       )}
+    </button>
+  );
+}
+
+function RegenerateButton({
+  onRegenerate,
+  busy = false,
+}: {
+  onRegenerate: () => void;
+  busy?: boolean;
+}) {
+  const [rotated, setRotated] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current != null) window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      title={busy ? "Busy" : "Regenerate response"}
+      aria-label={busy ? "Busy" : "Regenerate response"}
+      className="cursor-pointer rounded-md p-1 text-content/40 hover:bg-content/8 hover:text-content/70 disabled:cursor-not-allowed disabled:opacity-40"
+      onClick={() => {
+        if (busy) return;
+        playCue("switch");
+        setRotated(true);
+        if (timer.current != null) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => setRotated(false), 600);
+        onRegenerate();
+      }}
+    >
+      <RotateCcw
+        className={`size-3.5 transition-transform duration-500 ease-out ${
+          rotated ? "-rotate-180" : ""
+        }`}
+        strokeWidth={1.75}
+      />
     </button>
   );
 }
