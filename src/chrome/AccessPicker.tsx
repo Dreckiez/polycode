@@ -4,24 +4,32 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
   RUNTIME_MODE_HINT,
   RUNTIME_MODE_LABEL,
   RUNTIME_MODES,
+  type HarnessId,
   type RuntimeMode,
 } from "../lib/session";
+import {
+  hasAntigravityAcp,
+  isAntigravityAcpAvailable,
+  subscribeHarnessAvailability,
+} from "../lib/harness/availability";
 import { Popover } from "./Popover";
 
 type Props = {
   value: RuntimeMode;
+  harness?: HarnessId;
   onChange: (mode: RuntimeMode) => void;
   onClose?: () => void;
   busy?: boolean;
 };
 
-const MENU_WIDTH = 288;
+const MENU_WIDTH = 296;
 
 const ICONS: Record<RuntimeMode, typeof Lock> = {
   supervised: Lock,
@@ -30,16 +38,73 @@ const ICONS: Record<RuntimeMode, typeof Lock> = {
   "full-access": LockOpen,
 };
 
+export function isRuntimeModeSupported(
+  mode: RuntimeMode,
+  harness?: HarnessId,
+  hasAcp = false,
+): boolean {
+  if (mode === "auto") {
+    return harness === "codex";
+  }
+  if (harness === "antigravity" && !hasAcp) {
+    return mode === "full-access";
+  }
+  return true;
+}
+
+export function getRuntimeModeDisabledReason(
+  mode: RuntimeMode,
+  harness?: HarnessId,
+  hasAcp = false,
+): string | undefined {
+  if (mode === "auto" && harness !== "codex") {
+    return "Only available for Codex";
+  }
+  if (harness === "antigravity" && !hasAcp && mode !== "full-access") {
+    return "Requires Antigravity ACP server";
+  }
+  return undefined;
+}
+
 export const AccessPicker = memo(function AccessPicker({
   value,
+  harness,
   onChange,
   onClose,
   busy = false,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(() =>
-    Math.max(0, RUNTIME_MODES.indexOf(value)),
+  const hasAcp = useSyncExternalStore(
+    subscribeHarnessAvailability,
+    hasAntigravityAcp,
+    hasAntigravityAcp,
   );
+
+  useEffect(() => {
+    if (harness === "antigravity") {
+      void isAntigravityAcpAvailable();
+    }
+  }, [harness]);
+
+  useEffect(() => {
+    if (!isRuntimeModeSupported(value, harness, hasAcp)) {
+      const fallback: RuntimeMode =
+        harness === "antigravity" && !hasAcp ? "full-access" : "supervised";
+      onChange(fallback);
+    }
+  }, [value, harness, hasAcp, onChange]);
+
+  const [active, setActive] = useState(() => {
+    const idx = RUNTIME_MODES.indexOf(value);
+    if (idx >= 0 && isRuntimeModeSupported(value, harness, hasAcp)) {
+      return idx;
+    }
+    const firstValid = RUNTIME_MODES.findIndex((m) =>
+      isRuntimeModeSupported(m, harness, hasAcp),
+    );
+    return Math.max(0, firstValid);
+  });
+
   const root = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -52,10 +117,19 @@ export const AccessPicker = memo(function AccessPicker({
 
   useEffect(() => {
     if (!open) return;
-    setActive(Math.max(0, RUNTIME_MODES.indexOf(value)));
-  }, [open, value]);
+    const idx = RUNTIME_MODES.indexOf(value);
+    if (idx >= 0 && isRuntimeModeSupported(value, harness, hasAcp)) {
+      setActive(idx);
+    } else {
+      const firstValid = RUNTIME_MODES.findIndex((m) =>
+        isRuntimeModeSupported(m, harness, hasAcp),
+      );
+      setActive(Math.max(0, firstValid));
+    }
+  }, [open, value, harness, hasAcp]);
 
   const pick = (mode: RuntimeMode) => {
+    if (!isRuntimeModeSupported(mode, harness, hasAcp)) return;
     onChange(mode);
     dismiss(true);
   };
@@ -63,18 +137,30 @@ export const AccessPicker = memo(function AccessPicker({
   const onMenuKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(RUNTIME_MODES.length - 1, i + 1));
+      for (let i = active + 1; i < RUNTIME_MODES.length; i++) {
+        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness, hasAcp)) {
+          setActive(i);
+          return;
+        }
+      }
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => Math.max(0, i - 1));
+      for (let i = active - 1; i >= 0; i--) {
+        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness, hasAcp)) {
+          setActive(i);
+          return;
+        }
+      }
       return;
     }
     if (e.key === "Enter") {
       e.preventDefault();
       const mode = RUNTIME_MODES[active];
-      if (mode) pick(mode);
+      if (mode && isRuntimeModeSupported(mode, harness, hasAcp)) {
+        pick(mode);
+      }
     }
   };
 
@@ -125,28 +211,48 @@ export const AccessPicker = memo(function AccessPicker({
             const ModeIcon = ICONS[mode];
             const selected = mode === value;
             const highlighted = index === active;
+            const disabled = !isRuntimeModeSupported(mode, harness, hasAcp);
+            const disabledReason = getRuntimeModeDisabledReason(
+              mode,
+              harness,
+              hasAcp,
+            );
+
             return (
               <button
                 key={mode}
                 type="button"
                 role="option"
                 aria-selected={selected}
+                aria-disabled={disabled}
+                disabled={disabled}
                 onMouseDown={(e) => e.preventDefault()}
-                onMouseEnter={() => setActive(index)}
-                onClick={() => pick(mode)}
-                className={`flex w-full cursor-pointer items-start gap-2.5 rounded-lg px-2 py-2 text-left ${
-                  highlighted || selected
-                    ? "bg-content/10 text-content"
-                    : "text-content hover:bg-content/5"
+                onMouseEnter={() => !disabled && setActive(index)}
+                onClick={() => !disabled && pick(mode)}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${
+                  disabled
+                    ? "cursor-not-allowed opacity-40"
+                    : highlighted || selected
+                      ? "cursor-pointer bg-content/10 text-content"
+                      : "cursor-pointer text-content hover:bg-content/5"
                 }`}
               >
                 <ModeIcon
-                  className="mt-0.5 size-3.5 shrink-0 text-content/70"
+                  className={`mt-0.5 size-3.5 shrink-0 ${
+                    disabled ? "text-content/40" : "text-content/70"
+                  }`}
                   strokeWidth={1.75}
                 />
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-medium leading-5">
-                    {RUNTIME_MODE_LABEL[mode]}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-1.5">
+                    <span className="text-[13px] font-medium leading-5">
+                      {RUNTIME_MODE_LABEL[mode]}
+                    </span>
+                    {disabledReason ? (
+                      <span className="rounded bg-content/10 px-1.5 py-0.5 text-[10px] font-normal leading-none text-content/60">
+                        {disabledReason}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-4 text-content/50">
                     {RUNTIME_MODE_HINT[mode]}

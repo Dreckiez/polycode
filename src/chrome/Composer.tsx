@@ -1380,6 +1380,7 @@ export const Composer = memo(function Composer({
                 {harness !== "fx" ? (
                   <AccessPicker
                     value={runtimeMode}
+                    harness={harness}
                     busy={busy}
                     onChange={onRuntimeModeChange}
                     onClose={handlePickerClose}

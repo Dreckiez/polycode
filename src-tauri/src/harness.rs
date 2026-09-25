@@ -1536,6 +1536,20 @@ fn resolve_antigravity() -> Option<PathBuf> {
     let home = dirs_home().map(PathBuf::from);
     let mut candidates: Vec<PathBuf> = Vec::new();
 
+    // Prefer ACP server first (Windows .exe and Linux/Mac .par)
+    if let Some(home) = &home {
+        candidates.push(home.join("AppData/Local/agy/bin/agy_acp_server"));
+        candidates.push(home.join(".local/bin/agy_acp_server.par"));
+        candidates.push(home.join(".local/share/agy-acp/agy_acp_server.par"));
+    }
+    if let Some(from_shell) = which_via_login_shell("agy_acp_server") {
+        candidates.push(from_shell);
+    }
+    if let Some(from_shell) = which_via_login_shell("agy_acp_server.par") {
+        candidates.push(from_shell);
+    }
+
+    // Fall back to standard CLI (agy)
     if let Some(home) = &home {
         candidates.push(home.join("AppData/Local/agy/bin/agy"));
         candidates.push(home.join(".local/bin/agy"));
