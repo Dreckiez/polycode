@@ -94,7 +94,7 @@ type Resume = {
   cwd: string;
 };
 
-const INIT_TIMEOUT_MS = 20_000;
+const INIT_TIMEOUT_MS = 45_000;
 const SESSION_TIMEOUT_MS = 45_000;
 const CONTROL_TIMEOUT_MS = 15_000;
 const PROMPT_TIMEOUT_MS = 30 * 60_000;
