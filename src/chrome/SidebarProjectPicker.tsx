@@ -1,6 +1,7 @@
 import {
   Check,
   ChevronDown,
+  Folder,
   Plus,
   Search,
   Trash2,
@@ -9,7 +10,12 @@ import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "reac
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import { basename } from "../lib/fs";
 import { prettyParent, projectKey, projectName } from "../lib/paths";
-import { projectRailItems, sameProjectPath, type RecentProject } from "../lib/recents";
+import {
+  looksLikeProject,
+  projectRailItems,
+  sameProjectPath,
+  type RecentProject,
+} from "../lib/recents";
 import {
   loadTabGroupColors,
   loadTabGroupCustomColors,
@@ -53,10 +59,13 @@ export function SidebarProjectPicker({
   const [groupCustomColors] = useState(loadTabGroupCustomColors);
   const [groupMascots] = useState(loadTabGroupMascots);
   const groupLogos = useTabGroupLogos();
+  const inProject = looksLikeProject(cwd);
   const seed = projectName(cwd);
   const key = projectKey(cwd);
-  const label = resolveTabGroupLabel(key, groupLabels, basename(cwd) || seed);
-  const logoPath = resolveTabGroupLogo(key, groupLogos);
+  const label = inProject
+    ? resolveTabGroupLabel(key, groupLabels, basename(cwd) || seed)
+    : "No project";
+  const logoPath = inProject ? resolveTabGroupLogo(key, groupLogos) : undefined;
   const color = resolveTabGroupColor(key, groupColors, groupCustomColors, seed);
   const projects = projectRailItems(recents, cwd);
   const orderedProjects = [
@@ -127,8 +136,12 @@ export function SidebarProjectPicker({
       >
         <button
           type="button"
-          title={cwd}
-          aria-label={`Switch project, current project ${label}`}
+          title={inProject ? cwd : "No project selected"}
+          aria-label={
+            inProject
+              ? `Switch project, current project ${label}`
+              : "Select a project"
+          }
           aria-expanded={open}
           aria-haspopup="dialog"
           data-tauri-drag-region="false"
@@ -151,7 +164,7 @@ export function SidebarProjectPicker({
               className="size-4 shrink-0 rounded-sm"
               imageClassName="size-4"
             />
-          ) : (
+          ) : inProject ? (
             <ProjectMascot
               project={seed}
               color={color}
@@ -159,8 +172,14 @@ export function SidebarProjectPicker({
               className="size-3.5 shrink-0"
               active={busy}
             />
+          ) : (
+            <Folder className="size-3.5 shrink-0 text-content/50" />
           )}
-          <span className="min-w-0 flex-1 truncate text-left font-medium leading-normal py-0.5 text-content/90">
+          <span
+            className={`min-w-0 flex-1 truncate text-left font-medium leading-normal py-0.5 ${
+              inProject ? "text-content/90" : "text-content/50"
+            }`}
+          >
             {label}
           </span>
           <ChevronDown
@@ -279,7 +298,7 @@ export function SidebarProjectPicker({
                 })
               ) : (
                 <p className="px-2.5 py-5 text-center text-[12px] text-content/45">
-                  No projects found
+                  {normalizedQuery ? "No matching projects" : "No recent projects"}
                 </p>
               )}
             </div>
@@ -294,7 +313,7 @@ export function SidebarProjectPicker({
                   className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-content/75 hover:bg-content/8 hover:text-content"
                 >
                   <Plus className="size-4 shrink-0" strokeWidth={1.75} />
-                  <span>New project</span>
+                  <span>Open project…</span>
                 </button>
               </div>
             ) : null}

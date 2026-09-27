@@ -1,6 +1,7 @@
 import {
   Clock,
   File,
+  FolderOpen,
   ListFilter,
   Pin,
   Plus,
@@ -554,10 +555,7 @@ function SidebarComponent({
   const visibleTabs = tabOrder;
   const inProject = looksLikeProject(cwd);
   const showSidebarFooter = !settingsOpen;
-  const sidebarVisible =
-    open &&
-    (projectRailOpen || settingsOpen) &&
-    (inProject || settingsOpen);
+  const sidebarVisible = open && (projectRailOpen || settingsOpen);
   const [groupLabels] = useState(loadTabGroupLabels);
   const [groupColors] = useState(loadTabGroupColors);
   const [groupCustomColors] = useState(loadTabGroupCustomColors);
@@ -1291,7 +1289,7 @@ function SidebarComponent({
               onOpenFile={onOpenFile}
               onClose={() => onFilesSearchOpenChange(false)}
             />
-          ) : cwd && cwd !== "~" ? (
+          ) : inProject ? (
             <div className="flex min-h-0 flex-1 flex-col">
               <FileTree
                 key={gitRoot}
@@ -1305,9 +1303,27 @@ function SidebarComponent({
               />
             </div>
           ) : (
-            <p className="px-3 py-2 text-[12px] text-content/50">
-              No project folder
-            </p>
+            <div className="flex min-h-full flex-col items-center justify-center gap-3 p-6 text-center">
+              <FolderOpen className="size-8 text-content/25" />
+              <div className="space-y-1">
+                <p className="text-[13px] font-medium text-content/75">
+                  No project open
+                </p>
+                <p className="text-[12px] text-content/45">
+                  Open a folder to browse files and view git changes.
+                </p>
+              </div>
+              {onOpenProject ? (
+                <button
+                  type="button"
+                  onClick={onOpenProject}
+                  className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-lg bg-content/10 px-3 py-1.5 text-[12px] font-medium text-content hover:bg-content/15"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Open project</span>
+                </button>
+              ) : null}
+            </div>
           )}
         </div>
         {tab === "sessions" && cwd && cwd !== "~" ? (
@@ -1615,20 +1631,44 @@ function SidebarComponent({
         </div>
         {tab === "changes" ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <SourceControl
-              cwd={gitRoot}
-              enabled={open}
-              textHarness={textHarness}
-              selectedPath={selectedDiffPath}
-              selectedKind={selectedDiffKind}
-              selectedSha={selectedCommitSha}
-              onOpenFile={
-                onOpenDiff ??
-                ((path) => onOpenFile(path, undefined, { exact: true }))
-              }
-              onOpenAllChanges={onOpenAllChanges ?? (() => {})}
-              onOpenCommit={onOpenCommit ?? (() => {})}
-            />
+            {inProject ? (
+              <SourceControl
+                cwd={gitRoot}
+                enabled={open}
+                textHarness={textHarness}
+                selectedPath={selectedDiffPath}
+                selectedKind={selectedDiffKind}
+                selectedSha={selectedCommitSha}
+                onOpenFile={
+                  onOpenDiff ??
+                  ((path) => onOpenFile(path, undefined, { exact: true }))
+                }
+                onOpenAllChanges={onOpenAllChanges ?? (() => {})}
+                onOpenCommit={onOpenCommit ?? (() => {})}
+              />
+            ) : (
+              <div className="flex min-h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <FolderOpen className="size-8 text-content/25" />
+                <div className="space-y-1">
+                  <p className="text-[13px] font-medium text-content/75">
+                    No project open
+                  </p>
+                  <p className="text-[12px] text-content/45">
+                    Open a git repository to view changes and commit history.
+                  </p>
+                </div>
+                {onOpenProject ? (
+                  <button
+                    type="button"
+                    onClick={onOpenProject}
+                    className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-lg bg-content/10 px-3 py-1.5 text-[12px] font-medium text-content hover:bg-content/15"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Open project</span>
+                  </button>
+                ) : null}
+              </div>
+            )}
           </div>
         ) : null}
         {showSidebarFooter ? (

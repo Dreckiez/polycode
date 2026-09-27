@@ -927,19 +927,7 @@ export default function App({
     windowTransfer,
   ]);
 
-  useEffect(() => {
-    if (lastProjectPath()) return;
-    void invoke<string>("default_cwd")
-      .then((cwd) => {
-        if (!looksLikeProject(cwd)) return;
-        setProjectCwd(cwd);
-        setRecents((prev) => (prev.length > 0 ? prev : rememberProject(cwd)));
-        setSessions((prev) =>
-          prev.map((s) => (s.cwd === "~" ? { ...s, cwd } : s)),
-        );
-      })
-      .catch(() => {});
-  }, []);
+
 
   useEffect(() => {
     setTabs((prev) => {
