@@ -63,7 +63,7 @@ export const FolderRow = memo(function FolderRow({
       }}
       className={`group relative flex w-full touch-none items-center gap-1.5 px-2 h-8 text-left ${
         expanded ? "rounded-md" : ""
-      } ${canReorder ? "cursor-grab active:cursor-grabbing" : ""} ${
+      } ${canReorder ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
         dropTarget
           ? "text-content"
           : expanded

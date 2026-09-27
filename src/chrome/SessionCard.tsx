@@ -6,6 +6,7 @@ import {
   CircleDot,
   GitBranch,
   GitPullRequest,
+  GripVertical,
   Pin,
 } from "./icons";
 import {
@@ -279,6 +280,7 @@ export const SessionCard = memo(function SessionCard({
   };
 
   const archiveLabel = session.archived ? "Unarchive" : "Archive";
+  const canDrag = Boolean(onPlaceOnPane || onListDrop);
 
   return (
     <div className="group relative">
@@ -301,9 +303,9 @@ export const SessionCard = memo(function SessionCard({
           onContextMenu ? (e) => onContextMenu(session.id, e) : undefined
         }
         onKeyDown={onKeyDown}
-        className={`relative border flex w-full touch-none flex-col rounded-md px-2.5 text-left ${
+        className={`relative border flex w-full touch-none items-center gap-1.5 rounded-md px-2 text-left cursor-pointer ${
           compact ? "py-1.5" : "py-2"
-        } ${dragging ? "opacity-40" : ""} ${
+        } ${dragging ? "opacity-40 cursor-grabbing" : ""} ${
           dropTarget
             ? "text-content border-transparent"
             : isSelected
@@ -318,66 +320,74 @@ export const SessionCard = memo(function SessionCard({
         {dropTarget ? (
           <div className="pointer-events-none absolute inset-0 rounded-md bg-accent/20" />
         ) : null}
-        {compact ? null : (
-          <span className="relative flex items-center gap-2">
-            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        {canDrag ? (
+          <GripVertical
+            className="size-3.5 shrink-0 text-content/25 transition-colors group-hover:text-content/60 cursor-grab active:cursor-grabbing"
+            strokeWidth={1.75}
+          />
+        ) : null}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {compact ? null : (
+            <span className="relative flex items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <HarnessIcon
+                  harness={session.harness}
+                  className="size-3.5 shrink-0"
+                />
+                <span className="min-w-0 truncate text-[11px] text-content/50">
+                  {model}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {workItemBadge}
+                {status}
+              </span>
+            </span>
+          )}
+          <span
+            className={`relative flex min-w-0 items-center gap-1.5 ${
+              compact ? "" : "mt-1"
+            }`}
+          >
+            {session.pinned ? (
+              <Pin
+                className="size-3 shrink-0 text-content/45"
+                strokeWidth={1.75}
+              />
+            ) : null}
+            <span className="min-w-0 flex-1 line-clamp-1 text-[13px] font-semibold leading-snug text-content">
+              {title}
+            </span>
+            {compact ? (
+              <span className="flex shrink-0 items-center gap-1.5">
+                {workItemBadge}
+                {status}
+              </span>
+            ) : null}
+          </span>
+          <span className="relative mt-1 flex items-center gap-2">
+            {gitLabel ? (
+              <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45">
+                <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
+                <span className="min-w-0 truncate">{gitLabel}</span>
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1" />
+            )}
+            <span
+              className={`flex shrink-0 items-center gap-1.5 ${
+                onArchive
+                  ? "transition-[padding] group-focus-within:pl-5 group-hover:pl-5"
+                  : ""
+              }`}
+            >
               <HarnessIcon
                 harness={session.harness}
                 className="size-3.5 shrink-0"
               />
-              <span className="min-w-0 truncate text-[11px] text-content/50">
-                {model}
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              {workItemBadge}
-              {status}
             </span>
           </span>
-        )}
-        <span
-          className={`relative flex min-w-0 items-center gap-1.5 ${
-            compact ? "" : "mt-1"
-          }`}
-        >
-          {session.pinned ? (
-            <Pin
-              className="size-3 shrink-0 text-content/45"
-              strokeWidth={1.75}
-            />
-          ) : null}
-          <span className="min-w-0 flex-1 line-clamp-1 text-[13px] font-semibold leading-snug text-content">
-            {title}
-          </span>
-          {compact ? (
-            <span className="flex shrink-0 items-center gap-1.5">
-              {workItemBadge}
-              {status}
-            </span>
-          ) : null}
-        </span>
-        <span className="relative mt-1 flex items-center gap-2">
-          {gitLabel ? (
-            <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45">
-              <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="min-w-0 truncate">{gitLabel}</span>
-            </span>
-          ) : (
-            <span className="min-w-0 flex-1" />
-          )}
-          <span
-            className={`flex shrink-0 items-center gap-1.5 ${
-              onArchive
-                ? "transition-[padding] group-focus-within:pl-5 group-hover:pl-5"
-                : ""
-            }`}
-          >
-            <HarnessIcon
-              harness={session.harness}
-              className="size-3.5 shrink-0"
-            />
-          </span>
-        </span>
+        </div>
       </div>
       {onArchive ? (
         <button
@@ -391,7 +401,7 @@ export const SessionCard = memo(function SessionCard({
             event.stopPropagation();
             onArchive(session.id, !session.archived);
           }}
-          className={`pointer-events-none absolute right-7 grid size-5 place-items-center rounded text-content/50 opacity-0 transition-opacity hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 ${
+          className={`pointer-events-none absolute right-7 grid size-5 cursor-pointer place-items-center rounded text-content/50 opacity-0 transition-opacity hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 ${
             compact ? "bottom-[5px]" : "bottom-[7px]"
           }`}
         >

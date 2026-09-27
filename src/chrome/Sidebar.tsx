@@ -1576,7 +1576,7 @@ function SidebarComponent({
                                       onClick={() =>
                                         onNewInFolder(entry.folder.id)
                                       }
-                                      className="relative flex w-full items-center gap-1 rounded-md border border-transparent px-2.5 py-1.5 text-left text-content/45 hover:bg-content/10 hover:text-content"
+                                      className="relative flex w-full cursor-pointer items-center gap-1 rounded-md border border-transparent px-2.5 py-1.5 text-left text-content/45 hover:bg-content/10 hover:text-content"
                                     >
                                       <Plus
                                         className="size-3 shrink-0"

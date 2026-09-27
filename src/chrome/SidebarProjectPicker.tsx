@@ -215,7 +215,7 @@ export function SidebarProjectPicker({
                       title={item.path}
                       onMouseEnter={() => setActive(index)}
                       onClick={() => pickProject(item.path)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left ${
+                      className={`flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left ${
                         active === index
                           ? "bg-content/10 text-content"
                           : "text-content/75 hover:bg-content/5 hover:text-content"
@@ -262,7 +262,7 @@ export function SidebarProjectPicker({
                     closePicker();
                     onOpenProject();
                   }}
-                  className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-content/75 hover:bg-content/8 hover:text-content"
+                  className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-content/75 hover:bg-content/8 hover:text-content"
                 >
                   <Plus className="size-4 shrink-0" strokeWidth={1.75} />
                   <span>New project</span>
