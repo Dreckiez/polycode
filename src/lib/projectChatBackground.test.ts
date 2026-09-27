@@ -5,7 +5,7 @@ import {
   saveProjectChatBackground,
 } from "./projectChatBackground";
 
-const KEY = "monocode:project-chat-backgrounds";
+const KEY = "polycode:project-chat-backgrounds";
 
 function mockBrowserStorage() {
   const data = new Map<string, string>();

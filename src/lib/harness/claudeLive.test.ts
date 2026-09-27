@@ -85,7 +85,7 @@ async function startTurn(
   emit({ type: "system", subtype: "init", session_id: "sess_1" });
   emit({
     type: "control_response",
-    response: { subtype: "success", request_id: "monocode_1" },
+    response: { subtype: "success", request_id: "polycode_1" },
   });
   await waitFor(() => parse().some((m) => m.type === "user"), "user prompt");
   return { events, turn };

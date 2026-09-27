@@ -206,7 +206,7 @@ describe("provider defaults", () => {
 
   it("falls back to lastModel for the default provider when no map exists", () => {
     localStorage.setItem(
-      "monocode.lastModel",
+      "polycode.lastModel",
       JSON.stringify({ harness: "cursor", model: "cursor:grok-4.6" }),
     );
     expect(preferredModelId("cursor")).toBe("cursor:grok-4.6");

@@ -114,7 +114,7 @@ export function refreshAntigravityCatalog(): Promise<void> {
       if (models.length > 0) setHarnessModels("antigravity", models);
     })
     .catch((error: unknown) => {
-      console.debug("[monocode] antigravity catalog", error);
+      console.debug("[polycode] antigravity catalog", error);
     })
     .finally(() => {
       inflight = null;
@@ -130,7 +130,7 @@ export async function discoverAntigravityModels(): Promise<AgentModel[]> {
     const parsed = parseModelsOutput(output);
     if (parsed.length > 0) return parsed;
   } catch (error) {
-    console.debug("[monocode] agy models failed", error);
+    console.debug("[polycode] agy models failed", error);
   }
   return ANTIGRAVITY_MODEL_CATALOG;
 }

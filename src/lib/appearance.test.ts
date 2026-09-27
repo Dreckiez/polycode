@@ -26,12 +26,12 @@ import {
   saveBodyGlass,
 } from "./appearance";
 
-const KEY = "monocode.transcriptLayout";
-const SCHEME_KEY = "monocode.colorScheme";
-const ANCHOR_KEY = "monocode.transcriptAnchor";
-const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
-const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
-const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
+const KEY = "polycode.transcriptLayout";
+const SCHEME_KEY = "polycode.colorScheme";
+const ANCHOR_KEY = "polycode.transcriptAnchor";
+const CHAT_BACKGROUND_PATH_KEY = "polycode.chatBackgroundPath";
+const CHAT_BACKGROUND_OPACITY_KEY = "polycode.chatBackgroundOpacity";
+const CHAT_BACKGROUND_SCOPE_KEY = "polycode.chatBackgroundScope";
 
 function mockLocalStorage() {
   const data = new Map<string, string>();
@@ -141,8 +141,8 @@ describe("chat background setting", () => {
 describe("sidebar opacity and body glass defaults", () => {
   beforeEach(mockLocalStorage);
   afterEach(() => {
-    localStorage.removeItem("monocode.sidebarOpacity");
-    localStorage.removeItem("monocode.bodyGlass");
+    localStorage.removeItem("polycode.sidebarOpacity");
+    localStorage.removeItem("polycode.bodyGlass");
   });
 
   it("defaults sidebar opacity to 100% and body glass to off", () => {

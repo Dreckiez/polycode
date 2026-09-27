@@ -34,7 +34,7 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
   fx: { name: "fx CLI", install: "curl -fsSL https://fx.sh/setup.sh | bash" },
 };
 
-const AVAILABILITY_STORAGE_KEY = "monocode.harnessAvailability";
+const AVAILABILITY_STORAGE_KEY = "polycode.harnessAvailability";
 
 function loadCachedAvailability(): {
   cached: HarnessAvailability;
@@ -155,7 +155,7 @@ export function isHarnessAvailable(id: HarnessId): boolean {
 export function harnessUnavailableHint(id: HarnessId): string {
   const { name, install } = CLI[id];
   const how = install ? ` (\`${install}\`)` : "";
-  return `${name} not found${how}. Install it, or restart MonoCode if it is already installed.`;
+  return `${name} not found${how}. Install it, or restart PolyCode if it is already installed.`;
 }
 
 export function probeHarnessAvailability(

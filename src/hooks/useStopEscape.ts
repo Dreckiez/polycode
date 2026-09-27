@@ -80,7 +80,7 @@ export function useStopEscape(deps: StopEscapeDeps) {
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      const inTerminal = Boolean(target?.closest(".monocode-terminal"));
+      const inTerminal = Boolean(target?.closest(".polycode-terminal"));
       const activeTabId = d.activeTabIdRef.current;
       const sessionId = focusedBusyAgentSessionId(
         activeTabId,

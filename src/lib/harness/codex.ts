@@ -395,8 +395,8 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   try {
     await rpc.request("initialize", {
       clientInfo: {
-        name: "monocode",
-        title: "MonoCode",
+        name: "polycode",
+        title: "PolyCode",
         version: "0.1.0",
       },
       capabilities: {
@@ -600,7 +600,7 @@ function handleNotification(live: Live, method: string, params: unknown): void {
   const mapped = mapCodexNotification(method, params);
   if (mapped.diagnostic) {
     console.debug(
-      `[monocode] codex ${live.threadId} ${method}`,
+      `[polycode] codex ${live.threadId} ${method}`,
       mapped.diagnostic,
     );
   }
@@ -738,7 +738,7 @@ async function handleServerRequest(
       if (!live.cancelled && !live.muteUpdates)
         live.onEvent({
           type: "status",
-          text: "This MCP server requested a form or browser sign-in that MonoCode does not support yet. Complete it in the server's own interface.",
+          text: "This MCP server requested a form or browser sign-in that PolyCode does not support yet. Complete it in the server's own interface.",
         });
       await live.rpc.respond(id, {
         action: "cancel",

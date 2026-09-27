@@ -251,7 +251,7 @@ async function ensureLive(input: SendTurnInput): Promise<Live> {
       emit({ type: "session.ended", code });
     },
     (line) => {
-      console.debug("[monocode] fx stderr", line);
+      console.debug("[polycode] fx stderr", line);
       if (/Fx needs access|AI Gateway|not start/i.test(line)) {
         emit({ type: "session.error", message: line.trim() });
       }
@@ -267,7 +267,7 @@ async function ensureLive(input: SendTurnInput): Promise<Live> {
         {
           protocolVersion: 1,
           clientCapabilities: CLIENT_CAPABILITIES,
-          clientInfo: { name: "monocode", version: "0.1.0" },
+          clientInfo: { name: "polycode", version: "0.1.0" },
         },
         INIT_TIMEOUT_MS,
       );
@@ -462,7 +462,7 @@ async function prompt(live: Live, input: SendTurnInput): Promise<void> {
 }
 
 function ignoreUnsupportedControl(method: string, error: unknown): void {
-  console.debug(`[monocode] fx ${method} failed`, error);
+  console.debug(`[polycode] fx ${method} failed`, error);
   const detail = error instanceof Error ? error.message : String(error);
   if (/timed out|not running|exited|closed|pipe/i.test(detail)) throw error;
 }

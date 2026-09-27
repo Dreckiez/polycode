@@ -59,17 +59,17 @@ describe("historyWithLiveSessions", () => {
   });
 
   it("stamps composer git onto a live session that is not persisted yet", () => {
-    const session = newSession("cursor", "/tmp/monocode");
+    const session = newSession("cursor", "/tmp/polycode");
     session.blocks = [{ id: "u1", role: "user", text: "hello" }];
     session.busy = true;
 
-    const rows = historyWithLiveSessions([], [session], "/tmp/monocode", {
-      repo: "monocode",
+    const rows = historyWithLiveSessions([], [session], "/tmp/polycode", {
+      repo: "polycode",
       branch: "main",
     });
     expect(rows[0]).toMatchObject({
       id: session.id,
-      repo: "monocode",
+      repo: "polycode",
       branch: "main",
     });
   });
@@ -78,7 +78,7 @@ describe("historyWithLiveSessions", () => {
     const history = [
       {
         ...summary("a1", "/tmp/agent-terminal"),
-        repo: "monocode",
+        repo: "polycode",
         branch: "main",
       },
     ];
@@ -94,7 +94,7 @@ describe("historyWithLiveSessions", () => {
     );
     const live = rows.find((row) => row.id === session.id);
     expect(live).toMatchObject({
-      repo: "monocode",
+      repo: "polycode",
       branch: "fix-gutter",
     });
   });
@@ -109,11 +109,11 @@ describe("historyWithLiveSessions", () => {
       [],
       [session],
       "/tmp/agent-terminal",
-      { repo: "monocode", branch: "main" },
+      { repo: "polycode", branch: "main" },
     );
     expect(rows[0]).toMatchObject({
       id: session.id,
-      repo: "monocode",
+      repo: "polycode",
       branch: "feat/picker",
     });
   });

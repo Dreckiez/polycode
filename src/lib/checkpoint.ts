@@ -26,7 +26,7 @@ export type CheckpointFileDiff = {
   tooLarge: boolean;
 };
 
-const REVIEW_CHANGED = "monocode-review-changed";
+const REVIEW_CHANGED = "polycode-review-changed";
 const checkpointQueues = new Map<string, Promise<void>>();
 
 function enqueueCheckpoint<T>(

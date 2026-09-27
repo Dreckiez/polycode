@@ -2,15 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { HARNESS_TITLE, sessionDisplayTitle, type Session } from "./session";
 import { loadSoundsEnabled } from "./sounds";
 
-const KEY = "monocode.notifications";
+const KEY = "polycode.notifications";
 
 /** Off until the user opts in; enabling asks the OS for permission. */
 export const NOTIFICATIONS_DEFAULT = false;
 
-export const NOTIFICATIONS_CHANGE_EVENT = "monocode:notifications-change";
+export const NOTIFICATIONS_CHANGE_EVENT = "polycode:notifications-change";
 
 /** Rust emits this with the session id when a notification is clicked. */
-export const NOTIFICATION_CLICK_EVENT = "monocode:notification-click";
+export const NOTIFICATION_CLICK_EVENT = "polycode:notification-click";
 
 export type NotificationPermission =
   | "prompt"
@@ -160,7 +160,7 @@ export function notificationText(
   session: Session,
   event: NotificationEvent,
 ): NotificationText {
-  const title = "MonoCode";
+  const title = "PolyCode";
   const subtitle = sessionDisplayTitle(session.title, session.harness);
   const harness = HARNESS_TITLE[session.harness];
   if (event !== "finished") {

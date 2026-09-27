@@ -25,7 +25,7 @@ export async function generateCursorSessionTitle(input: {
     });
     return parseGeneratedSessionTitle(output, input.message);
   } catch (error) {
-    console.debug("[monocode] session title", error);
+    console.debug("[polycode] session title", error);
     return null;
   }
 }

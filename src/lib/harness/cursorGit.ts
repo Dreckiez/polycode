@@ -57,7 +57,7 @@ export async function generateCursorPrContent(
     });
     parsed = parsePrContent(output);
   } catch (error) {
-    console.debug("[monocode] pr content", error);
+    console.debug("[polycode] pr content", error);
   }
   const title =
     parsed?.title ||
@@ -83,7 +83,7 @@ export async function generateCursorBranchName(
     });
     return parseBranchName(output);
   } catch (error) {
-    console.debug("[monocode] branch name", error);
+    console.debug("[polycode] branch name", error);
     return null;
   }
 }

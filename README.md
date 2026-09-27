@@ -1,9 +1,9 @@
 
 <p align="center">
-  <img src="public/monocode.png" alt="MonoCode" width="88" />
+  <img src="public/polycode.png" alt="PolyCode" width="88" />
 </p>
 
-<h1 align="center">MonoCode</h1>
+<h1 align="center">PolyCode</h1>
 
 <p align="center">
   <strong>A desktop UI for your coding agents.</strong>
@@ -13,7 +13,7 @@
   <img width="1680" height="1050" alt="Screenshot 2026-09-04 at 06 34 00" src="https://github.com/user-attachments/assets/2cd4a6ec-eb1e-4b45-8627-a76442ea3874" />
 </p>
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, and fx. If they’re installed and logged in, MonoCode can run them. Tabs are sessions. The composer is the input. MonoCode does not sell tokens.
+Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, and fx. If they’re installed and logged in, PolyCode can run them. Tabs are sessions. The composer is the input. PolyCode does not sell tokens.
 
 ## Install
 
@@ -28,13 +28,13 @@ Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCod
 > - [omp](https://omp.sh) - `curl -fsSL https://omp.sh/install | sh`
 > - [fx](https://fx.sh) - `curl -fsSL https://fx.sh/setup.sh | bash` then `fx login`
 
-macOS (Apple Silicon): download [MonoCode.dmg](https://dl.usemono.dev/MonoCode.dmg), open it, drag MonoCode to Applications.
+macOS (Apple Silicon): download [PolyCode.dmg](https://dl.usemono.dev/PolyCode.dmg), open it, drag PolyCode to Applications.
 
-macOS (Intel): download [MonoCode_x64.dmg](https://dl.usemono.dev/MonoCode_x64.dmg), open it, drag MonoCode to Applications.
+macOS (Intel): download [PolyCode_x64.dmg](https://dl.usemono.dev/PolyCode_x64.dmg), open it, drag PolyCode to Applications.
 
-Linux (x86_64): download the `.deb` or AppImage from [GitHub Releases](https://github.com/hardbeat920/monocode/releases/latest). Install the `.deb` with `sudo apt install ./MonoCode_*.deb`, or make the AppImage executable with `chmod +x MonoCode_*.AppImage` and run it directly.
+Linux (x86_64): download the `.deb` or AppImage from [GitHub Releases](https://github.com/hardbeat920/polycode/releases/latest). Install the `.deb` with `sudo apt install ./PolyCode_*.deb`, or make the AppImage executable with `chmod +x PolyCode_*.AppImage` and run it directly.
 
-Windows (x86_64): download the NSIS installer from [GitHub Releases](https://github.com/hardbeat920/monocode/releases/latest) and run it.
+Windows (x86_64): download the NSIS installer from [GitHub Releases](https://github.com/hardbeat920/polycode/releases/latest) and run it.
 
 ## Some notes
 

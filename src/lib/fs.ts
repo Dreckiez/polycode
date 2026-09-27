@@ -36,7 +36,7 @@ export type DiscoveredSkill = {
     | "fx"
     | "grok"
     | "antigravity"
-    | "monocode";
+    | "polycode";
 };
 
 export function listSkills(
@@ -309,7 +309,7 @@ export function restoreSessionCheckout<
   };
 }
 
-const GIT_CHANGED = "monocode-git-changed";
+const GIT_CHANGED = "polycode-git-changed";
 
 /** Tell git UIs (diff pane, branch picker) to reload after a local git mutation. */
 export function notifyGitChanged() {

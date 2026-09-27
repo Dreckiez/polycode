@@ -38,26 +38,26 @@ export {
   type ThemePresetId,
 };
 
-const THEME_HUE_KEY = "monocode.themeHue";
-const THEME_SATURATION_KEY = "monocode.themeSaturation";
-const OPACITY_KEY = "monocode.sidebarOpacity";
-const BLUR_KEY = "monocode.sidebarBlur";
-const PROJECT_RAIL_OPEN_KEY = "monocode.projectRailOpen";
-const BODY_KEY = "monocode.bodyGlass";
-const SCHEME_KEY = "monocode.colorScheme";
-const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
-const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
-const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
-const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
-const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
-const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
-const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
-const CHANGES_VIEW_KEY = "monocode.changesView";
+const THEME_HUE_KEY = "polycode.themeHue";
+const THEME_SATURATION_KEY = "polycode.themeSaturation";
+const OPACITY_KEY = "polycode.sidebarOpacity";
+const BLUR_KEY = "polycode.sidebarBlur";
+const PROJECT_RAIL_OPEN_KEY = "polycode.projectRailOpen";
+const BODY_KEY = "polycode.bodyGlass";
+const SCHEME_KEY = "polycode.colorScheme";
+const SIDEBAR_TAB_ORDER_KEY = "polycode.sidebarTabOrder";
+const PROJECT_RAIL_WIDTH_KEY = "polycode.projectRailWidth";
+const TRANSCRIPT_LAYOUT_KEY = "polycode.transcriptLayout";
+const TRANSCRIPT_ANCHOR_KEY = "polycode.transcriptAnchor";
+const CHAT_BACKGROUND_PATH_KEY = "polycode.chatBackgroundPath";
+const CHAT_BACKGROUND_OPACITY_KEY = "polycode.chatBackgroundOpacity";
+const CHAT_BACKGROUND_SCOPE_KEY = "polycode.chatBackgroundScope";
+const CHANGES_VIEW_KEY = "polycode.changesView";
 let chatBackgroundRevision = Date.now();
 let nativeGlassReady = false;
 
 export const CHAT_BACKGROUND_PATH_CHANGE_EVENT =
-  "monocode:chat-background-path-change";
+  "polycode:chat-background-path-change";
 
 export type ColorScheme = "dark" | "light";
 export type ThemePreference = ColorScheme | "system";
@@ -68,7 +68,7 @@ export type ChangesView = "list" | "tree";
 export const THEME_PREFERENCE_DEFAULT: ThemePreference = "dark";
 
 /** Fired on `window` whenever the color scheme flips (detail: ColorScheme). */
-export const SCHEME_CHANGE_EVENT = "monocode:schemechange";
+export const SCHEME_CHANGE_EVENT = "polycode:schemechange";
 
 export const TRANSCRIPT_LAYOUT_DEFAULT: TranscriptLayout = "full";
 
@@ -77,10 +77,10 @@ export const CHANGES_VIEW_DEFAULT: ChangesView = "list";
 export const TRANSCRIPT_ANCHOR_DEFAULT = true;
 
 /** Fired on `window` whenever prompt-to-top anchoring flips (detail: boolean). */
-export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
+export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "polycode:transcriptanchorchange";
 
 /** Fired on `window` whenever the transcript layout flips (detail: TranscriptLayout). */
-export const TRANSCRIPT_LAYOUT_CHANGE_EVENT = "monocode:transcriptlayoutchange";
+export const TRANSCRIPT_LAYOUT_CHANGE_EVENT = "polycode:transcriptlayoutchange";
 
 export type SidebarTabId = "files" | "sessions" | "changes";
 
@@ -117,13 +117,13 @@ export const CHAT_BACKGROUND_OPACITY_MAX = 1;
 export const CHAT_BACKGROUND_OPACITY_DEFAULT = 0.24;
 export const CHAT_BACKGROUND_SCOPE_DEFAULT: ChatBackgroundScope = "all";
 
-export const CHAT_BACKGROUND_DITHER_KEY = "monocode.chatBackgroundDither";
+export const CHAT_BACKGROUND_DITHER_KEY = "polycode.chatBackgroundDither";
 export const CHAT_BACKGROUND_DITHER_DEFAULT = true;
-export const CHAT_BACKGROUND_DITHER_CHANGE_EVENT = "monocode:chat-background-dither-changed";
+export const CHAT_BACKGROUND_DITHER_CHANGE_EVENT = "polycode:chat-background-dither-changed";
 
-export const AUTO_MATCH_THEME_KEY = "monocode.autoMatchTheme";
+export const AUTO_MATCH_THEME_KEY = "polycode.autoMatchTheme";
 export const AUTO_MATCH_THEME_DEFAULT = true;
-export const AUTO_MATCH_THEME_CHANGE_EVENT = "monocode:auto-match-theme-changed";
+export const AUTO_MATCH_THEME_CHANGE_EVENT = "polycode:auto-match-theme-changed";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));

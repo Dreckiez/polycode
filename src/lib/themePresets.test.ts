@@ -54,7 +54,7 @@ describe("themePresets", () => {
   it("defaults to the default theme", () => {
     expect(DEFAULT_THEME_ID).toBe("default");
     expect(loadThemePresetId()).toBe("default");
-    expect(getThemePreset("default").name).toBe("MonoCode Slate");
+    expect(getThemePreset("default").name).toBe("PolyCode Slate");
   });
 
   it("falls back to default for unknown preset IDs", () => {

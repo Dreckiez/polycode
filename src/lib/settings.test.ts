@@ -18,11 +18,11 @@ import {
   saveNotesEnabled,
 } from "./settings";
 
-const KEY = "monocode.composerRunner";
-const NOTES_KEY = "monocode.notesEnabled";
-const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
-const DIFF_VIEWER_KEY = "monocode.diffViewer";
-const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
+const KEY = "polycode.composerRunner";
+const NOTES_KEY = "polycode.notesEnabled";
+const LIVE_AGENTS_KEY = "polycode.liveAgentsEnabled";
+const DIFF_VIEWER_KEY = "polycode.diffViewer";
+const FOLLOW_UP_BEHAVIOR_KEY = "polycode.followUpBehavior";
 
 describe("follow-up behavior setting", () => {
   beforeEach(mockLocalStorage);

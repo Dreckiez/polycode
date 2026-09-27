@@ -8,8 +8,8 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 use crate::session_store::{now_millis, validate_id, SessionStore};
 
-pub(crate) const CHANGED: &str = "monocode:reminders-changed";
-const OPEN: &str = "monocode:reminder-open";
+pub(crate) const CHANGED: &str = "polycode:reminders-changed";
+const OPEN: &str = "polycode:reminder-open";
 pub(crate) const NOTIFICATION_PREFIX: &str = "reminder:";
 
 #[derive(Clone, Debug, Serialize)]
@@ -343,7 +343,7 @@ pub(crate) fn init(app: &AppHandle) {
             let _ = tauri::async_runtime::block_on(crate::notifications::show_notification(
                 app.clone(),
                 identifier,
-                "MonoCode".into(),
+                "PolyCode".into(),
                 reminder.title,
                 "Reminder: continue this conversation.".into(),
                 preferences.sound,
@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn reopening_catches_missed_reminders_without_reannouncing_fired_ones() {
         let path = std::env::temp_dir().join(format!(
-            "monocode-reminders-{}-{}",
+            "polycode-reminders-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

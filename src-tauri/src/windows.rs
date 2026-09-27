@@ -14,7 +14,7 @@ use windows_sys::Win32::System::{
 
 static MANAGED_JOB: OnceLock<Result<OwnedHandle, i32>> = OnceLock::new();
 
-/// Restrict DLL lookup before the first PTY is opened. MonoCode itself stays
+/// Restrict DLL lookup before the first PTY is opened. PolyCode itself stays
 /// outside the job so relaunches and external applications do not inherit it.
 pub(crate) fn initialize() -> io::Result<()> {
     unsafe {
@@ -223,8 +223,8 @@ mod tests {
     // This subprocess deliberately dies before it can wait; the parent verifies cleanup.
     #[allow(clippy::zombie_processes)]
     fn abrupt_exit_kills_children() {
-        const MARKER: &str = "MONOCODE_JOB_TEST_CHILD";
-        const PID_FILE: &str = "MONOCODE_JOB_TEST_DESCENDANT_FILE";
+        const MARKER: &str = "POLYCODE_JOB_TEST_CHILD";
+        const PID_FILE: &str = "POLYCODE_JOB_TEST_DESCENDANT_FILE";
         if std::env::var(MARKER).as_deref() == Ok("terminal") {
             // This is the terminal's startup code. Launch a detached child
             // immediately, before the supervisor can do any post-spawn work.
@@ -254,7 +254,7 @@ mod tests {
                 .openpty(portable_pty::PtySize::default())
                 .unwrap();
             let pid_file = std::env::temp_dir().join(format!(
-                "monocode-pty-descendant-{}.pid",
+                "polycode-pty-descendant-{}.pid",
                 std::process::id()
             ));
             let _ = std::fs::remove_file(&pid_file);

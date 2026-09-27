@@ -61,15 +61,15 @@ export type ThemePreset = {
   terminalPalette: TerminalAnsiPalette;
 };
 
-export const THEME_PRESET_KEY = "monocode.themePreset";
-export const THEME_PRESET_CHANGE_EVENT = "monocode:theme-preset-change";
+export const THEME_PRESET_KEY = "polycode.themePreset";
+export const THEME_PRESET_CHANGE_EVENT = "polycode:theme-preset-change";
 
 export const DEFAULT_THEME_ID: ThemePresetId = "default";
 
 export const THEME_PRESETS: readonly ThemePreset[] = [
   {
     id: "default",
-    name: "MonoCode Slate",
+    name: "PolyCode Slate",
     scheme: "dark",
     description: "Neutral, focused dark theme with slate tones and vibrant syntax.",
     hue: 240,

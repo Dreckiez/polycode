@@ -28,8 +28,8 @@ describe("projectMascots", () => {
   });
 
   it("picks the same mascot for the same project", () => {
-    expect(projectMascot("~/code/monocode")).toBe(
-      projectMascot("~/code/monocode"),
+    expect(projectMascot("~/code/polycode")).toBe(
+      projectMascot("~/code/polycode"),
     );
   });
 

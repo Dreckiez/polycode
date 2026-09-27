@@ -47,7 +47,7 @@ export function refreshOpenCodeCatalog(): Promise<void> {
       if (models.length > 0) setHarnessModels("opencode", models);
     })
     .catch((error: unknown) => {
-      console.debug("[monocode] opencode catalog", error);
+      console.debug("[polycode] opencode catalog", error);
     })
     .finally(() => {
       inflight = null;
@@ -62,7 +62,7 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   const version = parseOpenCodeVersion(versionOut);
   if (!version) {
     throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
+      `Unable to determine OpenCode version. PolyCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
     );
   }
   if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {
@@ -78,7 +78,7 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
     const agentsOut = await execChild(path, ["agent", "list"], cwd);
     agents = parseAgentListCliOutput(agentsOut);
   } catch (error) {
-    console.debug("[monocode] opencode agents", error);
+    console.debug("[polycode] opencode agents", error);
   }
   return flattenOpenCodeModels(parsed, agents);
 }

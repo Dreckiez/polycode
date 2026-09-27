@@ -290,7 +290,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps) {
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         void message(`Could not ${mode} this conversation.\n\n${detail}`, {
-          title: "MonoCode",
+          title: "PolyCode",
           kind: "error",
         });
         return false;
@@ -324,7 +324,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps) {
         void message(
           `Could not unarchive this conversation.\n\n${String(error)}`,
           {
-            title: "MonoCode",
+            title: "PolyCode",
             kind: "error",
           },
         );

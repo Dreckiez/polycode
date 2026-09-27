@@ -58,7 +58,7 @@ const mocks = vi.hoisted(() => {
           surfaceOpen: boolean;
         }) => boolean)
       | null,
-    NOTIFICATION_CLICK_EVENT: "monocode:notification-click",
+    NOTIFICATION_CLICK_EVENT: "polycode:notification-click",
   };
 });
 
@@ -395,7 +395,7 @@ describe("useKeyboardShortcuts", () => {
 
   it("Ctrl+[ is left to the terminal instead of going back", async () => {
     await mount();
-    const terminal = clazz("monocode-terminal");
+    const terminal = clazz("polycode-terminal");
     press({ key: "[", code: "BracketLeft", ctrlKey: true, target: terminal });
     expect(actuators.onVisitBack).not.toHaveBeenCalled();
     press({ key: "[", code: "BracketLeft", metaKey: true, target: terminal });

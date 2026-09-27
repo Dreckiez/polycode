@@ -254,7 +254,7 @@ export const ModelPicker = memo(function ModelPicker({
   useEffect(() => {
     const inBlockingUi = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
-      if (target.closest(".monocode-terminal")) return true;
+      if (target.closest(".polycode-terminal")) return true;
       return Boolean(
         target.closest(
           "[data-file-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker], [data-access-picker], [data-effort-picker]",

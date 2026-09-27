@@ -20,10 +20,10 @@ import {
   CREATE_SKILL_NAME,
 } from "./createSkill";
 
-const DISABLED_SKILL_PATHS_KEY = "monocode.disabledSkillPaths";
+const DISABLED_SKILL_PATHS_KEY = "polycode.disabledSkillPaths";
 
 /** Fired on `window` when a skill is enabled or disabled in Settings. */
-export const SKILLS_CHANGE_EVENT = "monocode:skills-change";
+export const SKILLS_CHANGE_EVENT = "polycode:skills-change";
 
 export function loadDisabledSkillPaths(): string[] {
   try {
@@ -67,7 +67,7 @@ export type SkillSource =
   | "fx"
   | "grok"
   | "antigravity"
-  | "monocode";
+  | "polycode";
 
 type SkillCommon = {
   name: string;
@@ -85,7 +85,7 @@ export type FileSkill = SkillCommon & {
 export type BuiltinSkill = SkillCommon & {
   kind: "builtin";
   scope: "builtin";
-  source: "monocode";
+  source: "polycode";
 };
 
 export type NativeSkill = NativeCommand & {
@@ -106,7 +106,7 @@ export const BUILTIN_CREATE_SKILL: BuiltinSkill = {
   description: CREATE_SKILL_DESCRIPTION,
   invocation: CREATE_SKILL_NAME,
   scope: "builtin",
-  source: "monocode",
+  source: "polycode",
 };
 
 const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -306,7 +306,7 @@ export function isSkillCompatibleWithHarness(
   skillSource: string,
   harness: HarnessId,
 ): boolean {
-  if (skillSource === "agents" || skillSource === "monocode") return true;
+  if (skillSource === "agents" || skillSource === "polycode") return true;
   return skillSource === harness;
 }
 
@@ -355,7 +355,7 @@ function asSkill(skill: DiscoveredSkill): FileSkill {
     invocation: skill.name,
     path: skill.path,
     scope: skill.scope === "user" ? "user" : "project",
-    source: skill.source === "monocode" ? "monocode" : skill.source,
+    source: skill.source === "polycode" ? "polycode" : skill.source,
   };
 }
 

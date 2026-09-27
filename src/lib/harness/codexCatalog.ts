@@ -15,7 +15,7 @@ import {
 import { asRecord, stringField } from "./codexProtocol";
 import { JsonRpcClient } from "./jsonRpc";
 
-const PROBE_ID = "monocode-codex-probe";
+const PROBE_ID = "polycode-codex-probe";
 const DISCOVERY_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -39,7 +39,7 @@ export function refreshCodexCatalog(): Promise<void> {
       if (models.length > 0) setHarnessModels("codex", models);
     })
     .catch((error: unknown) => {
-      console.debug("[monocode] codex catalog", error);
+      console.debug("[polycode] codex catalog", error);
     })
     .finally(() => {
       inflight = null;
@@ -79,8 +79,8 @@ async function discoverCodexModels(): Promise<AgentModel[]> {
         "initialize",
         {
           clientInfo: {
-            name: "monocode",
-            title: "MonoCode",
+            name: "polycode",
+            title: "PolyCode",
             version: "0.1.0",
           },
           capabilities: { experimentalApi: true },

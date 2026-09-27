@@ -226,7 +226,7 @@ export function buildClaudeSpawnArgs(input: {
   if (input.includePartialMessages !== false) {
     args.push("--include-partial-messages");
   }
-  // Isolated spawns are MonoCode's own helper calls (titles, summaries); the
+  // Isolated spawns are PolyCode's own helper calls (titles, summaries); the
   // user's hooks have no business firing there. Interactive sessions inherit
   // whatever the caller decided so `~/.claude` hooks keep working.
   const settings: ClaudeCliSettings = {

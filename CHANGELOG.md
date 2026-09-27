@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Set a reminder from a session's menu using a preset or custom date and time. MonoCode persists scheduled reminders, delivers a notification when one is due, keeps reminder notices available in the session, and shows the scheduled time when cancelling one.
+- Set a reminder from a session's menu using a preset or custom date and time. PolyCode persists scheduled reminders, delivers a notification when one is due, keeps reminder notices available in the session, and shows the scheduled time when cancelling one.
 - The model picker remembers the six most recently used models. Right-click the current model or press Command/Ctrl+Period to switch among them quickly.
 - Notes support normalized tags that can be edited and searched, and selected text from an agent transcript can be saved directly as a note.
 - File and terminal tab menus include **Close Others**, with confirmation before closing unsaved files or running terminals.
@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `/add-to-folder` in the composer to place the current session in an existing sidebar folder or create a new folder without interrupting the prompt.
 - Ungrouped pinned sessions now appear in a dedicated **Pinned** sidebar section that can be collapsed independently for each project and expands automatically while searching.
 - Click an image attachment in the composer to inspect it in a full-screen preview; close it with Escape, the close button, or the backdrop, and focus returns to the attachment.
-- Right-click file links, inline file paths, and code-block paths in agent messages to open them in MonoCode or the default app, reveal them in the system file manager, or copy their absolute or project-relative path.
+- Right-click file links, inline file paths, and code-block paths in agent messages to open them in PolyCode or the default app, reveal them in the system file manager, or copy their absolute or project-relative path.
 - macOS releases now include separate signed packages for Apple Silicon and Intel Macs.
 
 ### Changed
@@ -63,9 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- GitLab joins the Inbox alongside GitHub and Linear. Connect GitLab.com or a self-managed instance from Settings, then browse and filter issues and merge requests, inspect details, comments, assignees, labels, and diffs, post comments, and start or discuss work without leaving MonoCode.
+- GitLab joins the Inbox alongside GitHub and Linear. Connect GitLab.com or a self-managed instance from Settings, then browse and filter issues and merge requests, inspect details, comments, assignees, labels, and diffs, post comments, and start or discuss work without leaving PolyCode.
 - Sessions started from a GitHub Inbox item, or whose first prompt references a GitHub issue or pull request, remember that work item. Session cards link back to it, Inbox rows show related thread counts, and issue or pull request details link to every matching current or archived thread.
-- Settings → Skills lists file-based skills from MonoCode, the current project, personal folders, and supported harnesses. Filter or refresh the catalog, enable and disable individual skills, create a starter project or personal `SKILL.md`, and copy or reveal a skill's path. In #137 by @imnakul.
+- Settings → Skills lists file-based skills from PolyCode, the current project, personal folders, and supported harnesses. Filter or refresh the catalog, enable and disable individual skills, create a starter project or personal `SKILL.md`, and copy or reveal a skill's path. In #137 by @imnakul.
 - Edit and Write activity in agent transcripts shows the tool's exact diff or written content in an accessible hover and keyboard-focus preview; click through to open the full file or diff.
 - Right-click file tabs to open a file in its default app, reveal it in the system file manager, copy its name or absolute or project-relative path, or close the tab.
 - Selecting code in the editor opens an **Add to chat** action that inserts the file and selected line range into the composer without copying the code itself.
@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Settings model picker now uses MonoCode's theme-aware popover, with keyboard navigation, active-option announcements, and reliable focus restoration instead of the operating system's native select menu. In #149 by @ardevdevts.
+- The Settings model picker now uses PolyCode's theme-aware popover, with keyboard navigation, active-option announcements, and reliable focus restoration instead of the operating system's native select menu. In #149 by @ardevdevts.
 - Skill names, sources, paths, and creation controls use the same sans-serif interface typography as the rest of Settings.
 
 ### Fixed
@@ -106,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Code block syntax highlighting follows MonoCode's appearance preference instead of the system color scheme. In #117 by @kartava.
+- Code block syntax highlighting follows PolyCode's appearance preference instead of the system color scheme. In #117 by @kartava.
 - Split conversation panes share one continuous chat background instead of repeating the image in every pane.
 - Project search safely treats include filters beginning with `-` as path patterns instead of Git options. In #125 by @Karajelly.
 - Release publishing validates and uploads the expected versioned artifacts for every supported platform.
@@ -131,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shift-click conversations in the sidebar to select several at once, then pin, unpin, archive, unarchive, move into or out of folders, or delete them together.
 - Settings → Appearance → Chat background adds an on-device image behind empty sessions or every conversation, with adjustable visibility. Each project can override the global image from its project-rail menu.
 - Long transcripts have a vertical prompt outline for jumping between turns. Hover or keyboard-focus a marker to preview its prompt and reply. In #90 by @kartava.
-- Drag image files into a note to copy them into MonoCode's local note storage and insert them into the note at the cursor.
+- Drag image files into a note to copy them into PolyCode's local note storage and insert them into the note at the cursor.
 - Archive the focused conversation with Shift+Command/Ctrl+A. The shortcut stays out of editors, terminals, diffs, and open overlays. In #89 by @kualta.
 
 ### Changed
@@ -166,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Terminal focus stays in place after changing directories with `cd`. In #94.
 - Wrapped inline code grows to fit its content, and list markers stay beside it. In #93.
 - GitHub pull request lookups qualify the head branch with its repository owner.
-- The Windows installer uses the MonoCode icon.
+- The Windows installer uses the PolyCode icon.
 
 ## [0.1.35] - 2026-09-06
 
@@ -174,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Inbox items have an **Ask** panel for discussing and analyzing GitHub and Linear issues and pull requests without leaving the Inbox. Discussions remain available while switching items, can be restarted, and stay out of project history, recovery, and notifications.
 - Settings → Appearance → Interface scale zooms the full UI from 50–200% and persists the choice. Use Command/Ctrl with `+`, `-`, or `0`, the View menu, or the settings slider. In #86 by @xaccefy.
-- Settings: Notifications, off by default. With it on, a system notification appears when a turn finishes or an agent waits on an approval or question in a session that is not on screen, whether MonoCode is in the background or another session is open; clicking it jumps to that session. Turning it on asks macOS for permission, and a blocked state links to System Settings. The Sounds setting decides whether the notification plays a sound, and the in-app cue is skipped when the banner fires. In #62 by @emircan-sahin.
+- Settings: Notifications, off by default. With it on, a system notification appears when a turn finishes or an agent waits on an approval or question in a session that is not on screen, whether PolyCode is in the background or another session is open; clicking it jumps to that session. Turning it on asks macOS for permission, and a blocked state links to System Settings. The Sounds setting decides whether the notification plays a sound, and the in-app cue is skipped when the banner fires. In #62 by @emircan-sahin.
 - Windows is a supported desktop target. Terminals, agent CLIs, and the rest of the macOS/Linux feature set run there, the window uses Tauri Acrylic in place of macOS vibrancy, and releases include an x86_64 NSIS installer. In #46.
 
 ### Changed
@@ -194,8 +194,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Navigate sessions with Shift+Command/Ctrl+Up or Down and projects with Shift+Command/Ctrl+Left or Right. The shortcuts follow the visible sidebar order and also work from an empty composer. In #47 by @MisterWanted.
 - Session cards show an Archive or Unarchive action on hover and keyboard focus.
-- OMP's native commands and custom workflows appear in the `/` picker, with descriptions and argument hints. Commands run through OMP with their arguments intact, and workflow dialogs support choosing options and entering text. MonoCode keeps `/plan` and `/compact`; use `/omp:plan` and `/omp:compact` for OMP's versions.
-- The `@` file picker supports files and folders whose paths contain spaces and refreshes when the workspace changes, so newly created paths appear without restarting MonoCode. Unsafe control and bidirectional formatting characters are excluded from mention tokens. In #67 by @elanchezhiyanr.
+- OMP's native commands and custom workflows appear in the `/` picker, with descriptions and argument hints. Commands run through OMP with their arguments intact, and workflow dialogs support choosing options and entering text. PolyCode keeps `/plan` and `/compact`; use `/omp:plan` and `/omp:compact` for OMP's versions.
+- The `@` file picker supports files and folders whose paths contain spaces and refreshes when the workspace changes, so newly created paths appear without restarting PolyCode. Unsafe control and bidirectional formatting characters are excluded from mention tokens. In #67 by @elanchezhiyanr.
 
 ### Fixed
 
@@ -364,16 +364,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- After an in-app update, MonoCode shows a notification with a **What's new** action. It opens the bundled notes in a read-only tab only when requested. The notes remain available under Settings → General → About.
+- After an in-app update, PolyCode shows a notification with a **What's new** action. It opens the bundled notes in a read-only tab only when requested. The notes remain available under Settings → General → About.
 - Inbox pull request and issue details load the conversation (comments, reviews, and review threads) in the background, so the description still appears first.
-- Grok Build joins the provider list. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash` and run `grok login` (or set `XAI_API_KEY`). MonoCode runs `grok agent stdio` like the other ACP harnesses: live turns, supervised approvals, model catalog, reasoning effort, context usage, skills from `.grok/skills`, and titles / commit / PR text.
+- Grok Build joins the provider list. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash` and run `grok login` (or set `XAI_API_KEY`). PolyCode runs `grok agent stdio` like the other ACP harnesses: live turns, supervised approvals, model catalog, reasoning effort, context usage, skills from `.grok/skills`, and titles / commit / PR text.
 - Search sits next to Inbox and Notes in the sidebar project picker, with the same ⌘K / Ctrl+K hint.
 
 ## [0.1.22] - 2026-08-31
 
 ### Added
 
-- Settings → Appearance: System theme. The picker was Dark and Light only, so the app never followed the OS. System tracks the appearance while MonoCode is open; Dark stays the default, so existing installs do not flip. In #36 by @emircan-sahin.
+- Settings → Appearance: System theme. The picker was Dark and Light only, so the app never followed the OS. System tracks the appearance while PolyCode is open; Dark stays the default, so existing installs do not flip. In #36 by @emircan-sahin.
 - Search, Inbox, and Notes show Back and a sidebar toggle in the title bar when the project rail is closed, so you can get the rail back without leaving the overlay.
 
 ### Changed
@@ -413,7 +413,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Notes: a markdown notebook on the project rail. Save a finished turn from the transcript, write your own, then mention it later with `@note` or add it to chat — the note shows as a card, the same way Inbox issues do. Settings → General has a Notes toggle (on by default) to hide it from the UI.
-- Claude Code hooks now run. MonoCode used to launch the CLI with `disableAllHooks`, so every hook in your `settings.json` — command rewrites, blocks, notifications — was silently skipped. Settings → General has a "Claude Code hooks" toggle (on by default) to turn them back off if one misbehaves. MonoCode's own helper spawns, like title generation, stay hook-free. In #25.
+- Claude Code hooks now run. PolyCode used to launch the CLI with `disableAllHooks`, so every hook in your `settings.json` — command rewrites, blocks, notifications — was silently skipped. Settings → General has a "Claude Code hooks" toggle (on by default) to turn them back off if one misbehaves. PolyCode's own helper spawns, like title generation, stay hook-free. In #25.
 
 ### Changed
 
@@ -519,7 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Claude usage in the footer refreshes OAuth tokens before they expire and retries on 401, so the chip stays signed in. Failed sign-in shows expired instead of a generic error.
-- GitHub inbox and `gh` subprocesses work when MonoCode is launched from Finder, by resolving the CLI through the login-shell PATH the same way harnesses do.
+- GitHub inbox and `gh` subprocesses work when PolyCode is launched from Finder, by resolving the CLI through the login-shell PATH the same way harnesses do.
 
 ## [0.1.12] - 2026-08-27
 
@@ -537,7 +537,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Linear personal API keys stay on this Mac: written to the app data folder (`~/Library/Application Support/com.monocode.desktop/linear-token`) with owner-only permissions (`0600`). They are sent only to Linear's API to list and read issues, never to MonoCode servers, and never placed in the agent prompt. Disconnect deletes the file. GitHub uses the `gh` login already on the machine; MonoCode does not store a GitHub token.
+- Linear personal API keys stay on this Mac: written to the app data folder (`~/Library/Application Support/com.polycode.desktop/linear-token`) with owner-only permissions (`0600`). They are sent only to Linear's API to list and read issues, never to PolyCode servers, and never placed in the agent prompt. Disconnect deletes the file. GitHub uses the `gh` login already on the machine; PolyCode does not store a GitHub token.
 
 ## [0.1.11] - 2026-08-27
 
@@ -561,7 +561,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- omp ([oh-my-pi](https://omp.sh)) joins the provider list. Install it with `curl -fsSL https://omp.sh/install | sh` and log in, and MonoCode runs it like any other harness: live turns, steering, approvals, model catalog, and skills from `.omp/skills`.
+- omp ([oh-my-pi](https://omp.sh)) joins the provider list. Install it with `curl -fsSL https://omp.sh/install | sh` and log in, and PolyCode runs it like any other harness: live turns, steering, approvals, model catalog, and skills from `.omp/skills`.
 - Check for updates in the classic sidebar footer.
 
 ### Changed
@@ -624,8 +624,8 @@ Thanks [@Queaxtra](https://github.com/Queaxtra) for the filter and archive ideas
 ### Fixed
 
 - Read and Find rows show the file or search query next to the verb, instead of a bare Read/Find. Every provider uses the same nested-arg extraction; Cursor also recovers Glob/Grep from its session store when ACP sends empty input.
-- Provider CLIs installed through a Node version manager (nvm, fnm, mise, Volta) no longer show as unavailable when MonoCode is launched from Finder. Detection reads PATH from an interactive login shell, so anything set up in `.zshrc` is found, and a disabled provider now says its CLI was not found instead of implying it needs to be authenticated.
-- Codex works when only the Codex desktop app is installed. MonoCode falls back to the CLI bundled inside `Codex.app` when no standalone `codex` is on PATH, preferring a real install whenever one exists.
+- Provider CLIs installed through a Node version manager (nvm, fnm, mise, Volta) no longer show as unavailable when PolyCode is launched from Finder. Detection reads PATH from an interactive login shell, so anything set up in `.zshrc` is found, and a disabled provider now says its CLI was not found instead of implying it needs to be authenticated.
+- Codex works when only the Codex desktop app is installed. PolyCode falls back to the CLI bundled inside `Codex.app` when no standalone `codex` is on PATH, preferring a real install whenever one exists.
 
 ## [0.1.5] - 2026-08-23
 
@@ -666,8 +666,8 @@ Thanks [@Queaxtra](https://github.com/Queaxtra) for the filter and archive ideas
 ### Added
 
 - Editor diff hunks show a centered gutter pill with revert and stage. Plus stages that hunk (or the selected lines) so you can commit some changes and leave the rest unstaged.
-- Pi Coding Agent as a harness: if `pi` is installed, it shows up next to Claude Code, Codex, Cursor, and OpenCode. Live sessions spawn `pi --mode rpc` with the user's existing config and extensions loaded, so globally installed Pi packages (todos, subagents, custom tools) still run. Project-local `.pi` resources follow Pi's saved trust file. TUI-only widgets do not appear in MonoCode; extension confirm/select dialogs use the existing approval UI. MonoCode's runtime-mode control does not gate Pi tools - Pi has no native permission prompts.
-- Closing the window no longer kills a running chat: MonoCode hides instead, and reopening the app brings the same window back mid-turn.
+- Pi Coding Agent as a harness: if `pi` is installed, it shows up next to Claude Code, Codex, Cursor, and OpenCode. Live sessions spawn `pi --mode rpc` with the user's existing config and extensions loaded, so globally installed Pi packages (todos, subagents, custom tools) still run. Project-local `.pi` resources follow Pi's saved trust file. TUI-only widgets do not appear in PolyCode; extension confirm/select dialogs use the existing approval UI. PolyCode's runtime-mode control does not gate Pi tools - Pi has no native permission prompts.
+- Closing the window no longer kills a running chat: PolyCode hides instead, and reopening the app brings the same window back mid-turn.
 - Quit (⌘Q) asks first if chats are still running, then restores those sessions the next time you open the app and continues the turn.
 - Reopening the app restores the last window: tabs, splits, and open file or terminal panes, instead of always starting on a blank homepage.
 
@@ -715,49 +715,49 @@ First public release. macOS (Apple Silicon) only.
 - Updater endpoint and minisign public key are injected at release time rather than committed, so forks do not inherit the maintainer's update channel.
 - macOS release builds sign with `APPLE_SIGNING_IDENTITY` via a config overlay; the committed default remains ad-hoc `-` for community builds.
 
-[Unreleased]: https://github.com/hardbeat920/monocode/compare/v0.1.44...HEAD
-[0.1.44]: https://github.com/hardbeat920/monocode/compare/v0.1.43...v0.1.44
-[0.1.43]: https://github.com/hardbeat920/monocode/compare/v0.1.42...v0.1.43
-[0.1.42]: https://github.com/hardbeat920/monocode/compare/v0.1.41...v0.1.42
-[0.1.41]: https://github.com/hardbeat920/monocode/compare/v0.1.40...v0.1.41
-[0.1.40]: https://github.com/hardbeat920/monocode/compare/v0.1.39...v0.1.40
-[0.1.39]: https://github.com/hardbeat920/monocode/compare/v0.1.38...v0.1.39
-[0.1.38]: https://github.com/hardbeat920/monocode/compare/v0.1.37...v0.1.38
-[0.1.37]: https://github.com/hardbeat920/monocode/compare/v0.1.36...v0.1.37
-[0.1.36]: https://github.com/hardbeat920/monocode/compare/v0.1.35...v0.1.36
-[0.1.35]: https://github.com/hardbeat920/monocode/compare/v0.1.34...v0.1.35
-[0.1.34]: https://github.com/hardbeat920/monocode/compare/v0.1.33...v0.1.34
-[0.1.33]: https://github.com/hardbeat920/monocode/compare/v0.1.32...v0.1.33
-[0.1.32]: https://github.com/hardbeat920/monocode/compare/v0.1.31...v0.1.32
-[0.1.31]: https://github.com/hardbeat920/monocode/compare/v0.1.30...v0.1.31
-[0.1.30]: https://github.com/hardbeat920/monocode/compare/v0.1.29...v0.1.30
-[0.1.29]: https://github.com/hardbeat920/monocode/compare/v0.1.28...v0.1.29
-[0.1.28]: https://github.com/hardbeat920/monocode/compare/v0.1.27...v0.1.28
-[0.1.27]: https://github.com/hardbeat920/monocode/compare/v0.1.26...v0.1.27
-[0.1.26]: https://github.com/hardbeat920/monocode/compare/v0.1.25...v0.1.26
-[0.1.25]: https://github.com/hardbeat920/monocode/compare/v0.1.24...v0.1.25
-[0.1.24]: https://github.com/hardbeat920/monocode/compare/v0.1.23...v0.1.24
-[0.1.23]: https://github.com/hardbeat920/monocode/compare/v0.1.22...v0.1.23
-[0.1.22]: https://github.com/hardbeat920/monocode/compare/v0.1.21...v0.1.22
-[0.1.21]: https://github.com/hardbeat920/monocode/compare/v0.1.20...v0.1.21
-[0.1.20]: https://github.com/hardbeat920/monocode/compare/v0.1.19...v0.1.20
-[0.1.19]: https://github.com/hardbeat920/monocode/compare/v0.1.18...v0.1.19
-[0.1.18]: https://github.com/hardbeat920/monocode/compare/v0.1.17...v0.1.18
-[0.1.17]: https://github.com/hardbeat920/monocode/compare/v0.1.16...v0.1.17
-[0.1.16]: https://github.com/hardbeat920/monocode/compare/v0.1.15...v0.1.16
-[0.1.15]: https://github.com/hardbeat920/monocode/compare/v0.1.14...v0.1.15
-[0.1.14]: https://github.com/hardbeat920/monocode/compare/v0.1.13...v0.1.14
-[0.1.13]: https://github.com/hardbeat920/monocode/compare/v0.1.12...v0.1.13
-[0.1.12]: https://github.com/hardbeat920/monocode/compare/v0.1.11...v0.1.12
-[0.1.11]: https://github.com/hardbeat920/monocode/compare/v0.1.10...v0.1.11
-[0.1.10]: https://github.com/hardbeat920/monocode/compare/v0.1.9...v0.1.10
-[0.1.9]: https://github.com/hardbeat920/monocode/compare/v0.1.8...v0.1.9
-[0.1.8]: https://github.com/hardbeat920/monocode/compare/v0.1.7...v0.1.8
-[0.1.7]: https://github.com/hardbeat920/monocode/compare/v0.1.6...v0.1.7
-[0.1.6]: https://github.com/hardbeat920/monocode/compare/v0.1.5...v0.1.6
-[0.1.5]: https://github.com/hardbeat920/monocode/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/hardbeat920/monocode/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/hardbeat920/monocode/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/hardbeat920/monocode/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/hardbeat920/monocode/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/hardbeat920/monocode/releases/tag/v0.1.0
+[Unreleased]: https://github.com/hardbeat920/polycode/compare/v0.1.44...HEAD
+[0.1.44]: https://github.com/hardbeat920/polycode/compare/v0.1.43...v0.1.44
+[0.1.43]: https://github.com/hardbeat920/polycode/compare/v0.1.42...v0.1.43
+[0.1.42]: https://github.com/hardbeat920/polycode/compare/v0.1.41...v0.1.42
+[0.1.41]: https://github.com/hardbeat920/polycode/compare/v0.1.40...v0.1.41
+[0.1.40]: https://github.com/hardbeat920/polycode/compare/v0.1.39...v0.1.40
+[0.1.39]: https://github.com/hardbeat920/polycode/compare/v0.1.38...v0.1.39
+[0.1.38]: https://github.com/hardbeat920/polycode/compare/v0.1.37...v0.1.38
+[0.1.37]: https://github.com/hardbeat920/polycode/compare/v0.1.36...v0.1.37
+[0.1.36]: https://github.com/hardbeat920/polycode/compare/v0.1.35...v0.1.36
+[0.1.35]: https://github.com/hardbeat920/polycode/compare/v0.1.34...v0.1.35
+[0.1.34]: https://github.com/hardbeat920/polycode/compare/v0.1.33...v0.1.34
+[0.1.33]: https://github.com/hardbeat920/polycode/compare/v0.1.32...v0.1.33
+[0.1.32]: https://github.com/hardbeat920/polycode/compare/v0.1.31...v0.1.32
+[0.1.31]: https://github.com/hardbeat920/polycode/compare/v0.1.30...v0.1.31
+[0.1.30]: https://github.com/hardbeat920/polycode/compare/v0.1.29...v0.1.30
+[0.1.29]: https://github.com/hardbeat920/polycode/compare/v0.1.28...v0.1.29
+[0.1.28]: https://github.com/hardbeat920/polycode/compare/v0.1.27...v0.1.28
+[0.1.27]: https://github.com/hardbeat920/polycode/compare/v0.1.26...v0.1.27
+[0.1.26]: https://github.com/hardbeat920/polycode/compare/v0.1.25...v0.1.26
+[0.1.25]: https://github.com/hardbeat920/polycode/compare/v0.1.24...v0.1.25
+[0.1.24]: https://github.com/hardbeat920/polycode/compare/v0.1.23...v0.1.24
+[0.1.23]: https://github.com/hardbeat920/polycode/compare/v0.1.22...v0.1.23
+[0.1.22]: https://github.com/hardbeat920/polycode/compare/v0.1.21...v0.1.22
+[0.1.21]: https://github.com/hardbeat920/polycode/compare/v0.1.20...v0.1.21
+[0.1.20]: https://github.com/hardbeat920/polycode/compare/v0.1.19...v0.1.20
+[0.1.19]: https://github.com/hardbeat920/polycode/compare/v0.1.18...v0.1.19
+[0.1.18]: https://github.com/hardbeat920/polycode/compare/v0.1.17...v0.1.18
+[0.1.17]: https://github.com/hardbeat920/polycode/compare/v0.1.16...v0.1.17
+[0.1.16]: https://github.com/hardbeat920/polycode/compare/v0.1.15...v0.1.16
+[0.1.15]: https://github.com/hardbeat920/polycode/compare/v0.1.14...v0.1.15
+[0.1.14]: https://github.com/hardbeat920/polycode/compare/v0.1.13...v0.1.14
+[0.1.13]: https://github.com/hardbeat920/polycode/compare/v0.1.12...v0.1.13
+[0.1.12]: https://github.com/hardbeat920/polycode/compare/v0.1.11...v0.1.12
+[0.1.11]: https://github.com/hardbeat920/polycode/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/hardbeat920/polycode/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/hardbeat920/polycode/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/hardbeat920/polycode/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/hardbeat920/polycode/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/hardbeat920/polycode/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/hardbeat920/polycode/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/hardbeat920/polycode/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/hardbeat920/polycode/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/hardbeat920/polycode/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/hardbeat920/polycode/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/hardbeat920/polycode/releases/tag/v0.1.0

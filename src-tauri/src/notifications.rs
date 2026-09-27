@@ -12,7 +12,7 @@ use tauri::AppHandle;
 /// Emitted to every window when the user clicks a notification. Payload is
 /// the session id; the window that owns that session handles it.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-pub const CLICK_EVENT: &str = "monocode:notification-click";
+pub const CLICK_EVENT: &str = "polycode:notification-click";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn handle_click(app: &AppHandle, identifier: &str) {
@@ -118,8 +118,8 @@ mod platform {
 
     /// Category with a single "Show" button, so the banner offers the jump
     /// explicitly instead of relying on a click on the body.
-    const CATEGORY: &str = "monocode.session";
-    const SHOW_ACTION: &str = "monocode.session.show";
+    const CATEGORY: &str = "polycode.session";
+    const SHOW_ACTION: &str = "polycode.session.show";
 
     fn options() -> UNAuthorizationOptions {
         UNAuthorizationOptions::Alert
@@ -287,7 +287,7 @@ mod platform {
 
     define_class!(
         #[unsafe(super(NSObject))]
-        #[name = "MonoCodeNotificationDelegate"]
+        #[name = "PolyCodeNotificationDelegate"]
         #[ivars = DelegateIvars]
         struct Delegate;
 
@@ -444,11 +444,11 @@ mod platform {
     ) -> Result<(), String> {
         let mut notification = notify_rust::Notification::new();
         notification
-            .appname("MonoCode")
+            .appname("PolyCode")
             .summary(&format!("{title}: {subtitle}"))
             // The body is agent output; servers render it as markup.
             .body(&escape_markup(body))
-            .icon("monocode")
+            .icon("polycode")
             // Servers only report the click when a "default" action exists.
             .action("default", "Show");
         if sound {

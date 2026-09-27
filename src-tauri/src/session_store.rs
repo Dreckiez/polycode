@@ -64,7 +64,14 @@ impl SessionStore {
 
 pub fn init(app: &AppHandle) -> Result<(), String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let store = SessionStore::open(data_dir.join("monocode.db"))?;
+    let db_path = data_dir.join("polycode.db");
+    if !db_path.exists() {
+        let legacy_path = data_dir.join("polycode.db");
+        if legacy_path.exists() {
+            let _ = std::fs::rename(&legacy_path, &db_path);
+        }
+    }
+    let store = SessionStore::open(db_path)?;
     app.manage(store);
     Ok(())
 }
@@ -1686,7 +1693,7 @@ mod tests {
     #[test]
     fn upsert_snapshots_git_branch() {
         let dir = std::env::temp_dir().join(format!(
-            "monocode-session-git-{}-{}",
+            "polycode-session-git-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -1875,7 +1882,7 @@ mod tests {
     #[test]
     fn migrate_creates_workspace_tables_when_versions_already_recorded() {
         let path = std::env::temp_dir().join(format!(
-            "monocode-stale-migrations-{}-{}.db",
+            "polycode-stale-migrations-{}-{}.db",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)

@@ -5,10 +5,10 @@ import { normalizeProjectPath } from "./recents";
 import { orderByIds } from "./reorder";
 import { TAB_GROUP_COLORS } from "./tabGroups";
 
-const KEY = "monocode.sessionFolders";
-const CHANGE_EVENT = "monocode:session-folders-change";
-const PINNED_COLLAPSED_KEY = "monocode.pinnedSessionsCollapsed";
-const REMINDERS_COLLAPSED_KEY = "monocode.reminderSessionsCollapsed";
+const KEY = "polycode.sessionFolders";
+const CHANGE_EVENT = "polycode:session-folders-change";
+const PINNED_COLLAPSED_KEY = "polycode.pinnedSessionsCollapsed";
+const REMINDERS_COLLAPSED_KEY = "polycode.reminderSessionsCollapsed";
 
 export type SessionFolder = {
   id: string;

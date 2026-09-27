@@ -817,7 +817,7 @@ const KILL_ESCALATE: Duration = Duration::from_secs(2);
 const KILL_ALL_GRACE: Duration = Duration::from_millis(300);
 #[cfg(not(windows))]
 const KILL_ALL_KILL_WAIT: Duration = Duration::from_millis(150);
-const HARNESS_PARENT_ENV: &str = "MONOCODE_HARNESS_PARENT";
+const HARNESS_PARENT_ENV: &str = "POLYCODE_HARNESS_PARENT";
 
 /// An interactive shell has to source the user's whole rc file; nvm alone can
 /// take a second.
@@ -1012,7 +1012,7 @@ struct ProcessSnapshot {
     harness_parent: Option<u32>,
 }
 
-/// Kill harness trees left behind by a previous MonoCode that exited
+/// Kill harness trees left behind by a previous PolyCode that exited
 /// before SIGKILL ran (crash, force-quit, or the detached escalate thread).
 /// Off-thread: the sweep shells out to `ps` and then waits on a SIGKILL, and
 /// launch would otherwise hold the first window for both. Nothing this run
@@ -1871,7 +1871,7 @@ mod windows_launcher_tests {
 
     #[test]
     fn npm_shell_shim_does_not_hide_windows_launcher() {
-        let dir = std::env::temp_dir().join(format!("monocode-launcher-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-launcher-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let bare = dir.join("agent");
         let cmd = dir.join("agent.cmd");
@@ -2434,7 +2434,7 @@ mod tests {
     fn which_in_path_takes_the_first_executable_hit() {
         use std::os::unix::fs::PermissionsExt;
 
-        let dir = std::env::temp_dir().join(format!("monocode-which-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-which-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let (empty, unreadable, real) = (dir.join("a"), dir.join("b"), dir.join("c"));
         for sub in [&empty, &unreadable, &real] {
@@ -2483,7 +2483,7 @@ mod tests {
     fn resolve_gui_binary_finds_a_binary_on_the_gui_path() {
         use std::os::unix::fs::PermissionsExt;
 
-        let dir = std::env::temp_dir().join(format!("monocode-gui-bin-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-gui-bin-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let target = dir.join("gh");
@@ -2498,7 +2498,7 @@ mod tests {
 
     #[test]
     fn cursor_agent_accepts_symlink_named_agent() {
-        let dir = std::env::temp_dir().join(format!("monocode-agent-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-agent-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("cursor-agent-pack")).unwrap();
         let target = dir.join("cursor-agent-pack/cursor-agent");
@@ -2512,7 +2512,7 @@ mod tests {
 
     #[test]
     fn pi_accepts_coding_agent_and_rejects_other_pi() {
-        let dir = std::env::temp_dir().join(format!("monocode-pi-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-pi-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -2540,7 +2540,7 @@ mod tests {
 
     #[test]
     fn omp_accepts_rpc_capable_binary_and_rejects_other_names() {
-        let dir = std::env::temp_dir().join(format!("monocode-omp-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-omp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -2571,7 +2571,7 @@ mod tests {
 
     #[test]
     fn fx_accepts_vercel_agent_and_rejects_json_viewer() {
-        let dir = std::env::temp_dir().join(format!("monocode-fx-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-fx-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -2596,7 +2596,7 @@ mod tests {
     /// missed them and silently fell back to spawning `fx --help`.
     #[test]
     fn fx_marker_is_found_past_the_first_chunk() {
-        let dir = std::env::temp_dir().join(format!("monocode-fx-deep-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-fx-deep-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -2618,7 +2618,7 @@ mod tests {
 
     #[test]
     fn grok_accepts_official_install_path_and_markers() {
-        let dir = std::env::temp_dir().join(format!("monocode-grok-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polycode-grok-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let home = dir.join(".grok/bin");
         std::fs::create_dir_all(&home).unwrap();
@@ -2714,7 +2714,7 @@ mod reap_logic_tests {
     #[test]
     fn parse_ps_row_reads_harness_parent_from_env_tail() {
         let parsed = parse_ps_row(
-            " 27129 21504 /Users/n/cursor-agent acp PATH=/usr/bin MONOCODE_HARNESS_PARENT=21504 HOME=/tmp",
+            " 27129 21504 /Users/n/cursor-agent acp PATH=/usr/bin POLYCODE_HARNESS_PARENT=21504 HOME=/tmp",
         )
         .unwrap();
         assert_eq!(parsed.pid, 27129);
@@ -2799,7 +2799,7 @@ mod reap_logic_tests {
     #[test]
     fn parse_ps_pid_command_does_not_treat_the_binary_as_ppid() {
         let (pid, command) = parse_ps_pid_command(
-            " 27129 /Users/n/cursor-agent acp PATH=/usr/bin MONOCODE_HARNESS_PARENT=21504 HOME=/tmp",
+            " 27129 /Users/n/cursor-agent acp PATH=/usr/bin POLYCODE_HARNESS_PARENT=21504 HOME=/tmp",
         )
         .unwrap();
         assert_eq!(pid, 27129);

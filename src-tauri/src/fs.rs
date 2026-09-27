@@ -1498,7 +1498,7 @@ fn git_pr_create_for(root: &Path, input: &GitPrCreateInput) -> Result<String, St
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let body_path = std::env::temp_dir().join(format!("monocode-pr-{stamp}.md"));
+    let body_path = std::env::temp_dir().join(format!("polycode-pr-{stamp}.md"));
     std::fs::write(&body_path, input.body.trim()).map_err(|e| e.to_string())?;
     let result = gh_checked(
         root,
@@ -2532,7 +2532,7 @@ fn write_attachment_sync(name: &str, data: &str) -> Result<String, String> {
             MAX_ATTACHMENT_EMBED_BYTES / 1024 / 1024
         ));
     }
-    let dir = std::env::temp_dir().join("monocode-attachments");
+    let dir = std::env::temp_dir().join("polycode-attachments");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2640,7 +2640,7 @@ fn write_text_file_sync(path: &str, content: &str) -> Result<(), String> {
     let mut temporary = None;
     for attempt in 0..100 {
         let candidate = parent.join(format!(
-            ".{name}.monocode-{}-{stamp}-{attempt}.tmp",
+            ".{name}.polycode-{}-{stamp}-{attempt}.tmp",
             std::process::id()
         ));
         match std::fs::OpenOptions::new()
@@ -2770,7 +2770,7 @@ fn rename_path_sync(path: &str, name: &str) -> Result<String, String> {
             .unwrap_or_default()
             .as_nanos();
         let tmp = parent.join(format!(
-            ".{}.monocode-rename-{stamp}",
+            ".{}.polycode-rename-{stamp}",
             file_label(&from, "tmp")
         ));
         std::fs::rename(&from, &tmp).map_err(|e| e.to_string())?;
@@ -2955,7 +2955,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let dir =
-            std::env::temp_dir().join(format!("monocode-editor-{}-{stamp}", std::process::id()));
+            std::env::temp_dir().join(format!("polycode-editor-{}-{stamp}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("example.rs");
         std::fs::write(&path, "fn old() {}\n").unwrap();
@@ -3025,7 +3025,7 @@ mod tests {
                 .as_nanos();
             let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
             let dir = std::env::temp_dir().join(format!(
-                "monocode-{label}-{}-{stamp}-{seq}",
+                "polycode-{label}-{}-{stamp}-{seq}",
                 std::process::id()
             ));
             match std::fs::create_dir(&dir) {
@@ -3203,8 +3203,8 @@ mod tests {
                 return false;
             }
         }
-        git(dir, &["config", "user.name", "MonoCode"])
-            && git(dir, &["config", "user.email", "monocode@test"])
+        git(dir, &["config", "user.name", "PolyCode"])
+            && git(dir, &["config", "user.email", "polycode@test"])
             && git(dir, &["config", "commit.gpgsign", "false"])
             && git(dir, &["config", "core.autocrlf", "false"])
     }
@@ -3242,18 +3242,18 @@ mod tests {
         Command::new("git")
             .args([
                 "-c",
-                "user.name=MonoCode",
+                "user.name=PolyCode",
                 "-c",
-                "user.email=monocode@test",
+                "user.email=polycode@test",
                 "-c",
                 "commit.gpgsign=false",
             ])
             .args(args)
             .current_dir(dir)
-            .env("GIT_AUTHOR_NAME", "MonoCode")
-            .env("GIT_AUTHOR_EMAIL", "monocode@test")
-            .env("GIT_COMMITTER_NAME", "MonoCode")
-            .env("GIT_COMMITTER_EMAIL", "monocode@test")
+            .env("GIT_AUTHOR_NAME", "PolyCode")
+            .env("GIT_AUTHOR_EMAIL", "polycode@test")
+            .env("GIT_COMMITTER_NAME", "PolyCode")
+            .env("GIT_COMMITTER_EMAIL", "polycode@test")
             .status()
             .map(|status| status.success())
             .unwrap_or(false)
@@ -3919,8 +3919,8 @@ mod tests {
                 .status()
                 .map(|status| !status.success())
                 .unwrap_or(true)
-            || !git(&b.0, &["config", "user.name", "MonoCode"])
-            || !git(&b.0, &["config", "user.email", "monocode@test"])
+            || !git(&b.0, &["config", "user.name", "PolyCode"])
+            || !git(&b.0, &["config", "user.email", "polycode@test"])
             || !git(&b.0, &["config", "commit.gpgsign", "false"])
             || !git(&b.0, &["config", "core.autocrlf", "false"])
             || !git(&b.0, &["checkout", "--", "."])
@@ -3966,7 +3966,7 @@ mod tests {
     #[test]
     fn pr_head_filter_qualifies_branch_with_repo_owner() {
         assert_eq!(
-            github_pr_head_filter("hardbeat920/monocode", "main").as_deref(),
+            github_pr_head_filter("hardbeat920/polycode", "main").as_deref(),
             Some("hardbeat920:main")
         );
     }
@@ -3974,10 +3974,10 @@ mod tests {
     #[test]
     fn split_github_repo_reads_owner_and_name() {
         assert_eq!(
-            split_github_repo(" hardbeat920/monocode ").unwrap(),
-            ("hardbeat920".into(), "monocode".into())
+            split_github_repo(" hardbeat920/polycode ").unwrap(),
+            ("hardbeat920".into(), "polycode".into())
         );
-        assert!(split_github_repo("monocode").is_err());
+        assert!(split_github_repo("polycode").is_err());
     }
 
     #[test]

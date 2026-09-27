@@ -11,7 +11,7 @@ import { SESSION_FOLDER_COMMAND } from "../lib/sessionFolderCommand";
 import type { Skill } from "../lib/skills";
 
 describe("native command picker", () => {
-  it("renders native commands and argument hints alongside MonoCode shortcuts, without new skill button", () => {
+  it("renders native commands and argument hints alongside PolyCode shortcuts, without new skill button", () => {
     const native: Skill[] = ompCommandsFromRpcData({
       commands: [
         { name: "plan", source: "builtin", description: "OMP planning" },

@@ -5,7 +5,7 @@ import { stopStreaming } from "./harness/apply";
 import type { ProjectReturnMemory } from "./projectReturn";
 
 export const INTERRUPT_MESSAGE =
-  "Turn interrupted when MonoCode quit.";
+  "Turn interrupted when PolyCode quit.";
 
 export const CONTINUE_PROMPT = "Continue from where you left off.";
 
@@ -60,9 +60,9 @@ export function inFlightRefs(
 
 export function quitWhileBusyMessage(count: number): string {
   if (count === 1) {
-    return "1 chat is still running. Quit anyway? It will resume when you reopen MonoCode.";
+    return "1 chat is still running. Quit anyway? It will resume when you reopen PolyCode.";
   }
-  return `${count} chats are still running. Quit anyway? They will resume when you reopen MonoCode.`;
+  return `${count} chats are still running. Quit anyway? They will resume when you reopen PolyCode.`;
 }
 
 /**

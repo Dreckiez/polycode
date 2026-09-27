@@ -38,13 +38,13 @@ export const DEFAULT_MODEL_ID: Record<HarnessId, string> = {
   fx: "fx:zai/glm-5.2-fast",
 };
 
-const FAVORITES_KEY = "monocode.favoriteModels";
-const MODEL_PICKER_TAB_KEY = "monocode.modelPickerTab";
-const HIDDEN_PICKER_PROVIDERS_KEY = "monocode.hiddenPickerProviders";
-const LAST_MODEL_KEY = "monocode.lastModel";
-const LAST_MODEL_SETTINGS_KEY = "monocode.lastModelSettings";
-const DEFAULT_MODELS_KEY = "monocode.defaultModels";
-const RECENT_MODELS_KEY = "monocode.recentModels";
+const FAVORITES_KEY = "polycode.favoriteModels";
+const MODEL_PICKER_TAB_KEY = "polycode.modelPickerTab";
+const HIDDEN_PICKER_PROVIDERS_KEY = "polycode.hiddenPickerProviders";
+const LAST_MODEL_KEY = "polycode.lastModel";
+const LAST_MODEL_SETTINGS_KEY = "polycode.lastModelSettings";
+const DEFAULT_MODELS_KEY = "polycode.defaultModels";
+const RECENT_MODELS_KEY = "polycode.recentModels";
 const RECENT_MODEL_LIMIT = 6;
 
 export type ModelPickerTab = "favorites" | HarnessId;

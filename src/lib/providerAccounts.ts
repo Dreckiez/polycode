@@ -1,9 +1,9 @@
 import { pathKey } from "./paths";
 import type { RateLimitProvider } from "./rateLimits";
 
-const ACCOUNTS_KEY = "monocode.providerAccounts.v1";
-const SELECTIONS_KEY = "monocode.providerAccountSelections.v1";
-const CHANGE_EVENT = "monocode-provider-accounts-changed";
+const ACCOUNTS_KEY = "polycode.providerAccounts.v1";
+const SELECTIONS_KEY = "polycode.providerAccountSelections.v1";
+const CHANGE_EVENT = "polycode-provider-accounts-changed";
 
 export const DEFAULT_PROVIDER_ACCOUNT_ID = "default";
 

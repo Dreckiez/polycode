@@ -17,7 +17,7 @@ import {
   parseServerUrlFromOutput,
 } from "./opencodeProtocol";
 
-const TEXT_CHILD_ID = "monocode-opencode-text";
+const TEXT_CHILD_ID = "polycode-opencode-text";
 const SERVER_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 45_000;
 

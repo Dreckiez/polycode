@@ -1,6 +1,6 @@
 import { ALT, IS_MAC, MOD, SHIFT } from "./platform";
 
-const SECTION_KEY = "monocode.settingsSection";
+const SECTION_KEY = "polycode.settingsSection";
 
 export type SettingsSectionId =
   | "general"
@@ -35,7 +35,7 @@ export const SETTINGS_SECTIONS: {
     id: "providers",
     label: "Providers",
     description:
-      "Agent CLIs MonoCode can drive, and the model new sessions start with.",
+      "Agent CLIs PolyCode can drive, and the model new sessions start with.",
   },
   {
     id: "skills",
@@ -87,9 +87,9 @@ export function saveSettingsSection(id: SettingsSectionId) {
   }
 }
 
-const COMPOSER_RUNNER_KEY = "monocode.composerRunner";
+const COMPOSER_RUNNER_KEY = "polycode.composerRunner";
 
-const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
+const FOLLOW_UP_BEHAVIOR_KEY = "polycode.followUpBehavior";
 
 export type FollowUpBehavior = "steer" | "queue";
 
@@ -117,7 +117,7 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
 export const COMPOSER_RUNNER_DEFAULT = true;
 
 /** Fired on `window` when the composer mascot setting flips. */
-export const COMPOSER_RUNNER_CHANGE_EVENT = "monocode:composer-runner-change";
+export const COMPOSER_RUNNER_CHANGE_EVENT = "polycode:composer-runner-change";
 
 export function loadComposerRunner(): boolean {
   try {
@@ -141,12 +141,12 @@ export function saveComposerRunner(value: boolean) {
   );
 }
 
-const NOTES_ENABLED_KEY = "monocode.notesEnabled";
+const NOTES_ENABLED_KEY = "polycode.notesEnabled";
 
 export const NOTES_ENABLED_DEFAULT = true;
 
 /** Fired on `window` when the Notes UI setting flips. */
-export const NOTES_ENABLED_CHANGE_EVENT = "monocode:notes-enabled-change";
+export const NOTES_ENABLED_CHANGE_EVENT = "polycode:notes-enabled-change";
 
 export function loadNotesEnabled(): boolean {
   try {
@@ -177,13 +177,13 @@ export function subscribeNotesEnabled(onStoreChange: () => void) {
     window.removeEventListener(NOTES_ENABLED_CHANGE_EVENT, onStoreChange);
 }
 
-const LIVE_AGENTS_ENABLED_KEY = "monocode.liveAgentsEnabled";
+const LIVE_AGENTS_ENABLED_KEY = "polycode.liveAgentsEnabled";
 
 export const LIVE_AGENTS_ENABLED_DEFAULT = true;
 
 /** Fired on `window` when the working-agents rail card setting flips. */
 export const LIVE_AGENTS_ENABLED_CHANGE_EVENT =
-  "monocode:live-agents-enabled-change";
+  "polycode:live-agents-enabled-change";
 
 export function loadLiveAgentsEnabled(): boolean {
   try {
@@ -216,14 +216,14 @@ export function subscribeLiveAgentsEnabled(onStoreChange: () => void) {
     window.removeEventListener(LIVE_AGENTS_ENABLED_CHANGE_EVENT, onStoreChange);
 }
 
-const DIFF_VIEWER_KEY = "monocode.diffViewer";
+const DIFF_VIEWER_KEY = "polycode.diffViewer";
 
 export type DiffViewer = "editor" | "unified";
 
 export const DIFF_VIEWER_DEFAULT: DiffViewer = "editor";
 
 /** Fired on `window` when the working-tree diff layout flips. */
-export const DIFF_VIEWER_CHANGE_EVENT = "monocode:diff-viewer-change";
+export const DIFF_VIEWER_CHANGE_EVENT = "polycode:diff-viewer-change";
 
 function isDiffViewer(value: unknown): value is DiffViewer {
   return value === "editor" || value === "unified";
@@ -258,7 +258,7 @@ export function subscribeDiffViewer(onStoreChange: () => void) {
     window.removeEventListener(DIFF_VIEWER_CHANGE_EVENT, onStoreChange);
 }
 
-const CLAUDE_HOOKS_KEY = "monocode.claudeHooks";
+const CLAUDE_HOOKS_KEY = "polycode.claudeHooks";
 
 export const CLAUDE_HOOKS_DEFAULT = true;
 

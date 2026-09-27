@@ -7,10 +7,10 @@ import {
   type ChatBackgroundScope,
 } from "./appearance";
 
-const KEY = "monocode:project-chat-backgrounds";
+const KEY = "polycode:project-chat-backgrounds";
 
 export const PROJECT_CHAT_BACKGROUND_CHANGED =
-  "monocode:project-chat-background-changed";
+  "polycode:project-chat-background-changed";
 
 export type ProjectChatBackground = {
   path: string;

@@ -1027,7 +1027,7 @@ export default function App({
     if (!document) {
       void message(
         "Release notes for this version are not available in this build.",
-        { title: "MonoCode" },
+        { title: "PolyCode" },
       );
       return;
     }

@@ -13,11 +13,11 @@ import {
 } from "./themePresets";
 import { loadImageElement } from "./dither";
 
-const THEME_HUE_KEY = "monocode.themeHue";
-const THEME_SATURATION_KEY = "monocode.themeSaturation";
+const THEME_HUE_KEY = "polycode.themeHue";
+const THEME_SATURATION_KEY = "polycode.themeSaturation";
 
-export const IMAGE_PALETTE_KEY = "monocode.imagePalette";
-export const IMAGE_PALETTE_CHANGED_EVENT = "monocode:image-palette-changed";
+export const IMAGE_PALETTE_KEY = "polycode.imagePalette";
+export const IMAGE_PALETTE_CHANGED_EVENT = "polycode:image-palette-changed";
 
 export type ExtractedPalette = {
   /** High-vibrancy signature accent color (hex or hsl). */

@@ -1,13 +1,13 @@
 import { play, setEnabled, setVolume, type SoundName } from "cuelume";
 
-const KEY = "monocode.sounds";
+const KEY = "polycode.sounds";
 
 export const SOUNDS_DEFAULT = true;
 
 /** Soft enough to sit in the background while a turn runs in another app. */
 export const SOUNDS_VOLUME = 0.55;
 
-export const SOUNDS_CHANGE_EVENT = "monocode:sounds-change";
+export const SOUNDS_CHANGE_EVENT = "polycode:sounds-change";
 
 export type SoundCue =
   | "turnFinished"

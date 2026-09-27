@@ -255,7 +255,7 @@ describe("sidebar pinned sessions", () => {
     expect(group.querySelector('[data-session-card="session-1"]')).toBeNull();
     expect(
       JSON.parse(
-        localStorage.getItem("monocode.pinnedSessionsCollapsed") ?? "{}",
+        localStorage.getItem("polycode.pinnedSessionsCollapsed") ?? "{}",
       ),
     ).toEqual({ "/workspace/project": true });
   });

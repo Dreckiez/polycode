@@ -197,10 +197,10 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     #[cfg(target_os = "macos")]
     {
-        let quit = MenuItemBuilder::with_id("quit", "Quit MonoCode")
+        let quit = MenuItemBuilder::with_id("quit", "Quit PolyCode")
             .accelerator("CmdOrCtrl+Q")
             .build(app)?;
-        let app_menu = SubmenuBuilder::new(app, "MonoCode")
+        let app_menu = SubmenuBuilder::new(app, "PolyCode")
             .about(Some(AboutMetadata::default()))
             .separator()
             .item(&open_settings)

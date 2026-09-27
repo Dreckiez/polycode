@@ -77,7 +77,7 @@ import { useLockOverscroll } from "../hooks/useLockOverscroll";
 
 function confirmNative(message: string, okLabel?: string): Promise<boolean> {
   return ask(message, {
-    title: "MonoCode",
+    title: "PolyCode",
     kind: "warning",
     ...(okLabel ? { okLabel } : {}),
   });

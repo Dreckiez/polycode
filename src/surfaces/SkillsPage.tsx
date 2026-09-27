@@ -39,7 +39,7 @@ const KNOWN_SOURCES: { id: string; title: string; isHarness: boolean }[] = [
   { id: "grok", title: "Grok", isHarness: true },
   { id: "cursor", title: "Cursor", isHarness: false },
   { id: "agents", title: "Agents", isHarness: false },
-  { id: "monocode", title: "MonoCode", isHarness: false },
+  { id: "polycode", title: "PolyCode", isHarness: false },
 ];
 
 type SkillGroup = {
@@ -446,7 +446,7 @@ export function SkillsPage({ cwd }: { cwd: string }): ReactNode {
                         <button
                           type="button"
                           role="switch"
-                          aria-label={`Include ${skill.name} in MonoCode catalog`}
+                          aria-label={`Include ${skill.name} in PolyCode catalog`}
                           aria-checked={!disabled}
                           onClick={() => onToggle(skill.path, disabled)}
                           className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${

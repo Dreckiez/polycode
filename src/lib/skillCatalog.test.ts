@@ -91,7 +91,7 @@ beforeEach(() => {
 });
 
 describe("provider-aware skill catalog", () => {
-  it("uses Pi discovery without adding MonoCode's built-in row", async () => {
+  it("uses Pi discovery without adding PolyCode's built-in row", async () => {
     const catalog = await loadSkills({ harness: "pi", cwd: "/repo/" });
 
     expect(mocks.discoverPiSkills).toHaveBeenCalledWith("/repo");
@@ -353,10 +353,10 @@ describe("file skill visibility preferences", () => {
   });
 
   it("tolerates malformed and mixed stored preferences", (): void => {
-    storage.set("monocode.disabledSkillPaths", "invalid json");
+    storage.set("polycode.disabledSkillPaths", "invalid json");
     expect(loadDisabledSkillPaths()).toEqual([]);
     storage.set(
-      "monocode.disabledSkillPaths",
+      "polycode.disabledSkillPaths",
       JSON.stringify([path, null, 42]),
     );
     expect(loadDisabledSkillPaths()).toEqual([path]);
@@ -540,7 +540,7 @@ describe("file skill visibility preferences", () => {
   it("filters agent-specific skills while keeping universal skills visible", async (): Promise<void> => {
     expect(isSkillCompatibleWithHarness("agents", "antigravity")).toBe(true);
     expect(isSkillCompatibleWithHarness("agents", "claude")).toBe(true);
-    expect(isSkillCompatibleWithHarness("monocode", "cursor")).toBe(true);
+    expect(isSkillCompatibleWithHarness("polycode", "cursor")).toBe(true);
     expect(isSkillCompatibleWithHarness("antigravity", "antigravity")).toBe(true);
     expect(isSkillCompatibleWithHarness("antigravity", "claude")).toBe(false);
     expect(isSkillCompatibleWithHarness("claude", "antigravity")).toBe(false);

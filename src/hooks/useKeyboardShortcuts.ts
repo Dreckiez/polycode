@@ -109,7 +109,7 @@ export function useKeyboardShortcuts(
           const target = e.target instanceof Element ? e.target : null;
           const blockedTarget = Boolean(
             target?.closest(
-              'input, textarea, select, [contenteditable="true"], .cm-editor, .monocode-terminal, [role="dialog"], [data-model-picker"], [data-file-picker], [data-branch-picker"], [data-skill-picker"], [data-mention-picker], [data-app-search]'
+              'input, textarea, select, [contenteditable="true"], .cm-editor, .polycode-terminal, [role="dialog"], [data-model-picker"], [data-file-picker], [data-branch-picker"], [data-skill-picker"], [data-mention-picker], [data-app-search]'
             )
           );
           const emptyComposerTarget = Boolean(
@@ -132,7 +132,7 @@ export function useKeyboardShortcuts(
           }
         }
         if (
-          target?.closest(".monocode-terminal") &&
+          target?.closest(".polycode-terminal") &&
           e.ctrlKey &&
           !e.metaKey &&
           (cmd === "back" ||
@@ -201,7 +201,7 @@ export function useKeyboardShortcuts(
       }
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
         const target = e.target instanceof Element ? e.target : null;
-        if (target?.closest(".monocode-terminal") && e.ctrlKey && !e.metaKey) {
+        if (target?.closest(".polycode-terminal") && e.ctrlKey && !e.metaKey) {
           return;
         }
         e.preventDefault();

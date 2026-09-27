@@ -390,7 +390,7 @@ struct DockMenuTargetIvars {
 
 define_class!(
     #[unsafe(super(NSObject))]
-    #[name = "MonoCodeDockMenuTarget"]
+    #[name = "PolyCodeDockMenuTarget"]
     #[ivars = DockMenuTargetIvars]
     struct DockMenuTarget;
 
@@ -482,7 +482,7 @@ pub(crate) fn install_dock_menu(app: &AppHandle) {
 #[cfg(debug_assertions)]
 pub(crate) fn ensure_dev_bundle() {
     if let Err(err) = relaunch_from_dev_bundle() {
-        eprintln!("monocode: macos dev bundle: {err}");
+        eprintln!("polycode: macos dev bundle: {err}");
     }
 }
 
@@ -540,12 +540,12 @@ fn relaunch_from_dev_bundle() -> Result<(), String> {
     let app = exe
         .parent()
         .ok_or("missing exe parent")?
-        .join("MonoCode.app");
+        .join("PolyCode.app");
     let macos_dir = app.join("Contents/MacOS");
     std::fs::create_dir_all(&macos_dir).map_err(|e| e.to_string())?;
     write_dev_bundle_icons(&app)?;
 
-    let bundled = macos_dir.join("monocode");
+    let bundled = macos_dir.join("polycode");
     let _ = std::fs::remove_file(&bundled);
     // A copy, not a hard link: re-signing below rewrites the file, and the
     // linked original is the executable running this code.
@@ -556,7 +556,7 @@ fn relaunch_from_dev_bundle() -> Result<(), String> {
     perms.set_mode(0o755);
     std::fs::set_permissions(&bundled, perms).map_err(|e| e.to_string())?;
 
-    // The linker's ad-hoc signature carries a `monocode-<hash>` identifier.
+    // The linker's ad-hoc signature carries a `polycode-<hash>` identifier.
     // UNUserNotificationCenter refuses authorization, without prompting,
     // unless the signing identifier matches CFBundleIdentifier.
     let signed = Command::new("/usr/bin/codesign")
@@ -566,7 +566,7 @@ fn relaunch_from_dev_bundle() -> Result<(), String> {
         .map(|status| status.success())
         .unwrap_or(false);
     if !signed {
-        eprintln!("monocode: macos dev bundle: codesign failed; notifications stay off");
+        eprintln!("polycode: macos dev bundle: codesign failed; notifications stay off");
     }
 
     let err = Command::new(&bundled)
@@ -590,7 +590,7 @@ fn write_dev_bundle_icons(app: &std::path::Path) -> Result<(), String> {
 
 /// Must match `CFBundleIdentifier` in `DEV_BUNDLE_PLIST` and tauri.conf.json.
 #[cfg(debug_assertions)]
-const DEV_BUNDLE_ID: &str = "com.monocode.desktop";
+const DEV_BUNDLE_ID: &str = "com.polycode.desktop";
 #[cfg(debug_assertions)]
 const DEV_ICNS: &[u8] = include_bytes!("../icons/icon.icns");
 #[cfg(debug_assertions)]
@@ -603,19 +603,19 @@ const DEV_BUNDLE_PLIST: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>MonoCode</string>
+	<string>PolyCode</string>
 	<key>CFBundleExecutable</key>
-	<string>monocode</string>
+	<string>polycode</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.monocode.desktop</string>
+	<string>com.polycode.desktop</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>MonoCode</string>
+	<string>PolyCode</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

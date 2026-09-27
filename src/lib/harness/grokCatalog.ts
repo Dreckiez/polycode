@@ -18,7 +18,7 @@ import {
   modelsFromSessionNew,
 } from "./grokProtocol";
 
-const PROBE_ID = "monocode-grok-probe";
+const PROBE_ID = "polycode-grok-probe";
 const DISCOVERY_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -36,7 +36,7 @@ export function refreshGrokCatalog(): Promise<void> {
       if (models.length > 0) setHarnessModels("grok", models);
     })
     .catch((error: unknown) => {
-      console.debug("[monocode] grok catalog", error);
+      console.debug("[polycode] grok catalog", error);
     })
     .finally(() => {
       inflight = null;
@@ -46,12 +46,12 @@ export function refreshGrokCatalog(): Promise<void> {
 
 async function discoverGrokModels() {
   const fromAcp = await discoverViaAcp().catch((error: unknown) => {
-    console.debug("[monocode] grok ACP catalog failed", error);
+    console.debug("[polycode] grok ACP catalog failed", error);
     return [];
   });
   if (fromAcp.length > 0) return fromAcp;
   const fromCli = await discoverViaCli().catch((error: unknown) => {
-    console.debug("[monocode] grok CLI catalog failed", error);
+    console.debug("[polycode] grok CLI catalog failed", error);
     return [];
   });
   if (fromCli.length > 0) return fromCli;
@@ -87,7 +87,7 @@ async function discoverViaAcp() {
         {
           protocolVersion: 1,
           clientCapabilities: CLIENT_CAPABILITIES,
-          clientInfo: { name: "monocode", version: "0.1.0" },
+          clientInfo: { name: "polycode", version: "0.1.0" },
         },
         REQUEST_TIMEOUT_MS,
       );
