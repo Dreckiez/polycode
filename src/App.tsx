@@ -96,7 +96,9 @@ import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { listRunningTerminals } from "./lib/terminalTab";
 import {
   cancelHarnessTurn,
+  firstAvailableHarness,
   forgetHarnessSession,
+  isHarnessAvailable,
   isLiveHarness,
   probeHarnessAvailability,
   refreshHarnessCatalogs,
@@ -109,7 +111,10 @@ import { sessionChildHarnesses } from "./lib/handoff";
 import { notifyReviewChanged } from "./lib/checkpoint";
 import { type EditorNavigationTarget } from "./lib/search";
 import {
+  loadLastModelChoice,
   mergeModelSettings,
+  preferredModelId,
+  preferredModelSettings,
   resolveModel,
   saveLastModelSettings,
 } from "./lib/models";
@@ -518,7 +523,37 @@ export default function App({
   }, [resumed, readProjectReturnMemory]);
 
   useEffect(() => {
-    void probeHarnessAvailability();
+    void probeHarnessAvailability().then(() => {
+      if (!loadLastModelChoice()) {
+        const available = firstAvailableHarness();
+        if (available) {
+          setSessions((prev) =>
+            prev.map((session) => {
+              if (
+                session.blocks.length === 0 &&
+                !session.busy &&
+                !session.providerSessionId &&
+                !isHarnessAvailable(session.harness)
+              ) {
+                const resolved = resolveModel(
+                  available,
+                  preferredModelId(available),
+                );
+                return {
+                  ...session,
+                  harness: available,
+                  model: resolved.id,
+                  modelSettings: preferredModelSettings(resolved),
+                  title: formatSessionTitle(available, ""),
+                };
+              }
+              return session;
+            }),
+          );
+          void refreshHarnessCatalogs([available]);
+        }
+      }
+    });
     // Only the harnesses already in this window. Probing every installed CLI
     // at boot left unused agents (especially Pi) running in the background.
     const harnesses = [

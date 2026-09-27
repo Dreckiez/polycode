@@ -152,6 +152,30 @@ export function isHarnessAvailable(id: HarnessId): boolean {
   return availability[id];
 }
 
+export const HARNESS_PRIORITY: readonly HarnessId[] = [
+  "antigravity",
+  "claude",
+  "codex",
+  "opencode",
+  "cursor",
+  "grok",
+  "pi",
+  "omp",
+  "fx",
+];
+
+export function firstAvailableHarness(): HarnessId | undefined {
+  for (const id of HARNESS_PRIORITY) {
+    if (availability[id]) return id;
+  }
+  return undefined;
+}
+
+export function setHarnessAvailableForTest(id: HarnessId, ok: boolean): void {
+  availability = { ...availability, [id]: ok };
+  emit();
+}
+
 export function harnessUnavailableHint(id: HarnessId): string {
   const { name, install } = CLI[id];
   const how = install ? ` (\`${install}\`)` : "";

@@ -482,10 +482,39 @@ export function preferredModelId(harness: HarnessId): string {
   return defaultModelId(harness);
 }
 
+const AVAILABILITY_STORAGE_KEY = "polycode.harnessAvailability";
+
+export const HARNESS_PRIORITY: readonly HarnessId[] = [
+  "antigravity",
+  "claude",
+  "codex",
+  "opencode",
+  "cursor",
+  "grok",
+  "pi",
+  "omp",
+  "fx",
+];
+
+export function detectedDefaultHarness(): HarnessId | undefined {
+  try {
+    if (typeof localStorage === "undefined") return undefined;
+    const raw = localStorage.getItem(AVAILABILITY_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Partial<Record<HarnessId, boolean>>;
+    for (const id of HARNESS_PRIORITY) {
+      if (parsed[id]) return id;
+    }
+  } catch {
+    // quota / private mode
+  }
+  return undefined;
+}
+
 /** Provider + model new conversations should start with. */
 export function defaultSessionChoice(): LastModelChoice {
   const last = loadLastModelChoice();
-  const harness = last?.harness ?? "cursor";
+  const harness = last?.harness ?? detectedDefaultHarness() ?? "antigravity";
   return { harness, model: preferredModelId(harness) };
 }
 

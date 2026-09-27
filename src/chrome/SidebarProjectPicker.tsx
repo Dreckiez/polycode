@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Plus,
   Search,
+  Trash2,
 } from "./icons";
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
@@ -22,6 +23,7 @@ import {
 import { Popover } from "./Popover";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
 import { ProjectMascot } from "./ProjectMascot";
+import { RemoveProjectDialog } from "./RemoveProjectDialog";
 
 export function SidebarProjectPicker({
   cwd,
@@ -29,16 +31,22 @@ export function SidebarProjectPicker({
   busy,
   onSelectProject,
   onOpenProject,
+  onRemoveProject,
 }: {
   cwd: string;
   recents: RecentProject[];
   busy: boolean;
   onSelectProject: (path: string) => void;
   onOpenProject?: () => void;
+  onRemoveProject?: (path: string, options: { purgeData: boolean }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [projectToDelete, setProjectToDelete] = useState<{
+    name: string;
+    path: string;
+  } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [groupLabels] = useState(loadTabGroupLabels);
   const [groupColors] = useState(loadTabGroupColors);
@@ -209,43 +217,64 @@ export function SidebarProjectPicker({
                     itemSeed,
                   );
                   return (
-                    <button
+                    <div
                       key={item.path}
-                      type="button"
-                      title={item.path}
                       onMouseEnter={() => setActive(index)}
-                      onClick={() => pickProject(item.path)}
-                      className={`flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left ${
+                      className={`group relative flex h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left ${
                         active === index
                           ? "bg-content/10 text-content"
                           : "text-content/75 hover:bg-content/5 hover:text-content"
                       }`}
                     >
-                      <span className="grid size-4 shrink-0 place-items-center">
-                        {current ? (
-                          <Check className="size-3.5" strokeWidth={2} />
-                        ) : itemLogo ? (
-                          <ProjectLogoIcon
-                            path={itemLogo}
-                            className="size-4 rounded-sm"
-                            imageClassName="size-4"
-                          />
-                        ) : (
-                          <ProjectMascot
-                            project={itemSeed}
-                            color={itemColor}
-                            name={resolveTabGroupMascot(itemKey, groupMascots)}
-                            className="size-3.5"
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                        {itemLabel}
-                      </span>
-                      <span className="max-w-44 shrink truncate font-mono text-[11px] text-content/40">
-                        {prettyParent(item.path)}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        title={item.path}
+                        onClick={() => pickProject(item.path)}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-1 text-left"
+                      >
+                        <span className="grid size-4 shrink-0 place-items-center">
+                          {current ? (
+                            <Check className="size-3.5" strokeWidth={2} />
+                          ) : itemLogo ? (
+                            <ProjectLogoIcon
+                              path={itemLogo}
+                              className="size-4 rounded-sm"
+                              imageClassName="size-4"
+                            />
+                          ) : (
+                            <ProjectMascot
+                              project={itemSeed}
+                              color={itemColor}
+                              name={resolveTabGroupMascot(itemKey, groupMascots)}
+                              className="size-3.5"
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                          {itemLabel}
+                        </span>
+                        <span className="max-w-36 shrink truncate font-mono text-[11px] text-content/40">
+                          {prettyParent(item.path)}
+                        </span>
+                      </button>
+                      {onRemoveProject ? (
+                        <button
+                          type="button"
+                          title={`Delete “${itemLabel}”`}
+                          aria-label={`Delete ${itemLabel}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProjectToDelete({
+                              name: itemLabel,
+                              path: item.path,
+                            });
+                          }}
+                          className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-content/30 opacity-0 transition-opacity hover:bg-red-500/15 hover:text-red-400 group-hover:opacity-100 group-focus-within:opacity-100"
+                        >
+                          <Trash2 className="size-3.5" strokeWidth={1.75} />
+                        </button>
+                      ) : null}
+                    </div>
                   );
                 })
               ) : (
@@ -272,6 +301,21 @@ export function SidebarProjectPicker({
           </Popover>
         ) : null}
       </div>
+      {projectToDelete && onRemoveProject ? (
+        <RemoveProjectDialog
+          name={projectToDelete.name}
+          path={projectToDelete.path}
+          onCancel={() => setProjectToDelete(null)}
+          onConfirm={() => {
+            const targetPath = projectToDelete.path;
+            setProjectToDelete(null);
+            onRemoveProject(targetPath, { purgeData: true });
+            if (sameProjectPath(targetPath, cwd)) {
+              closePicker();
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

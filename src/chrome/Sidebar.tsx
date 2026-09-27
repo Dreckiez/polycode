@@ -289,7 +289,7 @@ function SidebarComponent({
   onSelectAgent,
   onSelectProject,
   onOpenProject,
-  onRemoveProject: _onRemoveProject,
+  onRemoveProject,
   onNew,
   onSearch,
   onOpenNotes,
@@ -1264,6 +1264,7 @@ function SidebarComponent({
               busy={projectPathBusy(busyProjectPaths, cwd)}
               onSelectProject={onSelectProject}
               onOpenProject={onOpenProject}
+              onRemoveProject={onRemoveProject}
             />
           ) : null}
 

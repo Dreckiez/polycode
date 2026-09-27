@@ -117,6 +117,7 @@ export { refreshFxCatalog } from "./fxCatalog";
 export { refreshGrokCatalog } from "./grokCatalog";
 export { registerBuiltinHarnesses } from "./register";
 export {
+  firstAvailableHarness,
   getHarnessAvailabilitySnapshot,
   hasProbedHarnessAvailability,
   harnessUnavailableHint,

@@ -223,9 +223,29 @@ describe("provider defaults", () => {
 
   it("keeps catalog defaults when nothing is saved", () => {
     expect(defaultSessionChoice()).toEqual({
-      harness: "cursor",
-      model: defaultModelId("cursor"),
+      harness: "antigravity",
+      model: defaultModelId("antigravity"),
     });
+  });
+
+  it("uses the first detected available CLI when nothing is saved", () => {
+    localStorage.setItem(
+      "polycode.harnessAvailability",
+      JSON.stringify({ claude: true }),
+    );
+    expect(defaultSessionChoice()).toEqual({
+      harness: "claude",
+      model: defaultModelId("claude"),
+    });
+    localStorage.setItem(
+      "polycode.harnessAvailability",
+      JSON.stringify({ antigravity: true, claude: true }),
+    );
+    expect(defaultSessionChoice()).toEqual({
+      harness: "antigravity",
+      model: defaultModelId("antigravity"),
+    });
+    localStorage.removeItem("polycode.harnessAvailability");
   });
 
   it("keeps the six most recently used unique models", () => {

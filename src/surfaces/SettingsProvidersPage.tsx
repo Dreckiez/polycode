@@ -12,6 +12,7 @@ import { refreshHarnessCatalogs } from "../lib/harness/registry";
 import {
   defaultModelId,
   getModelSnapshot,
+  defaultSessionChoice,
   hasLiveCatalog,
   isPickerProviderVisible,
   loadDefaultModels,
@@ -42,11 +43,15 @@ export function ProvidersPage() {
     getHarnessAvailabilitySnapshot,
     getHarnessAvailabilitySnapshot,
   );
-  const [choice, setChoice] = useState(loadLastModelChoice);
+  const [choice, setChoice] = useState(defaultSessionChoice);
   const [defaultModels, setDefaultModels] = useState(loadDefaultModels);
 
   useEffect(() => {
-    void probeHarnessAvailability();
+    void probeHarnessAvailability().then(() => {
+      if (!loadLastModelChoice()) {
+        setChoice(defaultSessionChoice());
+      }
+    });
   }, []);
 
   const onModelChange = (harness: HarnessId, model: string) => {
