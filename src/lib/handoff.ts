@@ -357,6 +357,7 @@ export function wrapHandoffPrompt(
   from: HarnessId,
   userText: string,
   earlierRequests: string[] = [],
+  to?: HarnessId,
 ): string {
   const fromTitle = HARNESS_TITLE[from];
   const request = userText.trim();
@@ -366,17 +367,99 @@ export function wrapHandoffPrompt(
     earlier.length > 0
       ? `\n\nAfter the switch, before this message, the user also sent:\n\n${earlier.join("\n\n")}`
       : "";
-  const lead = `You are continuing an existing conversation handed off from ${fromTitle}. This is not a new session. Do not say you have no prior context.\n\n${request}${earlierBlock}`;
+  const lead =
+    to && from === to
+      ? `You are continuing an existing conversation. This is not a new session. Do not say you have no prior context.\n\n${request}${earlierBlock}`
+      : `You are continuing an existing conversation handed off from ${fromTitle}. This is not a new session. Do not say you have no prior context.\n\n${request}${earlierBlock}`;
   if (!body) {
     return `${lead}\n\nContinue from a ${fromTitle} session. Do not invent prior work.`;
   }
+  const priorHeader =
+    to && from === to
+      ? `Prior conversation context — this is the thread you are joining, not optional background:`
+      : `Prior conversation from ${fromTitle} — this is the thread you are joining, not optional background:`;
   return `${lead}
 
-Prior conversation from ${fromTitle} — this is the thread you are joining, not optional background:
+${priorHeader}
 
 <handoff>
 ${body}
 </handoff>`;
+}
+
+export const PROVIDER_SESSION_REMOVED_MESSAGE =
+  "The provider session was removed in the CLI. Your local conversation history is intact.";
+
+export function isProviderSessionRemovedError(
+  message: string,
+  hasProviderSessionId: boolean,
+): boolean {
+  if (!hasProviderSessionId) return false;
+  if (message === PROVIDER_SESSION_REMOVED_MESSAGE) return true;
+  const lower = message.toLowerCase();
+  if (lower.includes("model") && lower.includes("not found")) return false;
+  if (lower.includes("command not found") || lower.includes("binary not found")) return false;
+  if (lower.includes("file not found") || lower.includes("enoent")) return false;
+  return (
+    lower.includes("session not found") ||
+    lower.includes("thread not found") ||
+    lower.includes("conversation not found") ||
+    lower.includes("no conversation found") ||
+    lower.includes("no thread found") ||
+    lower.includes("invalid session") ||
+    lower.includes("unknown session") ||
+    lower.includes("unknown thread") ||
+    lower.includes("session does not exist") ||
+    lower.includes("thread does not exist") ||
+    lower.includes("claude code exited") ||
+    lower.includes("codex app-server exited") ||
+    lower.includes("process exited with code 1") ||
+    lower.includes("exited with code 1")
+  );
+}
+
+export function prepareContinueWithContext(session: Session): {
+  session: Session;
+  failedUserText: string;
+} {
+  const blocks = session.blocks;
+  const lastBlock = blocks[blocks.length - 1];
+  const prevBlock = blocks[blocks.length - 2];
+
+  const isFailedTurn =
+    lastBlock?.role === "system" &&
+    (lastBlock.text === PROVIDER_SESSION_REMOVED_MESSAGE ||
+      lastBlock.notice === "error") &&
+    prevBlock?.role === "user";
+
+  const failedUserText = isFailedTurn ? prevBlock.text : "";
+
+  const baseBlocks = isFailedTurn
+    ? blocks.slice(0, -2)
+    : blocks.filter(
+        (b) =>
+          !(
+            b.role === "system" &&
+            (b.text === PROVIDER_SESSION_REMOVED_MESSAGE ||
+              b.notice === "error")
+          ),
+      );
+
+  const sessionForBrief = { ...session, blocks: baseBlocks };
+  const brief = buildDeterministicHandoff(sessionForBrief);
+
+  const updatedSession = appendReadyHandoff(
+    {
+      ...session,
+      blocks: baseBlocks,
+      providerSessionId: undefined,
+    },
+    session.harness,
+    session.harness,
+    brief,
+  );
+
+  return { session: updatedSession, failedUserText };
 }
 
 function appendHandoffBlock(

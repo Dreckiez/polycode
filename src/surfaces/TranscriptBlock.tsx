@@ -8,8 +8,9 @@ import {
 import type { ApprovalDecision } from "../lib/harness";
 import type { TranscriptLayout } from "../lib/appearance";
 import { AttachmentChip } from "../chrome/AttachmentChip";
-import { AlertCircle, RotateCcw } from "../chrome/icons";
+import { AlertCircle, RotateCcw, Sparkles } from "../chrome/icons";
 import { HarnessIcon } from "../chrome/HarnessIcon";
+import { PROVIDER_SESSION_REMOVED_MESSAGE } from "../lib/handoff";
 import { NoteMiniCard } from "../chrome/NoteMiniCard";
 import { PlanPreview } from "../chrome/PlanPreview";
 import { SecondOpinionCard } from "../chrome/SecondOpinionCard";
@@ -37,6 +38,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planModel,
   sessionId,
   onRetry,
+  onContinueWithContext,
 }: {
   block: Block;
   layout: TranscriptLayout;
@@ -54,6 +56,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planModel?: string;
   sessionId: string;
   onRetry?: () => void;
+  onContinueWithContext?: () => void;
 }) {
   // For streaming assistant/reasoning blocks, read text from the narrow chatStore selector
   // so only this block re-renders on token deltas.
@@ -151,7 +154,13 @@ const TranscriptBlock = memo(function TranscriptBlock({
       block.notice !== "interrupt" &&
       (block.notice === "error" || !isSystemStatus(block.text))
     ) {
-      return <GenerationErrorBanner text={block.text} onRetry={onRetry} />;
+      return (
+        <GenerationErrorBanner
+          text={block.text}
+          onRetry={onRetry}
+          onContinueWithContext={onContinueWithContext}
+        />
+      );
     }
     return (
       <div className="px-4 py-2 text-content/50">
@@ -191,10 +200,14 @@ function isSystemStatus(text: string): boolean {
 function GenerationErrorBanner({
   text,
   onRetry,
+  onContinueWithContext,
 }: {
   text: string;
   onRetry?: () => void;
+  onContinueWithContext?: () => void;
 }) {
+  const isSessionLost = text === PROVIDER_SESSION_REMOVED_MESSAGE;
+
   return (
     <div className="px-4 py-2">
       <div
@@ -208,19 +221,33 @@ function GenerationErrorBanner({
               strokeWidth={2}
             />
             <span className="font-medium text-sm text-rose-200">
-              Generation stopped
+              {isSessionLost
+                ? "Provider session removed in CLI"
+                : "Generation stopped"}
             </span>
           </div>
-          {onRetry ? (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-rose-400 transition-colors hover:text-rose-200"
-            >
-              <RotateCcw className="size-3.5" strokeWidth={2} />
-              <span>Retry</span>
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {isSessionLost && onContinueWithContext ? (
+              <button
+                type="button"
+                onClick={onContinueWithContext}
+                className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-medium text-rose-100 transition-colors hover:bg-rose-500/30 hover:text-white"
+              >
+                <Sparkles className="size-3.5 text-rose-300" strokeWidth={2} />
+                <span>Continue with Context</span>
+              </button>
+            ) : null}
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-rose-400 transition-colors hover:text-rose-200"
+              >
+                <RotateCcw className="size-3.5" strokeWidth={2} />
+                <span>Retry</span>
+              </button>
+            ) : null}
+          </div>
         </div>
         {text ? (
           <p className="mt-1 pl-7 text-xs leading-relaxed text-rose-400/80 whitespace-pre-wrap break-words">
@@ -349,7 +376,11 @@ function HandoffDivider({ block }: { block: Block }) {
   if (!meta) return null;
 
   const preparing = meta.status === "preparing";
-  const label = preparing ? "Preparing a handoff" : HARNESS_TITLE[meta.to];
+  const label = preparing
+    ? "Preparing a handoff"
+    : meta.from === meta.to
+      ? "Continued with context"
+      : HARNESS_TITLE[meta.to];
 
   return (
     <div className="px-4 py-5">
@@ -360,7 +391,9 @@ function HandoffDivider({ block }: { block: Block }) {
           aria-label={
             preparing
               ? `Preparing a handoff to ${HARNESS_TITLE[meta.to]}`
-              : `Continued with ${label}`
+              : meta.from === meta.to
+                ? "Continued with context"
+                : `Continued with ${label}`
           }
           className="flex max-w-[min(100%,20rem)] items-center gap-1.5 px-1.5 font-sans text-[12px] text-content/55"
         >
@@ -372,6 +405,7 @@ function HandoffDivider({ block }: { block: Block }) {
           ) : (
             <>
               <HarnessIcon harness={meta.to} className="size-3.5 shrink-0" />
+              <span>{label}</span>
             </>
           )}
         </div>

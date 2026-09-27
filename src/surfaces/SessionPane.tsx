@@ -137,6 +137,7 @@ type Props = {
     turn: Block[],
     model: string,
   ) => void;
+  onContinueWithContext?: (sessionId: string) => void;
   onNewTerminal: (sessionId: string) => void;
   onPaneDragStart?: (event: ReactPointerEvent<HTMLElement>) => void;
 };
@@ -178,6 +179,7 @@ export const SessionPane = memo(function SessionPane({
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
+  onContinueWithContext,
   onNewTerminal,
   onPaneDragStart,
 }: Props) {
@@ -432,6 +434,9 @@ export const SessionPane = memo(function SessionPane({
     },
     [onHandoff, session.id],
   );
+  const onContinueWithContextCb = useCallback(() => {
+    onContinueWithContext?.(session.id);
+  }, [onContinueWithContext, session.id]);
 
   const composer = (
     <Composer
@@ -590,6 +595,9 @@ export const SessionPane = memo(function SessionPane({
                 onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}
                 onHandoff={onHandoff ? onHandoffCb : undefined}
                 onRegenerate={onRegenerateTurn}
+                onContinueWithContext={
+                  onContinueWithContext ? onContinueWithContextCb : undefined
+                }
                 onJumpToBottomChange={setShowJumpToBottom}
                 onJumpToBottomReady={onJumpToBottomReady}
                 onRevealReady={onRevealReady}

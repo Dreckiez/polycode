@@ -10,13 +10,16 @@ import {
   consumeHandoff,
   handoffTurnCard,
   hasSessionEdits,
+  isProviderSessionRemovedError,
   pendingHandoff,
   planComposerSwitch,
+  prepareContinueWithContext,
   sessionChildHarnesses,
   sessionThroughTurn,
   shouldAskOutgoingAgent,
   userMessagesAfterHandoff,
   wrapHandoffPrompt,
+  PROVIDER_SESSION_REMOVED_MESSAGE,
 } from "./handoff";
 import { newSession, type Block, type Session } from "./session";
 
@@ -377,5 +380,107 @@ describe("wrapHandoffPrompt", () => {
     expect(buildOutgoingHandoffPrompt("add dark mode")).not.toContain(
       "Goal (the user request)",
     );
+  });
+
+  it("formats prompt cleanly when continuing the same provider conversation", () => {
+    const prompt = wrapHandoffPrompt(
+      "## Prior conversation context\nRecap of what happened",
+      "claude",
+      "continue working",
+      undefined,
+      "claude",
+    );
+    expect(prompt).toContain("continue working");
+    expect(prompt).toContain(
+      "You are continuing an existing conversation. This is not a new session. Do not say you have no prior context.",
+    );
+    expect(prompt).toContain("<handoff>");
+    expect(prompt).toContain("</handoff>");
+  });
+});
+
+describe("isProviderSessionRemovedError", () => {
+  it("returns false if there is no providerSessionId", () => {
+    expect(isProviderSessionRemovedError("session not found", false)).toBe(false);
+    expect(isProviderSessionRemovedError("process exited with code 1", false)).toBe(false);
+  });
+
+  it("returns true for PROVIDER_SESSION_REMOVED_MESSAGE", () => {
+    expect(
+      isProviderSessionRemovedError(PROVIDER_SESSION_REMOVED_MESSAGE, true),
+    ).toBe(true);
+  });
+
+  it("detects missing session/thread errors", () => {
+    expect(
+      isProviderSessionRemovedError("Error: Session not found: sess-123", true),
+    ).toBe(true);
+    expect(
+      isProviderSessionRemovedError("Thread not found", true),
+    ).toBe(true);
+    expect(
+      isProviderSessionRemovedError("process exited with code 1", true),
+    ).toBe(true);
+    expect(
+      isProviderSessionRemovedError("Claude code exited with code 1", true),
+    ).toBe(true);
+    expect(
+      isProviderSessionRemovedError("Codex app-server exited unexpectedly", true),
+    ).toBe(true);
+  });
+
+  it("excludes model, command, or file not found errors", () => {
+    expect(
+      isProviderSessionRemovedError("model claude-3 not found", true),
+    ).toBe(false);
+    expect(
+      isProviderSessionRemovedError("command not found: claude", true),
+    ).toBe(false);
+    expect(
+      isProviderSessionRemovedError("binary not found", true),
+    ).toBe(false);
+    expect(
+      isProviderSessionRemovedError("file not found: config.json", true),
+    ).toBe(false);
+  });
+});
+
+describe("prepareContinueWithContext", () => {
+  it("removes failed turn, builds handoff brief, and clears providerSessionId", () => {
+    const session = sessionWith(
+      [
+        { id: "u1", role: "user", text: "create a button" },
+        { id: "a1", role: "assistant", text: "Created the button." },
+        { id: "u2", role: "user", text: "now make it red" },
+        {
+          id: "s1",
+          role: "system",
+          text: PROVIDER_SESSION_REMOVED_MESSAGE,
+          notice: "error",
+        },
+      ],
+      { providerSessionId: "stale-cli-id", harness: "claude" },
+    );
+
+    const { session: prepared, failedUserText } =
+      prepareContinueWithContext(session);
+
+    expect(failedUserText).toBe("now make it red");
+    expect(prepared.providerSessionId).toBeUndefined();
+
+    // Verify the failed user and error block were removed
+    const remainingRoles = prepared.blocks.map((b) => b.role);
+    expect(remainingRoles).toEqual(["user", "assistant", "handoff"]);
+
+    // Verify ready handoff block was appended
+    const lastBlock = prepared.blocks[prepared.blocks.length - 1];
+    expect(lastBlock.role).toBe("handoff");
+    expect(lastBlock.handoff).toMatchObject({
+      from: "claude",
+      to: "claude",
+      status: "ready",
+      pending: true,
+    });
+    expect(lastBlock.text).toContain("create a button");
   });
 });

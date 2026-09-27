@@ -69,6 +69,7 @@ type TranscriptTurnProps = {
   onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
   onSaveNote?: (text: string) => void;
   onRegenerate?: (turn: Block[]) => void;
+  onContinueWithContext?: () => void;
   sessionId: string;
 };
 
@@ -280,7 +281,8 @@ function areTurnsEqual(
       prev.onSecondOpinion === next.onSecondOpinion &&
       prev.onHandoff === next.onHandoff &&
       prev.onSaveNote === next.onSaveNote &&
-      prev.onRegenerate === next.onRegenerate
+      prev.onRegenerate === next.onRegenerate &&
+      prev.onContinueWithContext === next.onContinueWithContext
     );
   }
 
@@ -301,7 +303,8 @@ function areTurnsEqual(
     prev.onSecondOpinion === next.onSecondOpinion &&
     prev.onHandoff === next.onHandoff &&
     prev.onSaveNote === next.onSaveNote &&
-    prev.onRegenerate === next.onRegenerate
+    prev.onRegenerate === next.onRegenerate &&
+    prev.onContinueWithContext === next.onContinueWithContext
   );
 }
 
@@ -335,6 +338,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
   onHandoff,
   onSaveNote,
   onRegenerate,
+  onContinueWithContext,
   sessionId,
 }: TranscriptTurnProps) {
   const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
@@ -456,6 +460,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
         cwd={cwd}
         sessionId={sessionId}
         onRetry={onRegenerate ? handleRegenerate : undefined}
+        onContinueWithContext={onContinueWithContext}
       />
     );
 

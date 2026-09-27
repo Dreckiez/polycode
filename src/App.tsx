@@ -1801,7 +1801,12 @@ export default function App({
     onSubmit,
   });
 
-  const { onSecondOpinion, onHandoff, onCompactContext } = useMultiSession({
+  const {
+    onSecondOpinion,
+    onHandoff,
+    onCompactContext,
+    onContinueWithContext,
+  } = useMultiSession({
     activeTabIdRef,
     appendTab,
     enqueueHarnessEvent,
@@ -2210,6 +2215,7 @@ export default function App({
     onBuildPlan,
     onSecondOpinion,
     onHandoff,
+    onContinueWithContext,
     onNewTerminal: projectTerminal.onNewTerminalInSession,
   };
 

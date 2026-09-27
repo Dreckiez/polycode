@@ -35,16 +35,19 @@ import {
   HANDOFF_TITLE,
   buildDeterministicHandoff,
   buildHandoffComposerCard,
+  prepareContinueWithContext,
   sessionThroughTurn,
 } from "../lib/handoff";
 import {
   applyHarnessEvent,
   canCompactHarnessContext,
   compactHarnessContext,
+  forgetHarnessSession,
   type HarnessEvent,
 } from "../lib/harness";
 import { syncDockBadge } from "../lib/dockBadge";
 import { selectedProviderAccountId } from "../lib/providerAccounts";
+import { requestAddToChat } from "../lib/quoteDraft";
 
 export type MultiSessionDeps = {
   activeTabIdRef: RefObject<string>;
@@ -259,10 +262,35 @@ export function useMultiSession(deps: MultiSessionDeps) {
     [d.enqueueHarnessEvent, d.flushHarnessEvents],
   );
 
+  const onContinueWithContext = useCallback(
+    (sessionId: string) => {
+      const current = d.sessionsRef.current.find((s) => s.id === sessionId);
+      if (!current) return;
+
+      void forgetHarnessSession(current.harness, sessionId);
+
+      const { session: prepared, failedUserText } =
+        prepareContinueWithContext(current);
+
+      const next = d.sessionsRef.current.map((s) =>
+        s.id === sessionId ? prepared : s,
+      );
+      d.sessionsRef.current = next;
+      d.setSessions(next);
+
+      if (failedUserText) {
+        requestAddToChat(failedUserText, "plain");
+      }
+      d.setComposerFocused(true);
+    },
+    [d.sessionsRef, d.setSessions, d.setComposerFocused],
+  );
+
   return {
     openSessionBeside,
     onSecondOpinion,
     onHandoff,
     onCompactContext,
+    onContinueWithContext,
   };
 }

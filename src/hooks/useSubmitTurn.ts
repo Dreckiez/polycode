@@ -40,7 +40,9 @@ import {
   consumeHandoff,
   handoffTurnCard,
   isPreparingHandoff,
+  isProviderSessionRemovedError,
   pendingHandoff,
+  PROVIDER_SESSION_REMOVED_MESSAGE,
   shouldAskOutgoingAgent,
   userMessagesAfterHandoff,
   wrapHandoffPrompt,
@@ -479,7 +481,27 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
         let nativePlanSeen = false;
         let providerFailureSeen = false;
         const routePlanEvent = (event: HarnessEvent): HarnessEvent | null => {
-          if (event.type === "session.error") providerFailureSeen = true;
+          if (event.type === "session.error") {
+            providerFailureSeen = true;
+            if (
+              isProviderSessionRemovedError(
+                event.message,
+                Boolean(current.providerSessionId),
+              )
+            ) {
+              d.setSessions((prev) =>
+                prev.map((s) =>
+                  s.id === sessionId
+                    ? { ...s, providerSessionId: undefined }
+                    : s,
+                ),
+              );
+              return {
+                ...event,
+                message: PROVIDER_SESSION_REMOVED_MESSAGE,
+              };
+            }
+          }
           if (intent !== "plan") return event;
           if (event.type === "plan") {
             nativePlanSeen = true;
@@ -525,6 +547,7 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
                     wrap.from,
                     turnPrompt.trim() || CONTINUE_PROMPT,
                     earlier,
+                    wrap.to,
                   )
                 : turnPrompt,
             attachments: prepared,
@@ -560,10 +583,24 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
         } catch (error: unknown) {
           if (d.turnGen.current.get(sessionId) !== gen) return;
           if (wrap) revealHandoff(wrap.text);
-          const message =
+          let message =
             error instanceof Error
               ? error.message
               : `${current.harness} adapter failed`;
+          const isSessionLost = isProviderSessionRemovedError(
+            message,
+            Boolean(current.providerSessionId),
+          );
+          if (isSessionLost) {
+            message = PROVIDER_SESSION_REMOVED_MESSAGE;
+            d.setSessions((prev) =>
+              prev.map((s) =>
+                s.id === sessionId
+                  ? { ...s, providerSessionId: undefined }
+                  : s,
+              ),
+            );
+          }
           if (!providerFailureSeen) {
             d.enqueueHarnessEvent(sessionId, {
               type: "session.error",
