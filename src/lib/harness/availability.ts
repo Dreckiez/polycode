@@ -117,37 +117,6 @@ export function hasProbedHarnessAvailability(): boolean {
   return probedAt > 0;
 }
 
-import { isAntigravityAcpBinary } from "./antigravityProtocol";
-
-let antigravityHasAcp = false;
-
-export function hasAntigravityAcp(): boolean {
-  return antigravityHasAcp;
-}
-
-export function setAntigravityHasAcpForTest(hasAcp: boolean): void {
-  antigravityHasAcp = hasAcp;
-  emit();
-}
-
-export async function isAntigravityAcpAvailable(): Promise<boolean> {
-  try {
-    const res = await resolveAntigravityBinary();
-    const isAcp = isAntigravityAcpBinary(res.path);
-    if (antigravityHasAcp !== isAcp) {
-      antigravityHasAcp = isAcp;
-      emit();
-    }
-    return isAcp;
-  } catch {
-    if (antigravityHasAcp !== false) {
-      antigravityHasAcp = false;
-      emit();
-    }
-    return false;
-  }
-}
-
 export function isHarnessAvailable(id: HarnessId): boolean {
   return availability[id];
 }
@@ -194,11 +163,9 @@ export function probeHarnessAvailability(
       if (!isLiveHarness(id)) return [id, false] as const;
       if (id === "antigravity") {
         try {
-          const res = await resolveAntigravityBinary();
-          antigravityHasAcp = isAntigravityAcpBinary(res.path);
+          await resolveAntigravityBinary();
           return [id, true] as const;
         } catch {
-          antigravityHasAcp = false;
           return [id, false] as const;
         }
       }

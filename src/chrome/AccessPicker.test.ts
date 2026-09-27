@@ -10,7 +10,6 @@ import {
   getRuntimeModeDisabledReason,
   isRuntimeModeSupported,
 } from "./AccessPicker";
-import { setAntigravityHasAcpForTest } from "../lib/harness/availability";
 
 vi.mock("./Popover", () => ({
   Popover: ({
@@ -40,36 +39,17 @@ vi.mock("./Popover", () => ({
 
 describe("AccessPicker mode support helpers", () => {
   it("enables auto only when harness is codex", () => {
-    expect(isRuntimeModeSupported("auto", "codex", false)).toBe(true);
-    expect(isRuntimeModeSupported("auto", "codex", true)).toBe(true);
-    expect(isRuntimeModeSupported("auto", "antigravity", true)).toBe(false);
-    expect(isRuntimeModeSupported("auto", "antigravity", false)).toBe(false);
-    expect(isRuntimeModeSupported("auto", "claude", false)).toBe(false);
-    expect(isRuntimeModeSupported("auto", undefined, false)).toBe(false);
+    expect(isRuntimeModeSupported("auto", "codex")).toBe(true);
+    expect(isRuntimeModeSupported("auto", "antigravity")).toBe(false);
+    expect(isRuntimeModeSupported("auto", "claude")).toBe(false);
+    expect(isRuntimeModeSupported("auto", undefined)).toBe(false);
   });
 
-  it("enables supervised, auto-accept-edits, full-access for antigravity when ACP is present", () => {
-    expect(isRuntimeModeSupported("supervised", "antigravity", true)).toBe(true);
-    expect(
-      isRuntimeModeSupported("auto-accept-edits", "antigravity", true),
-    ).toBe(true);
-    expect(isRuntimeModeSupported("full-access", "antigravity", true)).toBe(
-      true,
-    );
-    expect(isRuntimeModeSupported("auto", "antigravity", true)).toBe(false);
-  });
-
-  it("enables only full-access for antigravity when ACP is absent", () => {
-    expect(isRuntimeModeSupported("supervised", "antigravity", false)).toBe(
-      false,
-    );
-    expect(
-      isRuntimeModeSupported("auto-accept-edits", "antigravity", false),
-    ).toBe(false);
-    expect(isRuntimeModeSupported("auto", "antigravity", false)).toBe(false);
-    expect(isRuntimeModeSupported("full-access", "antigravity", false)).toBe(
-      true,
-    );
+  it("enables only full-access for antigravity", () => {
+    expect(isRuntimeModeSupported("supervised", "antigravity")).toBe(false);
+    expect(isRuntimeModeSupported("auto-accept-edits", "antigravity")).toBe(false);
+    expect(isRuntimeModeSupported("auto", "antigravity")).toBe(false);
+    expect(isRuntimeModeSupported("full-access", "antigravity")).toBe(true);
   });
 
   it("enables supervised, auto-accept-edits, full-access for other providers", () => {
@@ -83,17 +63,17 @@ describe("AccessPicker mode support helpers", () => {
     expect(getRuntimeModeDisabledReason("auto", "claude")).toBe(
       "Only available for Codex",
     );
-    expect(getRuntimeModeDisabledReason("auto", "antigravity", true)).toBe(
+    expect(getRuntimeModeDisabledReason("auto", "antigravity")).toBe(
       "Only available for Codex",
     );
-    expect(getRuntimeModeDisabledReason("supervised", "antigravity", false)).toBe(
-      "Requires Antigravity ACP server",
+    expect(getRuntimeModeDisabledReason("supervised", "antigravity")).toBe(
+      "Antigravity CLI only supports Full Access",
     );
     expect(
-      getRuntimeModeDisabledReason("auto-accept-edits", "antigravity", false),
-    ).toBe("Requires Antigravity ACP server");
+      getRuntimeModeDisabledReason("auto-accept-edits", "antigravity"),
+    ).toBe("Antigravity CLI only supports Full Access");
     expect(
-      getRuntimeModeDisabledReason("full-access", "antigravity", false),
+      getRuntimeModeDisabledReason("full-access", "antigravity"),
     ).toBeUndefined();
     expect(getRuntimeModeDisabledReason("auto", "codex")).toBeUndefined();
   });
@@ -116,10 +96,7 @@ describe("AccessPicker component lifecycle", () => {
     container.remove();
   });
 
-  it("auto-clamps to full-access if antigravity has no ACP and mode is supervised", () => {
-    act(() => {
-      setAntigravityHasAcpForTest(false);
-    });
+  it("auto-clamps to full-access if harness is antigravity and mode is supervised", () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
@@ -135,9 +112,6 @@ describe("AccessPicker component lifecycle", () => {
   });
 
   it("auto-clamps to supervised if non-codex harness has auto mode selected", () => {
-    act(() => {
-      setAntigravityHasAcpForTest(true);
-    });
     const onChange = vi.fn();
     act(() => {
       root.render(
@@ -153,9 +127,6 @@ describe("AccessPicker component lifecycle", () => {
   });
 
   it("renders disabled options with reason and prevents clicking them", () => {
-    act(() => {
-      setAntigravityHasAcpForTest(false);
-    });
     const onChange = vi.fn();
     act(() => {
       root.render(
@@ -168,57 +139,34 @@ describe("AccessPicker component lifecycle", () => {
     });
 
     // Open dropdown
-    const trigger = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+    const trigger = container.querySelector(
+      'button[aria-haspopup="listbox"]',
+    ) as HTMLButtonElement;
     expect(trigger).toBeTruthy();
     act(() => {
       trigger.click();
     });
 
     // Supervised should be disabled
-    const options = Array.from(container.querySelectorAll('button[role="option"]')) as HTMLButtonElement[];
+    const options = Array.from(
+      container.querySelectorAll('button[role="option"]'),
+    ) as HTMLButtonElement[];
     expect(options.length).toBe(4);
 
-    const supervisedOption = options.find((btn) => btn.textContent?.includes("Supervised"))!;
+    const supervisedOption = options.find((btn) =>
+      btn.textContent?.includes("Supervised"),
+    )!;
     expect(supervisedOption).toBeTruthy();
     expect(supervisedOption.disabled).toBe(true);
     expect(supervisedOption.getAttribute("aria-disabled")).toBe("true");
-    expect(supervisedOption.textContent).toContain("Requires Antigravity ACP server");
+    expect(supervisedOption.textContent).toContain(
+      "Antigravity CLI only supports Full Access",
+    );
 
     // Clicking supervised should not trigger onChange
     act(() => {
       supervisedOption.click();
     });
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("allows selecting supervised when antigravity has ACP", () => {
-    act(() => {
-      setAntigravityHasAcpForTest(true);
-    });
-    const onChange = vi.fn();
-    act(() => {
-      root.render(
-        createElement(AccessPicker, {
-          value: "full-access",
-          harness: "antigravity",
-          onChange,
-        }),
-      );
-    });
-
-    // Open dropdown
-    const trigger = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
-    act(() => {
-      trigger.click();
-    });
-
-    const options = Array.from(container.querySelectorAll('button[role="option"]')) as HTMLButtonElement[];
-    const supervisedOption = options.find((btn) => btn.textContent?.includes("Supervised"))!;
-    expect(supervisedOption.disabled).toBe(false);
-
-    act(() => {
-      supervisedOption.click();
-    });
-    expect(onChange).toHaveBeenCalledWith("supervised");
   });
 });

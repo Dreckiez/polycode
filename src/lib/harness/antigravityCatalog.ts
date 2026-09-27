@@ -1,7 +1,6 @@
 import { homeDir } from "../fs";
 import { setHarnessModels, type AgentModel } from "../models";
 import { execChild, resolveAntigravityBinary } from "./child";
-import { isAntigravityAcpBinary } from "./antigravityProtocol";
 
 export const ANTIGRAVITY_MODEL_CATALOG: AgentModel[] = [
   {
@@ -126,9 +125,6 @@ export function refreshAntigravityCatalog(): Promise<void> {
 export async function discoverAntigravityModels(): Promise<AgentModel[]> {
   try {
     const { path } = await resolveAntigravityBinary();
-    if (isAntigravityAcpBinary(path)) {
-      return ANTIGRAVITY_MODEL_CATALOG;
-    }
     const cwd = await homeDir();
     const output = await execChild(path, ["models"], cwd);
     const parsed = parseModelsOutput(output);

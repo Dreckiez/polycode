@@ -4,7 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
@@ -14,11 +13,6 @@ import {
   type HarnessId,
   type RuntimeMode,
 } from "../lib/session";
-import {
-  hasAntigravityAcp,
-  isAntigravityAcpAvailable,
-  subscribeHarnessAvailability,
-} from "../lib/harness/availability";
 import { Popover } from "./Popover";
 
 type Props = {
@@ -41,12 +35,11 @@ const ICONS: Record<RuntimeMode, typeof Lock> = {
 export function isRuntimeModeSupported(
   mode: RuntimeMode,
   harness?: HarnessId,
-  hasAcp = false,
 ): boolean {
   if (mode === "auto") {
     return harness === "codex";
   }
-  if (harness === "antigravity" && !hasAcp) {
+  if (harness === "antigravity") {
     return mode === "full-access";
   }
   return true;
@@ -55,13 +48,12 @@ export function isRuntimeModeSupported(
 export function getRuntimeModeDisabledReason(
   mode: RuntimeMode,
   harness?: HarnessId,
-  hasAcp = false,
 ): string | undefined {
   if (mode === "auto" && harness !== "codex") {
     return "Only available for Codex";
   }
-  if (harness === "antigravity" && !hasAcp && mode !== "full-access") {
-    return "Requires Antigravity ACP server";
+  if (harness === "antigravity" && mode !== "full-access") {
+    return "Antigravity CLI only supports Full Access";
   }
   return undefined;
 }
@@ -74,33 +66,22 @@ export const AccessPicker = memo(function AccessPicker({
   busy = false,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const hasAcp = useSyncExternalStore(
-    subscribeHarnessAvailability,
-    hasAntigravityAcp,
-    hasAntigravityAcp,
-  );
 
   useEffect(() => {
-    if (harness === "antigravity") {
-      void isAntigravityAcpAvailable();
-    }
-  }, [harness]);
-
-  useEffect(() => {
-    if (!isRuntimeModeSupported(value, harness, hasAcp)) {
+    if (!isRuntimeModeSupported(value, harness)) {
       const fallback: RuntimeMode =
-        harness === "antigravity" && !hasAcp ? "full-access" : "supervised";
+        harness === "antigravity" ? "full-access" : "supervised";
       onChange(fallback);
     }
-  }, [value, harness, hasAcp, onChange]);
+  }, [value, harness, onChange]);
 
   const [active, setActive] = useState(() => {
     const idx = RUNTIME_MODES.indexOf(value);
-    if (idx >= 0 && isRuntimeModeSupported(value, harness, hasAcp)) {
+    if (idx >= 0 && isRuntimeModeSupported(value, harness)) {
       return idx;
     }
     const firstValid = RUNTIME_MODES.findIndex((m) =>
-      isRuntimeModeSupported(m, harness, hasAcp),
+      isRuntimeModeSupported(m, harness),
     );
     return Math.max(0, firstValid);
   });
@@ -118,18 +99,18 @@ export const AccessPicker = memo(function AccessPicker({
   useEffect(() => {
     if (!open) return;
     const idx = RUNTIME_MODES.indexOf(value);
-    if (idx >= 0 && isRuntimeModeSupported(value, harness, hasAcp)) {
+    if (idx >= 0 && isRuntimeModeSupported(value, harness)) {
       setActive(idx);
     } else {
       const firstValid = RUNTIME_MODES.findIndex((m) =>
-        isRuntimeModeSupported(m, harness, hasAcp),
+        isRuntimeModeSupported(m, harness),
       );
       setActive(Math.max(0, firstValid));
     }
-  }, [open, value, harness, hasAcp]);
+  }, [open, value, harness]);
 
   const pick = (mode: RuntimeMode) => {
-    if (!isRuntimeModeSupported(mode, harness, hasAcp)) return;
+    if (!isRuntimeModeSupported(mode, harness)) return;
     onChange(mode);
     dismiss(true);
   };
@@ -138,7 +119,7 @@ export const AccessPicker = memo(function AccessPicker({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       for (let i = active + 1; i < RUNTIME_MODES.length; i++) {
-        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness, hasAcp)) {
+        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness)) {
           setActive(i);
           return;
         }
@@ -148,7 +129,7 @@ export const AccessPicker = memo(function AccessPicker({
     if (e.key === "ArrowUp") {
       e.preventDefault();
       for (let i = active - 1; i >= 0; i--) {
-        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness, hasAcp)) {
+        if (isRuntimeModeSupported(RUNTIME_MODES[i], harness)) {
           setActive(i);
           return;
         }
@@ -158,7 +139,7 @@ export const AccessPicker = memo(function AccessPicker({
     if (e.key === "Enter") {
       e.preventDefault();
       const mode = RUNTIME_MODES[active];
-      if (mode && isRuntimeModeSupported(mode, harness, hasAcp)) {
+      if (mode && isRuntimeModeSupported(mode, harness)) {
         pick(mode);
       }
     }
@@ -211,11 +192,10 @@ export const AccessPicker = memo(function AccessPicker({
             const ModeIcon = ICONS[mode];
             const selected = mode === value;
             const highlighted = index === active;
-            const disabled = !isRuntimeModeSupported(mode, harness, hasAcp);
+            const disabled = !isRuntimeModeSupported(mode, harness);
             const disabledReason = getRuntimeModeDisabledReason(
               mode,
               harness,
-              hasAcp,
             );
 
             return (
@@ -261,12 +241,6 @@ export const AccessPicker = memo(function AccessPicker({
               </button>
             );
           })}
-          {busy ? (
-            <p className="px-2 py-1.5 text-[11px] leading-4 text-content/50">
-              Access changes apply to the next turn. Stop and resend to apply
-              them now.
-            </p>
-          ) : null}
         </Popover>
       ) : null}
     </div>

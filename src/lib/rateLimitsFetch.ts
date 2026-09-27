@@ -19,7 +19,6 @@ import {
   watchChild,
 } from "./harness/child";
 import { asRecord } from "./harness/codexProtocol";
-import { isAntigravityAcpBinary } from "./harness/antigravityProtocol";
 import { JsonRpcClient } from "./harness/jsonRpc";
 
 const USAGE_CHILD_ID = "polycode-codex-usage";
@@ -129,13 +128,6 @@ export async function fetchAntigravityRateLimits(
     path = (await resolveAntigravityBinary()).path;
   } catch {
     return unavailableRateLimits("antigravity", "Antigravity CLI not found");
-  }
-
-  if (isAntigravityAcpBinary(path)) {
-    return unavailableRateLimits(
-      "antigravity",
-      "Antigravity usage requires the agy CLI binary",
-    );
   }
 
   try {
