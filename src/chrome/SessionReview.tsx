@@ -87,14 +87,6 @@ export const SessionReview = memo(function SessionReview({
     if (busy) setFiles([]);
   }, [busy]);
 
-  // The card represents the result of a turn. Keep it out of the live turn,
-  // then refresh and reveal it once the turn has settled.
-  if (busy || files.length === 0) return null;
-
-  const disabled = acting != null;
-  const canUndoAll = !undoLocked && files.every((file) => file.undoable);
-  const visibleFiles = expanded ? files : files.slice(0, 3);
-  const hiddenFileCount = files.length - visibleFiles.length;
   const totals = useMemo(
     () =>
       files.reduce(
@@ -106,6 +98,15 @@ export const SessionReview = memo(function SessionReview({
       ),
     [files],
   );
+
+  // The card represents the result of a turn. Keep it out of the live turn,
+  // then refresh and reveal it once the turn has settled.
+  if (busy || files.length === 0) return null;
+
+  const disabled = acting != null;
+  const canUndoAll = !undoLocked && files.every((file) => file.undoable);
+  const visibleFiles = expanded ? files : files.slice(0, 3);
+  const hiddenFileCount = files.length - visibleFiles.length;
 
   const run = (action: "keep" | "undo") => {
     if (disabled) return;

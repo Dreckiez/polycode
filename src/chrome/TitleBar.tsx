@@ -50,6 +50,7 @@ type Props = {
   onGoToFile?: () => void;
   recents?: RecentProject[];
   onSelectProject?: (path: string) => void;
+  onOpenProject?: () => void;
 };
 
 export function IconButton({
@@ -208,6 +209,7 @@ function TitleBarComponent({
   onGoToFile: _onGoToFile,
   recents = [],
   onSelectProject,
+  onOpenProject,
 }: Props) {
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeId),
@@ -292,6 +294,7 @@ function TitleBarComponent({
           recents={recents}
           placement="below"
           onCwdChange={onSelectProject}
+          onOpenProject={onOpenProject}
           onNewTerminal={onNewTerminal}
           buttonClassName="flex h-full min-w-0 max-w-64 shrink items-center gap-2 px-6 text-left text-sm font-medium leading-tight"
         >

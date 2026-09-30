@@ -139,6 +139,7 @@ type Props = {
   ) => void;
   onContinueWithContext?: (sessionId: string) => void;
   onNewTerminal: (sessionId: string) => void;
+  onOpenProject?: () => void;
   onPaneDragStart?: (event: ReactPointerEvent<HTMLElement>) => void;
 };
 
@@ -181,6 +182,7 @@ export const SessionPane = memo(function SessionPane({
   onHandoff,
   onContinueWithContext,
   onNewTerminal,
+  onOpenProject,
   onPaneDragStart,
 }: Props) {
   const title = sessionDisplayTitle(session.title, session.harness);
@@ -468,6 +470,7 @@ export const SessionPane = memo(function SessionPane({
       onQuestionInteraction={onQuestionInteraction ? onQuestionInteractionCb : undefined}
       onFocus={onFocusCb}
       onCwdChange={onCwdChangeCb}
+      onOpenProject={onOpenProject}
       onBranchChange={onBranchChangeCb}
       onNewTerminal={onNewTerminalCb}
       onModelChange={onModelChangeCb}

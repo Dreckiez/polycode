@@ -48,7 +48,8 @@ import {
   type MentionIndex,
   type MentionToken,
 } from "../lib/fileMentions";
-import type { ProjectFile } from "../lib/fs";
+import { pickFolder, type ProjectFile } from "../lib/fs";
+import { IS_WIN } from "../lib/platform";
 import type { HandoffComposerCard } from "../lib/handoff";
 import { looksLikeProject, type RecentProject } from "../lib/recents";
 import type {
@@ -183,6 +184,7 @@ type Props = {
   onResumeQueue?: () => void;
   onOpenFile?: (path: string) => void;
   onDraftChange?: (text: string) => void;
+  onOpenProject?: () => void;
   children?: ReactNode;
 };
 
@@ -236,8 +238,11 @@ export const Composer = memo(function Composer({
   onResumeQueue,
   onOpenFile,
   onDraftChange,
+  onOpenProject,
   children,
 }: Props) {
+  const inProject = looksLikeProject(cwd ?? "");
+  const projectRequired = IS_WIN && !inProject;
   const ref = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
@@ -820,6 +825,21 @@ export const Composer = memo(function Composer({
   }, []);
 
   const submit = (value: string) => {
+    if (projectRequired) {
+      const text = value.trim();
+      if (!text && attachments.length === 0 && !noteCard && !handoffCard) {
+        return;
+      }
+      if (onOpenProject) {
+        onOpenProject();
+      } else {
+        void pickFolder().then((p) => {
+          if (p) onCwdChange(p);
+        });
+      }
+      return;
+    }
+
     const folderCommand = consumeSessionFolderCommand(value);
     if (folderCommand.matched && onPlaceInFolder && !sessionFolderSelected) {
       openSessionFolderPicker();
@@ -1159,6 +1179,7 @@ export const Composer = memo(function Composer({
                   projectLogoPath={projectLogoPath}
                   enabled={enabled}
                   onCwdChange={onCwdChange}
+                  onOpenProject={onOpenProject}
                   onNewTerminal={onNewTerminal}
                   onClose={handlePickerClose}
                 />
@@ -1226,13 +1247,15 @@ export const Composer = memo(function Composer({
               spellCheck={false}
               defaultValue={initialDraft}
               placeholder={
-                noteCard
-                  ? "Add a message, or send…"
-                  : handoffCard
-                    ? "Add context, or send to continue…"
-                    : shell
-                      ? "Ask, build, / for commands, @ for references... "
-                      : "Ask, build, / for commands, @ for references... "
+                projectRequired
+                  ? "Open a project to start prompting…"
+                  : noteCard
+                    ? "Add a message, or send…"
+                    : handoffCard
+                      ? "Add context, or send to continue…"
+                      : shell
+                        ? "Ask, build, / for commands, @ for references... "
+                        : "Ask, build, / for commands, @ for references... "
               }
               className={`composer-field scrollbar-none relative max-h-[168px] w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent px-3.5 text-[14.75px] leading-6 outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap font-sans ${
                 shell ? "py-4.5" : "py-3.5"
@@ -1393,6 +1416,7 @@ export const Composer = memo(function Composer({
               <ComposerAction
                 busy={busy}
                 hasValue={hasValue}
+                title={projectRequired ? "Open a project to prompt" : undefined}
                 onSend={() => submit(ref.current?.value ?? "")}
                 onStop={handleStop}
               />

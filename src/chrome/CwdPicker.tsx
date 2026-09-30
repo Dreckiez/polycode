@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "./icons";
+import { ChevronDown, ChevronRight, FolderOpen } from "./icons";
 import {
   useMemo,
   useRef,
@@ -6,7 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { basename } from "../lib/fs";
+import { basename, pickFolder } from "../lib/fs";
 import { prettyCwd, prettyParent } from "../lib/paths";
 import {
   looksLikeProject,
@@ -31,6 +31,7 @@ type Props = {
   chevron?: boolean;
   children?: ReactNode;
   onCwdChange: (path: string) => void;
+  onOpenProject?: () => void;
   onNewTerminal?: () => void;
   onClose?: () => void;
 };
@@ -47,6 +48,7 @@ const SELF = "[data-cwd-picker],[data-cwd-submenu]";
 type Row =
   | { kind: "recent"; path: string }
   | { kind: "more" }
+  | { kind: "open-project" }
   | { kind: "new-terminal" };
 
 export function CwdPicker({
@@ -60,6 +62,7 @@ export function CwdPicker({
   chevron = false,
   children,
   onCwdChange,
+  onOpenProject,
   onNewTerminal,
   onClose,
 }: Props) {
@@ -90,6 +93,7 @@ export function CwdPicker({
       path: item.path,
     }));
     if (hasMore) out.push({ kind: "more" });
+    out.push({ kind: "open-project" });
     if (onNewTerminal) out.push({ kind: "new-terminal" });
     return out;
   }, [hasMore, onNewTerminal, previewRecents]);
@@ -122,8 +126,22 @@ export function CwdPicker({
     }, HOVER_CLOSE_MS);
   };
 
+  const handleOpenProject = async () => {
+    dismiss(true);
+    if (onOpenProject) {
+      onOpenProject();
+    } else {
+      const selected = await pickFolder();
+      if (selected) onCwdChange(selected);
+    }
+  };
+
   const pick = (row: Row) => {
     if (row.kind === "more") return;
+    if (row.kind === "open-project") {
+      void handleOpenProject();
+      return;
+    }
     dismiss(true);
     if (row.kind === "new-terminal") {
       onNewTerminal?.();
@@ -175,10 +193,12 @@ export function CwdPicker({
     }
   };
 
-  const newTerminalIndex = onNewTerminal
-    ? previewRecents.length + (hasMore ? 1 : 0)
-    : -1;
   const moreIndex = hasMore ? previewRecents.length : -1;
+  const openProjectIndex = previewRecents.length + (hasMore ? 1 : 0);
+  const newTerminalIndex = onNewTerminal
+    ? previewRecents.length + (hasMore ? 1 : 0) + 1
+    : -1;
+  const hasTopSection = inProject || previewRecents.length > 0 || hasMore;
 
   return (
     <div
@@ -218,23 +238,25 @@ export function CwdPicker({
             <ProjectLogoIcon
               path={projectLogoPath}
               fallbackStrokeWidth={1.5}
+              className="size-3.5 shrink-0 opacity-70"
             />
-            <span className="truncate font-mono text-[12.5px]">{label}</span>
+            <span className="min-w-0 truncate text-[11px]">{label}</span>
           </>
         )}
         {chevron ? (
           <ChevronDown
-            className={`size-3.5 shrink-0 text-content/50 ${
+            className={`size-3 shrink-0 text-content/50 transition-transform ${
               open ? "rotate-180" : ""
             }`}
             strokeWidth={1.75}
           />
         ) : null}
       </button>
+
       {open ? (
         <Popover
           anchor={root}
-          side={placement === "below" ? "bottom" : "top"}
+          side={placement === "above" ? "top" : "bottom"}
           width={MENU_WIDTH}
           maxHeight={MENU_MAX_HEIGHT}
           ignore={SELF}
@@ -244,91 +266,118 @@ export function CwdPicker({
           data-cwd-picker
           className="flex flex-col overflow-hidden"
         >
+          {hasTopSection ? (
+            <div
+              ref={lockOverscroll}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-none py-1"
+            >
+              {inProject ? (
+                <>
+                  <p className="px-2.5 pb-1 pt-2 text-[10px] uppercase tracking-widest text-content/50">
+                    Current project
+                  </p>
+                  <div className="px-2.5 py-1.5 text-content/50">
+                    <p className="truncate text-[13px] text-content">
+                      {basename(cwd)}
+                    </p>
+                    <p className="truncate font-mono text-[11px]">
+                      {prettyParent(cwd)}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+              {previewRecents.length > 0 ? (
+                <>
+                  <p className="px-2.5 pb-1 pt-2 text-[10px] uppercase tracking-widest text-content/50">
+                    Recent projects
+                  </p>
+                  {previewRecents.map((item, index) => (
+                    <button
+                      key={item.path}
+                      type="button"
+                      role="menuitem"
+                      title={item.path}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseEnter={() => {
+                        setMoreOpen(false);
+                        setActive(index);
+                      }}
+                      onClick={() => pick({ kind: "recent", path: item.path })}
+                      className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
+                        active === index
+                          ? "bg-content/10 text-content"
+                          : "text-content/80 hover:bg-content/5"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate text-[13px]">
+                        {basename(item.path)}
+                      </span>
+                      <span className="max-w-28 shrink-0 truncate font-mono text-[11px] text-content/45">
+                        {prettyParent(item.path)}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              ) : null}
+              {hasMore ? (
+                <button
+                  ref={moreRef}
+                  type="button"
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseEnter={() => {
+                    setActive(moreIndex);
+                    openMore();
+                  }}
+                  onMouseLeave={scheduleCloseMore}
+                  onFocus={() => {
+                    setActive(moreIndex);
+                    openMore();
+                  }}
+                  className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
+                    active === moreIndex || moreOpen
+                      ? "bg-content/10 text-content"
+                      : "text-content/80 hover:bg-content/5"
+                  }`}
+                >
+                  <span className="text-[13px]">More Projects</span>
+                  <ChevronRight
+                    className="size-3.5 shrink-0"
+                    strokeWidth={1.75}
+                  />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div
-            ref={lockOverscroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-none py-1"
+            className={`shrink-0 py-1 ${
+              hasTopSection ? "border-t border-content/10" : ""
+            }`}
           >
-            {inProject ? (
-              <>
-                <p className="px-2.5 pb-1 pt-2 text-[10px] uppercase tracking-widest text-content/50">
-                  Current project
-                </p>
-                <div className="px-2.5 py-1.5 text-content/50">
-                  <p className="truncate text-[13px] text-content">
-                    {basename(cwd)}
-                  </p>
-                  <p className="truncate font-mono text-[11px]">
-                    {prettyParent(cwd)}
-                  </p>
-                </div>
-              </>
-            ) : null}
-            {previewRecents.length > 0 ? (
-              <>
-                <p className="px-2.5 pb-1 pt-2 text-[10px] uppercase tracking-widest text-content/50">
-                  Recent projects
-                </p>
-                {previewRecents.map((item, index) => (
-                  <button
-                    key={item.path}
-                    type="button"
-                    role="menuitem"
-                    title={item.path}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onMouseEnter={() => {
-                      setMoreOpen(false);
-                      setActive(index);
-                    }}
-                    onClick={() => pick({ kind: "recent", path: item.path })}
-                    className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
-                      active === index
-                        ? "bg-content/10 text-content"
-                        : "text-content/80 hover:bg-content/5"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate text-[13px]">
-                      {basename(item.path)}
-                    </span>
-                    <span className="max-w-28 shrink-0 truncate font-mono text-[11px] text-content/45">
-                      {prettyParent(item.path)}
-                    </span>
-                  </button>
-                ))}
-              </>
-            ) : null}
-            {hasMore ? (
-              <button
-                ref={moreRef}
-                type="button"
-                role="menuitem"
-                aria-haspopup="menu"
-                aria-expanded={moreOpen}
-                onMouseDown={(e) => e.stopPropagation()}
-                onMouseEnter={() => {
-                  setActive(moreIndex);
-                  openMore();
-                }}
-                onMouseLeave={scheduleCloseMore}
-                onFocus={() => {
-                  setActive(moreIndex);
-                  openMore();
-                }}
-                className={`flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-2 text-left ${
-                  active === moreIndex || moreOpen
-                    ? "bg-content/10 text-content"
-                    : "text-content/80 hover:bg-content/5"
-                }`}
-              >
-                <span className="text-[13px]">More Projects</span>
-                <ChevronRight
-                  className="size-3.5 shrink-0"
-                  strokeWidth={1.75}
-                />
-              </button>
-            ) : null}
-          </div>
-          {onNewTerminal ? (
-            <div className="shrink-0 border-t border-content/10 py-1">
+            <button
+              type="button"
+              role="menuitem"
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseEnter={() => {
+                setMoreOpen(false);
+                setActive(openProjectIndex);
+              }}
+              onClick={() => pick({ kind: "open-project" })}
+              className={`flex w-full cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left ${
+                active === openProjectIndex
+                  ? "bg-content/10 text-content"
+                  : "text-content/80 hover:bg-content/5"
+              }`}
+            >
+              <FolderOpen
+                className="size-4 shrink-0 text-content/60"
+                strokeWidth={1.75}
+              />
+              <span className="text-[13px]">Open project…</span>
+            </button>
+            {onNewTerminal ? (
               <button
                 type="button"
                 role="menuitem"
@@ -349,8 +398,8 @@ export function CwdPicker({
                   {MOD}`
                 </span>
               </button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </Popover>
       ) : null}
       {open && moreOpen ? (

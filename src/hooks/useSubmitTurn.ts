@@ -91,6 +91,8 @@ import { notifySession } from "../lib/notifications";
 import { playCue } from "../lib/sounds";
 import { notifyGitChanged } from "../lib/fs";
 import { nudgeWatchedFiles } from "../lib/fileWatch";
+import { IS_WIN } from "../lib/platform";
+import { looksLikeProject } from "../lib/recents";
 
 type SubmitTurnOptions = {
   secondOpinion?: SecondOpinionMeta;
@@ -127,6 +129,14 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
       if (d.removingSessionIds.current.has(sessionId)) return;
       const storedCurrent = d.sessionsRef.current.find((s) => s.id === sessionId);
       if (!storedCurrent) return;
+      if (IS_WIN && !looksLikeProject(storedCurrent.cwd)) {
+        d.enqueueHarnessEvent(sessionId, {
+          type: "session.error",
+          message: "Opening a project is required before prompting on Windows.",
+        });
+        d.flushHarnessEvents();
+        return;
+      }
       const current = options?.buildTarget
         ? withPlanBuildTarget(storedCurrent, options.buildTarget)
         : storedCurrent;

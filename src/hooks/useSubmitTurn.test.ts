@@ -560,4 +560,20 @@ describe("useSubmitTurn", () => {
     );
     expect(h.sendHarnessTurn).toHaveBeenCalledTimes(1);
   });
+
+  it("onSubmit rejects prompt when cwd is not a project on Windows", async () => {
+    await mount([session("s1", { cwd: "~" })]);
+
+    await act(async () => {
+      api.onSubmit("s1", "hello without project");
+    });
+
+    expect(enqueueHarnessEvent).toHaveBeenCalledWith("s1", {
+      type: "session.error",
+      message: "Opening a project is required before prompting on Windows.",
+    });
+    expect(flushHarnessEvents).toHaveBeenCalled();
+    expect(h.sendHarnessTurn).not.toHaveBeenCalled();
+    expect(h.appendUser).not.toHaveBeenCalled();
+  });
 });

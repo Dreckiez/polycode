@@ -292,22 +292,25 @@ function MentionRuns({
 export function ComposerAction({
   busy,
   hasValue,
+  title,
   onSend,
   onStop,
 }: {
   busy: boolean;
   hasValue: boolean;
+  title?: string;
   onSend: () => void;
   onStop: () => void;
 }) {
+  const sendLabel = title ?? "Send";
   if (busy) {
     return (
       <>
         {hasValue ? (
           <button
             type="button"
-            title="Send"
-            aria-label="Send"
+            title={sendLabel}
+            aria-label={sendLabel}
             onClick={onSend}
             className="composer-send grid size-7.5 cursor-pointer place-items-center rounded-lg bg-white text-black hover:bg-white/90"
           >
@@ -330,8 +333,8 @@ export function ComposerAction({
   return (
     <button
       type="button"
-      title="Send"
-      aria-label="Send"
+      title={sendLabel}
+      aria-label={sendLabel}
       disabled={!hasValue}
       onClick={onSend}
       className="composer-send grid size-7.5 cursor-pointer place-items-center rounded-lg bg-white text-black hover:bg-white/90 disabled:cursor-default disabled:bg-white/30 disabled:text-black/40 disabled:hover:bg-white/30"

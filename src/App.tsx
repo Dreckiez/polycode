@@ -2214,6 +2214,7 @@ export default function App({
     onFocus: onFocusPane,
     onClose: onClosePane,
     onCwdChange,
+    onOpenProject: pickProject,
     onBranchChange,
     onModelChange,
     onModelSettingsChange,
@@ -2397,6 +2398,7 @@ export default function App({
             onGoToFile={onGoToFile}
             recents={recents}
             onSelectProject={onSelectProject}
+            onOpenProject={pickProject}
           />
 
           <main className="relative min-h-0 min-w-0 flex-1">
