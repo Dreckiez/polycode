@@ -26,8 +26,9 @@ export function RailAction({
       type="button"
       onClick={onClick}
       disabled={!onClick}
+      title={label}
       aria-label={ariaLabel ?? label}
-      className={`relative flex w-full cursor-pointer items-center gap-2 rounded-md px-2 h-8 text-left ${
+      className={`relative flex w-full cursor-pointer items-center gap-1.5 @min-[190px]:gap-2 rounded-md px-1.5 @min-[190px]:px-2 h-8 text-left ${
         active
           ? "bg-content/10 text-content"
           : "text-content/50 hover:bg-content/10 hover:text-content"
@@ -51,7 +52,10 @@ export function RailAction({
       {dot ? (
         <span aria-hidden className="size-2 shrink-0 rounded-full bg-accent" />
       ) : shortcut ? (
-        <span aria-hidden className="shrink-0 text-[11px] text-content/40">
+        <span
+          aria-hidden
+          className="shrink-0 text-[11px] text-content/40 @max-[190px]:hidden"
+        >
           {shortcut}
         </span>
       ) : null}
@@ -79,8 +83,9 @@ export function RailSearch({
       type="button"
       onClick={onClick}
       disabled={!onClick}
+      title={label}
       aria-label={ariaLabel ?? label}
-      className={`relative flex w-full cursor-pointer items-center gap-2 rounded-md border border-content/8 px-1.5 shadow-sm h-8 text-left ${
+      className={`relative flex w-full cursor-pointer items-center gap-1.5 @min-[190px]:gap-2 rounded-md border border-content/8 px-1.5 shadow-sm h-8 text-left ${
         active
           ? "bg-content/10 text-content"
           : "text-content/50 hover:bg-content/10 hover:text-content"
@@ -91,7 +96,10 @@ export function RailSearch({
         {label}
       </span>
       {shortcut ? (
-        <span aria-hidden className="shrink-0 text-[11px] text-content/40">
+        <span
+          aria-hidden
+          className="shrink-0 text-[11px] text-content/40 @max-[190px]:hidden"
+        >
           {shortcut}
         </span>
       ) : null}

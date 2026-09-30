@@ -67,7 +67,7 @@ export function SettingsNav({ section, onSelect, onClose }: Props) {
             <ArrowLeft className="size-4.5 shrink-0 opacity-70" strokeWidth={1.75} />
             <span className="text-[13.5px] font-medium">Back</span>
           </div>
-          <kbd className="rounded border border-content/15 bg-content/5 px-1.5 py-0.5 font-mono text-[10px] text-content/40 shadow-xs">
+          <kbd className="rounded border border-content/15 bg-content/5 px-1.5 py-0.5 font-mono text-[10px] text-content/40 shadow-xs @max-[180px]:hidden">
             Esc
           </kbd>
         </button>
@@ -115,7 +115,7 @@ function NavRow({
           {label}
         </div>
         {subtitle ? (
-          <div className="truncate text-[11.5px] leading-normal text-content/40">
+          <div className="truncate text-[11.5px] leading-normal text-content/40 @max-[180px]:hidden">
             {subtitle}
           </div>
         ) : null}

@@ -139,7 +139,7 @@ export function SidebarUpdate({
         <span className="block truncate text-[12px] font-medium leading-tight">
           {label}
         </span>
-        <span className="ml-auto block text-[11px] text-content/40">
+        <span className="ml-auto block text-[11px] text-content/40 @max-[200px]:hidden">
           v{snapshot.currentVersion}
         </span>
       </span>

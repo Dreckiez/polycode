@@ -518,8 +518,8 @@ function Sash({
       <div
         className={
           row
-            ? "absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize touch-none"
-            : "absolute inset-x-0 -top-1.5 -bottom-1.5 cursor-row-resize touch-none"
+            ? "absolute inset-y-0 left-0 -right-2.5 cursor-col-resize touch-none"
+            : "absolute inset-x-0 top-0 -bottom-2.5 cursor-row-resize touch-none"
         }
         onPointerDown={(e) => {
           e.preventDefault();

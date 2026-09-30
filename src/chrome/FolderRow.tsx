@@ -61,7 +61,7 @@ export const FolderRow = memo(function FolderRow({
           onRename();
         }
       }}
-      className={`group relative flex w-full touch-none items-center gap-1.5 px-2 h-8 text-left ${
+      className={`group relative flex w-full touch-none items-center gap-1.5 px-1.5 @min-[180px]:px-2 h-8 text-left ${
         expanded ? "rounded-md" : ""
       } ${canReorder ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
         dropTarget

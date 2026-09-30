@@ -109,17 +109,17 @@ export const SessionCard = memo(function SessionCard({
       {needsApproval ? (
         <>
           <CircleAlert className="size-3" strokeWidth={1.75} />
-          <span>Need approval</span>
+          <span className="@max-[180px]:hidden">Need approval</span>
         </>
       ) : busy ? (
         <>
           <TerminalSpinner className="inline-block w-3 select-none text-center text-[11px] leading-none text-accent" />
-          <span>Working...</span>
+          <span className="@max-[180px]:hidden">Working...</span>
         </>
       ) : done ? (
         <>
           <Check className="size-3" strokeWidth={2.25} />
-          <span>Done</span>
+          <span className="@max-[180px]:hidden">Done</span>
         </>
       ) : (
         <span>{time}</span>
@@ -303,7 +303,7 @@ export const SessionCard = memo(function SessionCard({
           onContextMenu ? (e) => onContextMenu(session.id, e) : undefined
         }
         onKeyDown={onKeyDown}
-        className={`relative border flex w-full touch-none items-center gap-1.5 rounded-md px-2 text-left cursor-pointer ${
+        className={`relative border flex w-full touch-none items-center gap-1.5 rounded-md px-1.5 @min-[180px]:px-2 text-left cursor-pointer ${
           compact ? "py-1.5" : "py-2"
         } ${dragging ? "opacity-40 cursor-grabbing" : ""} ${
           dropTarget
@@ -322,7 +322,7 @@ export const SessionCard = memo(function SessionCard({
         ) : null}
         {canDrag ? (
           <GripVertical
-            className="size-3.5 shrink-0 text-content/25 transition-colors group-hover:text-content/60 cursor-grab active:cursor-grabbing"
+            className="size-3.5 shrink-0 text-content/25 transition-colors group-hover:text-content/60 cursor-grab active:cursor-grabbing @max-[160px]:hidden"
             strokeWidth={1.75}
           />
         ) : null}

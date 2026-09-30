@@ -2,7 +2,10 @@ import {
   Clock,
   File,
   FolderOpen,
+  FolderTree,
+  GitCompare,
   ListFilter,
+  MessageSquare,
   Pin,
   Plus,
   Search,
@@ -126,7 +129,7 @@ import { SidebarProjectPicker } from "./SidebarProjectPicker";
 import { SidebarUpdateFooter } from "./SidebarUpdate";
 import { SourceControl } from "./SourceControl";
 
-const MIN_WIDTH = 260;
+const MIN_WIDTH = 130;
 const MAX_WIDTH = 560;
 const DEFAULT_WIDTH = 260;
 const REMINDERS_COLOR = "#f59e0b";
@@ -1089,7 +1092,7 @@ function SidebarComponent({
       ref={searchInputRef}
       type="text"
       value={searchQuery}
-      placeholder="Search conversations..."
+      placeholder={resize.width < 200 ? "Search…" : "Search conversations…"}
       aria-label="Search conversations"
       spellCheck={false}
       autoComplete="off"
@@ -1153,6 +1156,7 @@ function SidebarComponent({
           type="button"
           role="tab"
           aria-selected={active}
+          title={TAB_LABELS[itemId]}
           aria-label={
             isChangesTab
               ? hasChangeStats
@@ -1164,14 +1168,14 @@ function SidebarComponent({
                     .filter(Boolean)
                     .join(" ")
                 : "Changes"
-              : undefined
+              : TAB_LABELS[itemId]
           }
           data-tauri-drag-region="false"
           onClick={() => {
             if (sortable.consumeClick()) return;
             onTabPick(itemId);
           }}
-          className={`flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-center self-center rounded-md px-2 text-[12px] leading-none ${
+          className={`flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-center self-center rounded-md px-1 @min-[210px]:px-2 text-[12px] leading-none ${
             active
               ? "bg-content/10 text-content"
               : "text-content/50 hover:bg-content/5 hover:text-content"
@@ -1180,9 +1184,20 @@ function SidebarComponent({
           {isChangesTab && hasChangeStats ? (
             <DiffStat additions={changeAdditions} deletions={changeDeletions} />
           ) : (
-            <span className="block truncate leading-label">
-              {TAB_LABELS[itemId]}
-            </span>
+            <>
+              <span className="hidden items-center justify-center @max-[209px]:flex">
+                {itemId === "sessions" ? (
+                  <MessageSquare className="size-3.5 shrink-0" strokeWidth={1.75} />
+                ) : itemId === "files" ? (
+                  <FolderTree className="size-3.5 shrink-0" strokeWidth={1.75} />
+                ) : (
+                  <GitCompare className="size-3.5 shrink-0" strokeWidth={1.75} />
+                )}
+              </span>
+              <span className="block truncate leading-label @max-[209px]:hidden">
+                {TAB_LABELS[itemId]}
+              </span>
+            </>
           )}
         </button>
       </div>
@@ -1192,7 +1207,7 @@ function SidebarComponent({
   const sidebarContent = (
     <aside
       ref={resize.setPaneRef}
-      className="sidebar-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-content/10"
+      className="@container sidebar-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-content/10"
     >
       {settingsOpen ? (
         <>

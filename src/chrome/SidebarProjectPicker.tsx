@@ -152,7 +152,7 @@ export function SidebarProjectPicker({
             event.preventDefault();
             openPicker();
           }}
-          className={`flex h-7.5 w-full cursor-pointer min-w-0 items-center gap-2 rounded-md px-2 text-[13px] hover:text-content ${
+          className={`flex h-7.5 w-full cursor-pointer min-w-0 items-center gap-1.5 @min-[180px]:gap-2 rounded-md px-1.5 @min-[180px]:px-2 text-[13px] hover:text-content ${
             open
               ? "bg-content/10 text-content"
               : "text-content/75 hover:bg-content/5 hover:text-content"
