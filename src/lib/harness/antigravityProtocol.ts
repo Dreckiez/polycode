@@ -51,6 +51,7 @@ export type AgyResult = {
   conversation_id: string;
   status: "SUCCESS" | "ERROR" | string;
   response?: string;
+  error?: string | Record<string, unknown>;
   duration_seconds?: number;
   num_turns?: number;
   usage?: AgyUsage;
@@ -269,3 +270,20 @@ export function previewFromTool(
     },
   );
 }
+
+export function extractAntigravityError(res: Record<string, unknown>): string {
+  if (typeof res.error === "string" && res.error.trim()) {
+    return res.error.trim();
+  }
+  if (res.error && typeof res.error === "object") {
+    const errObj = res.error as Record<string, unknown>;
+    if (typeof errObj.message === "string" && errObj.message.trim()) {
+      return errObj.message.trim();
+    }
+  }
+  if (typeof res.error_message === "string" && res.error_message.trim()) {
+    return res.error_message.trim();
+  }
+  return "Antigravity turn failed";
+}
+

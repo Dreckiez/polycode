@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAgySpawnArgs,
   buildAgyUserMessage,
+  extractAntigravityError,
   parseJsonLine,
   previewFromTool,
   toolKindFromName,
@@ -203,4 +204,42 @@ gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
     expect(gpt?.settings).toBeUndefined();
   });
 });
+
+describe("extractAntigravityError", () => {
+  it("extracts error string from result", () => {
+    expect(
+      extractAntigravityError({
+        error: "Quota exceeded for quota metric 'GenerateContent'",
+        response: "Here is partial text",
+      }),
+    ).toBe("Quota exceeded for quota metric 'GenerateContent'");
+  });
+
+  it("extracts error message from error object", () => {
+    expect(
+      extractAntigravityError({
+        error: { message: "Model request timed out" },
+        response: "Partial text",
+      }),
+    ).toBe("Model request timed out");
+  });
+
+  it("extracts error_message property if error is not present", () => {
+    expect(
+      extractAntigravityError({
+        error_message: "Rate limit reached",
+        response: "Partial text",
+      }),
+    ).toBe("Rate limit reached");
+  });
+
+  it("falls back to generic failure message without using response text", () => {
+    expect(
+      extractAntigravityError({
+        response: "Full text that should never be treated as error message",
+      }),
+    ).toBe("Antigravity turn failed");
+  });
+});
+
 

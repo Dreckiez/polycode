@@ -11,6 +11,7 @@ import {
 import {
   buildAgySpawnArgs,
   buildAgyUserMessage,
+  extractAntigravityError,
   parseJsonLine,
   previewFromTool,
   toolKindFromName,
@@ -392,11 +393,10 @@ function handleLine(sessionId: string, live: LiveCli, line: string): void {
     const res = rec.result as Record<string, unknown> | undefined;
     if (res && !live.muteUpdates) {
       if (res.status === "ERROR") {
-        const err =
-          typeof res.response === "string"
-            ? res.response
-            : "Antigravity turn failed";
-        live.onEvent({ type: "session.error", message: err });
+        live.onEvent({
+          type: "session.error",
+          message: extractAntigravityError(res),
+        });
       }
       if (res.usage && typeof res.usage === "object") {
         const usage = res.usage as Record<string, number>;

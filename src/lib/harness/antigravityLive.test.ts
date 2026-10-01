@@ -248,4 +248,52 @@ describe("Antigravity live turn", () => {
 
     await turnPromise;
   });
+
+  it("handles ERROR result status by emitting actual error instead of response text", async () => {
+    const input = makeInput("agy-test-1", "cause an error");
+    const turnPromise = sendAntigravityTurn(input);
+    await flush();
+
+    emitLine("agy-test-1", {
+      event: "init",
+      conversation_id: "conv-err-1",
+    });
+
+    emitLine("agy-test-1", {
+      event: "step_update",
+      step_update: {
+        conversation_id: "conv-err-1",
+        step_index: 1,
+        state: "ACTIVE",
+        step_type: "agent_response",
+        text_delta: "Partial response before crashing",
+      },
+    });
+
+    emitLine("agy-test-1", {
+      event: "result",
+      result: {
+        conversation_id: "conv-err-1",
+        status: "ERROR",
+        response: "Partial response before crashing",
+        error: "Quota exceeded for model",
+      },
+    });
+
+    await turnPromise;
+
+    expect(events).toContainEqual({
+      type: "message.delta",
+      text: "Partial response before crashing",
+    });
+    expect(events).toContainEqual({
+      type: "session.error",
+      message: "Quota exceeded for model",
+    });
+    expect(events).not.toContainEqual({
+      type: "session.error",
+      message: "Partial response before crashing",
+    });
+  });
 });
+
