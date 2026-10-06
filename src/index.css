@@ -701,21 +701,138 @@ header[data-tauri-drag-region] button {
   font-size: 10px;
 }
 
+/* Markdown Tables */
+.agent-markdown .markdown-table-wrapper,
+.agent-markdown [data-streamdown="table-wrapper"] {
+  margin-block: 1rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-content) 12%, transparent);
+  background: color-mix(in srgb, var(--color-content) 2%, transparent);
+}
+
 .agent-markdown [data-streamdown="table-wrapper"] > div {
   border: 0;
   border-radius: 0;
   background: transparent;
 }
 
-.agent-markdown [data-streamdown="table"] > :not(:last-child),
-.agent-markdown [data-streamdown="table-body"] > :not(:last-child) {
-  border-color: color-mix(in srgb, var(--color-content) 5%, transparent);
+.agent-markdown table,
+.agent-markdown [data-streamdown="table"] {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
 }
 
-.agent-markdown [data-streamdown="table-header-cell"],
+.agent-markdown thead,
+.agent-markdown [data-streamdown="table-header"] {
+  background: color-mix(in srgb, var(--color-content) 5%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-content) 12%, transparent);
+}
+
+.agent-markdown th,
+.agent-markdown [data-streamdown="table-header-cell"] {
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--color-content);
+  border-right: 1px solid color-mix(in srgb, var(--color-content) 6%, transparent);
+}
+
+.agent-markdown th:last-child,
+.agent-markdown [data-streamdown="table-header-cell"]:last-child {
+  border-right: none;
+}
+
+.agent-markdown tbody tr,
+.agent-markdown [data-streamdown="table-row"] {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-content) 6%, transparent);
+  transition: background-color 0.15s ease;
+}
+
+.agent-markdown tbody tr:last-child {
+  border-bottom: none;
+}
+
+.agent-markdown tbody tr:hover {
+  background: color-mix(in srgb, var(--color-content) 3%, transparent);
+}
+
+.agent-markdown td,
 .agent-markdown [data-streamdown="table-cell"] {
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  color: color-mix(in srgb, var(--color-content) 85%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--color-content) 6%, transparent);
+}
+
+.agent-markdown td:last-child,
+.agent-markdown [data-streamdown="table-cell"]:last-child {
+  border-right: none;
+}
+
+/* Task list items */
+.agent-markdown ul.contains-task-list,
+.agent-markdown [data-streamdown="unordered-list"]:has(.task-list-item) {
+  list-style: none;
+  padding-left: 0;
+  padding-inline-start: 0.25rem;
+}
+
+.agent-markdown li.task-list-item,
+.agent-markdown li:has(input[type="checkbox"]) {
+  list-style-type: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.agent-markdown li.task-list-item input[type="checkbox"],
+.agent-markdown li input[type="checkbox"] {
+  margin-top: 0.25rem;
+  accent-color: var(--color-content);
+  cursor: default;
+}
+
+/* Details / Summary */
+.agent-markdown details {
+  margin-block: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-content) 10%, transparent);
+  background: color-mix(in srgb, var(--color-content) 2%, transparent);
+  padding: 0.6rem 0.85rem;
+}
+
+.agent-markdown details > summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--color-content);
+  user-select: none;
+}
+
+.agent-markdown details[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+/* Strikethrough & Kbd */
+.agent-markdown del,
+.agent-markdown s {
+  color: color-mix(in srgb, var(--color-content) 50%, transparent);
+  text-decoration: line-through;
+}
+
+.agent-markdown kbd {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-content) 15%, transparent);
+  background: color-mix(in srgb, var(--color-content) 8%, transparent);
+  color: var(--color-content);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-content) 10%, transparent);
 }
 
 .agent-markdown [data-streamdown="horizontal-rule"] {

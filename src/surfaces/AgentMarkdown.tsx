@@ -397,26 +397,289 @@ function NoteAssetImage({
   );
 }
 
+function resolveLocalImagePath(url: string, cwd?: string): string | null {
+  if (url.startsWith("file://")) {
+    const withoutScheme = url.slice(7);
+    return withoutScheme.startsWith("/") && /^\/[a-zA-Z]:/.test(withoutScheme)
+      ? withoutScheme.slice(1)
+      : withoutScheme;
+  }
+  if (/^[a-zA-Z]:[\\/]/.test(url) || url.startsWith("/")) {
+    return url;
+  }
+  if (!cwd) return null;
+  const cleanUrl = url.replace(/^\.\//, "");
+  return `${cwd.replace(/[/\\]+$/, "")}/${cleanUrl}`;
+}
+
 function MarkdownImage({
   src,
   alt,
   node: _node,
   ...props
 }: MarkdownImageProps) {
+  const { cwd } = useContext(FileOpenContext);
   const url = typeof src === "string" ? src.trim() : "";
+  if (!url) return null;
+
   if (url.startsWith("data:image/")) {
-    return <img {...props} src={url} alt={alt ?? ""} />;
+    return (
+      <img
+        {...props}
+        src={url}
+        alt={alt ?? ""}
+        className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
+        loading="lazy"
+      />
+    );
   }
+
   if (isNoteImagePath(url)) {
     return <NoteAssetImage {...props} asset={url} alt={alt} />;
   }
+
+  if (url.startsWith("https://") || url.startsWith("http://")) {
+    return (
+      <img
+        {...props}
+        src={url}
+        alt={alt ?? ""}
+        className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
+        loading="lazy"
+      />
+    );
+  }
+
+  if (
+    cwd ||
+    url.startsWith("/") ||
+    /^[a-zA-Z]:[\\/]/.test(url) ||
+    url.startsWith("file://")
+  ) {
+    const fullPath = resolveLocalImagePath(url, cwd);
+    if (fullPath) {
+      return (
+        <img
+          {...props}
+          src={convertFileSrc(fullPath)}
+          alt={alt ?? ""}
+          className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
+          loading="lazy"
+        />
+      );
+    }
+  }
+
   return null;
+}
+
+function MarkdownTable({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"table"> & { node?: unknown }) {
+  return (
+    <div className="markdown-table-wrapper my-4 w-full overflow-x-auto rounded-lg border border-content/10 bg-content/[0.02]">
+      <table
+        className="w-full min-w-full border-collapse text-left text-xs"
+        {...props}
+      >
+        {children}
+      </table>
+    </div>
+  );
+}
+
+function MarkdownThead({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"thead"> & { node?: unknown }) {
+  return (
+    <thead
+      className="border-b border-content/10 bg-content/[0.04] text-content"
+      {...props}
+    >
+      {children}
+    </thead>
+  );
+}
+
+function MarkdownTbody({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"tbody"> & { node?: unknown }) {
+  return (
+    <tbody className="divide-y divide-content/5" {...props}>
+      {children}
+    </tbody>
+  );
+}
+
+function MarkdownTr({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"tr"> & { node?: unknown }) {
+  return (
+    <tr
+      className="transition-colors hover:bg-content/[0.025]"
+      {...props}
+    >
+      {children}
+    </tr>
+  );
+}
+
+function MarkdownTh({
+  children,
+  node: _node,
+  style,
+  ...props
+}: ComponentProps<"th"> & { node?: unknown }) {
+  return (
+    <th
+      className="border-r border-content/5 px-3 py-2 font-semibold text-content last:border-r-0"
+      style={style}
+      {...props}
+    >
+      {children}
+    </th>
+  );
+}
+
+function MarkdownTd({
+  children,
+  node: _node,
+  style,
+  ...props
+}: ComponentProps<"td"> & { node?: unknown }) {
+  return (
+    <td
+      className="border-r border-content/5 px-3 py-2 text-content/85 last:border-r-0"
+      style={style}
+      {...props}
+    >
+      {children}
+    </td>
+  );
+}
+
+function MarkdownInput({
+  type,
+  checked,
+  disabled,
+  node: _node,
+  ...props
+}: ComponentProps<"input"> & { node?: unknown }) {
+  if (type === "checkbox") {
+    return (
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        readOnly
+        className="mr-2 size-3.5 cursor-default rounded border border-content/20 bg-content/5 align-middle accent-content"
+        {...props}
+      />
+    );
+  }
+  return <input type={type} checked={checked} disabled={disabled} {...props} />;
+}
+
+function MarkdownDetails({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"details"> & { node?: unknown }) {
+  return (
+    <details
+      className="my-3 rounded-lg border border-content/10 bg-content/[0.02] p-3 text-content"
+      {...props}
+    >
+      {children}
+    </details>
+  );
+}
+
+function MarkdownSummary({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"summary"> & { node?: unknown }) {
+  return (
+    <summary
+      className="cursor-pointer font-medium text-content/90 outline-none select-none transition-colors hover:text-content"
+      {...props}
+    >
+      {children}
+    </summary>
+  );
+}
+
+function MarkdownKbd({
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"kbd"> & { node?: unknown }) {
+  return (
+    <kbd
+      className="rounded border border-content/15 bg-content/10 px-1.5 py-0.5 font-mono text-[11px] text-content shadow-2xs"
+      {...props}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+export function parseMarkdownFrontmatter(rawText: string): {
+  frontmatterEntries: Array<[string, string]>;
+  content: string;
+} {
+  const match = rawText.match(FRONTMATTER_REGEX);
+  if (!match) {
+    return { frontmatterEntries: [], content: rawText };
+  }
+  const entries: Array<[string, string]> = [];
+  for (const line of match[1].split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx > 0) {
+      const key = trimmed.slice(0, colonIdx).trim();
+      let val = trimmed.slice(colonIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      entries.push([key, val]);
+    }
+  }
+  return {
+    frontmatterEntries: entries,
+    content: rawText.slice(match[0].length),
+  };
 }
 
 const MARKDOWN_COMPONENTS = {
   a: MarkdownLink,
   code: MarkdownCode,
   img: MarkdownImage,
+  table: MarkdownTable,
+  thead: MarkdownThead,
+  tbody: MarkdownTbody,
+  tr: MarkdownTr,
+  th: MarkdownTh,
+  td: MarkdownTd,
+  input: MarkdownInput,
+  details: MarkdownDetails,
+  summary: MarkdownSummary,
+  kbd: MarkdownKbd,
 } satisfies Components;
 
 const remarkPluginsCache = new Map<string | undefined, PluggableList>();
@@ -497,9 +760,29 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     });
   };
 
+  const { frontmatterEntries, content: parsedText } = useMemo(() => {
+    if (streaming) return { frontmatterEntries: [], content: text };
+    return parseMarkdownFrontmatter(text);
+  }, [text, streaming]);
+
   return (
     <FileOpenContext.Provider value={fileOpen}>
       <>
+        {frontmatterEntries.length > 0 ? (
+          <div className="mb-4 rounded-lg border border-content/10 bg-content/[0.03] p-3 text-xs">
+            <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-content/40">
+              Metadata
+            </div>
+            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              {frontmatterEntries.map(([key, value]) => (
+                <div key={key} className="contents">
+                  <span className="font-mono text-content/50">{key}:</span>
+                  <span className="truncate text-content/80">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <Streamdown
           className={`agent-markdown min-w-0 font-sans text-sm leading-6 ${className ?? ""}`}
           components={MARKDOWN_COMPONENTS}
@@ -510,7 +793,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
           remarkPlugins={remarkPlugins}
           rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
         >
-          {text}
+          {parsedText}
         </Streamdown>
         {fileMenu ? (
           <ExplorerMenu

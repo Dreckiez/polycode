@@ -52,6 +52,7 @@
     "react-dom": "^19.1.0",
     "react-material-icon-theme": "^1.2.0",
     "rehype-harden": "^1.1.8",
+    "remark-frontmatter": "^5.0.0",
     "streamdown": "^2.5.0",
     "zustand": "^5.0.15"
   },
