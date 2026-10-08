@@ -106,6 +106,7 @@ type Shared = {
     session?: { sessionId: string; cwd: string },
   ) => void;
   onOpenPlan: (sessionId: string, blockId: string) => void;
+  onOpenArtifact?: (sessionId: string, artifactId: string) => void;
   onUpdatePlan: (sessionId: string, blockId: string, text: string) => void;
   onBuildPlan: (
     sessionId: string,
@@ -184,6 +185,7 @@ function PaneTreeComponent({
   editorNavigation,
   onOpenDiff,
   onOpenPlan,
+  onOpenArtifact,
   onUpdatePlan,
   onBuildPlan,
   onSecondOpinion,
@@ -408,6 +410,7 @@ function PaneTreeComponent({
                   onOpenFile={onOpenFile}
                   onOpenDiff={onOpenDiff}
                   onOpenPlan={onOpenPlan}
+                  onOpenArtifact={onOpenArtifact}
                   onBuildPlan={onBuildPlan}
                   onSecondOpinion={onSecondOpinion}
                   onHandoff={onHandoff}

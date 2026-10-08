@@ -207,6 +207,8 @@ export type Block = {
   secondOpinion?: SecondOpinionMeta;
   /** Note chip shown on this user turn. Body is not stored; the harness already received it. */
   noteCard?: NoteCardMeta;
+  /** Saved artifacts attached to this turn; their bodies live outside chat. */
+  artifactCards?: import("./artifacts").ArtifactCard[];
   /**
    * A system row the reader must not miss — an error or an interruption —
    * rather than turn chrome like a status ping. Never folds into the trail.

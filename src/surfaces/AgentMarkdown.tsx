@@ -42,6 +42,7 @@ import { copyText } from "../lib/clipboard";
 import { revealPath } from "../lib/fs";
 import { isNoteImagePath } from "../lib/noteImages";
 import { IS_MAC, IS_WIN } from "../lib/platform";
+import { rehypeHardBreaks } from "../lib/hardBreaks";
 
 const MERMAID_BASE_CONFIG = {
   startOnLoad: false,
@@ -702,12 +703,14 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
   cwd,
   onOpenFile,
+  hardBreaks,
 }: {
   text: string;
   streaming?: boolean;
   className?: string;
   cwd?: string;
   onOpenFile?: OpenFileFn;
+  hardBreaks?: boolean;
 }) {
   const [fileMenu, setFileMenu] = useState<FileLinkMenu | null>(null);
   const onFileContextMenu = useCallback(
@@ -725,6 +728,13 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   const remarkPlugins = useMemo<PluggableList>(
     () => getRemarkPlugins(cwd),
     [cwd],
+  );
+  const rehypePlugins = useMemo<PluggableList>(
+    () =>
+      hardBreaks
+        ? [...MARKDOWN_REHYPE_PLUGINS, rehypeHardBreaks]
+        : MARKDOWN_REHYPE_PLUGINS,
+    [hardBreaks],
   );
 
   const onFileMenuPick = (id: string) => {
@@ -791,7 +801,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
           isAnimating={!!streaming}
           plugins={MARKDOWN_PLUGINS}
           remarkPlugins={remarkPlugins}
-          rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+          rehypePlugins={rehypePlugins}
         >
           {parsedText}
         </Streamdown>

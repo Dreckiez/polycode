@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { message } from "@tauri-apps/plugin-dialog";
+import {
+  ARTIFACT_DELETED_EVENT,
+  removeArtifactCard,
+} from "./lib/artifacts";
+import { ArtifactPanel } from "./surfaces/ArtifactPanel";
 import {
   useCallback,
   useEffect,
@@ -343,6 +349,33 @@ export default function App({
     () => true,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeArtifact, setActiveArtifact] = useState<{
+    id: string;
+    sessionId: string;
+  } | null>(null);
+
+  const onOpenArtifact = useCallback(
+    (sessionId: string, artifactId: string) => {
+      setActiveArtifact({ id: artifactId, sessionId });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const listening = listen<string>(ARTIFACT_DELETED_EVENT, ({ payload: id }) => {
+      const previous = sessionsRef.current;
+      const updated = previous.map((session) => removeArtifactCard(session, id));
+      if (updated.some((session, index) => session !== previous[index])) {
+        sessionsRef.current = updated;
+        setSessions(updated);
+      }
+      setActiveArtifact((current) => (current?.id === id ? null : current));
+    });
+    return () => {
+      void listening.then((unlisten) => unlisten());
+    };
+  }, []);
+
   const [updateNotice, setUpdateNotice] = useState(installedUpdate);
   const [whatsNewVersion, setWhatsNewVersion] = useState<string | null>(null);
   const [providerSignInRequest, setProviderSignInRequest] = useState<{
@@ -2236,6 +2269,7 @@ export default function App({
     onOpenFile,
     onOpenDiff,
     onOpenPlan,
+    onOpenArtifact,
     onBuildPlan,
     onSecondOpinion,
     onHandoff,
@@ -2501,6 +2535,14 @@ export default function App({
                     </div>
                   ))}
                 </div>
+                {activeArtifact ? (
+                  <ArtifactPanel
+                    key={activeArtifact.id}
+                    id={activeArtifact.id}
+                    onClose={() => setActiveArtifact(null)}
+                    onOpenFile={onOpenFile}
+                  />
+                ) : null}
               </div>
             </div>
           </main>

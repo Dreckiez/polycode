@@ -129,6 +129,7 @@ type Props = {
     session?: { sessionId: string; cwd: string },
   ) => void;
   onOpenPlan: (sessionId: string, blockId: string) => void;
+  onOpenArtifact?: (sessionId: string, artifactId: string) => void;
   onBuildPlan: (
     sessionId: string,
     blockId: string,
@@ -186,6 +187,7 @@ export const SessionPane = memo(function SessionPane({
   onOpenFile,
   onOpenDiff,
   onOpenPlan,
+  onOpenArtifact,
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
@@ -235,6 +237,10 @@ export const SessionPane = memo(function SessionPane({
   const openPlan = useCallback(
     (blockId: string) => onOpenPlan(session.id, blockId),
     [onOpenPlan, session.id],
+  );
+  const openArtifact = useCallback(
+    (artifactId: string) => onOpenArtifact?.(session.id, artifactId),
+    [onOpenArtifact, session.id],
   );
   const buildPlan = useCallback(
     (blockId: string, target?: PlanBuildTarget) =>
@@ -619,6 +625,7 @@ export const SessionPane = memo(function SessionPane({
                 onSaveSelectionNote={notesEnabled ? saveSelectionNote : undefined}
                 onOpenFile={onOpenFile}
                 onOpenDiff={onOpenDiff}
+                onOpenArtifact={onOpenArtifact ? openArtifact : undefined}
                 onOpenPlan={openPlan}
                 onBuildPlan={buildPlan}
                 onSecondOpinion={onSecondOpinion ? onSecondOpinionCb : undefined}

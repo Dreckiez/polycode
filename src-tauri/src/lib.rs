@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod artifacts;
 mod chat_background;
 mod checkpoint;
 mod cursor_store;
@@ -304,6 +305,10 @@ pub fn run() {
             notes::notes_delete,
             notes::notes_save_image,
             notes::notes_image_path,
+            artifacts::artifacts_list,
+            artifacts::artifacts_get,
+            artifacts::artifacts_upsert,
+            artifacts::artifacts_delete,
             checkpoint::session_checkpoint_ensure,
             checkpoint::session_checkpoint_prepare,
             checkpoint::session_checkpoint_capture,

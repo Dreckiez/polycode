@@ -80,6 +80,25 @@ pub fn ensure_notes_table(conn: &Connection) -> rusqlite::Result<()> {
             [],
         )?;
     }
+    let kind_present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name = 'content_kind'",
+        [],
+        |row| row.get(0),
+    )?;
+    if kind_present == 0 {
+        conn.execute(
+            "ALTER TABLE notes ADD COLUMN content_kind TEXT NOT NULL DEFAULT 'note'",
+            [],
+        )?;
+    }
+    let artifact_kind_present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name = 'artifact_kind'",
+        [],
+        |row| row.get(0),
+    )?;
+    if artifact_kind_present == 0 {
+        conn.execute("ALTER TABLE notes ADD COLUMN artifact_kind TEXT", [])?;
+    }
     Ok(())
 }
 
@@ -98,17 +117,26 @@ pub fn notes_get(store: State<'_, SessionStore>, id: String) -> Result<Option<No
 
 #[tauri::command(async)]
 pub fn notes_upsert(store: State<'_, SessionStore>, note: NoteUpsert) -> Result<Note, String> {
-    validate_id(&note.id, "note")?;
+    save_content(store, note, "note", None)
+}
+
+pub(crate) fn save_content(
+    store: State<'_, SessionStore>,
+    note: NoteUpsert,
+    kind: &str,
+    artifact_kind: Option<&str>,
+) -> Result<Note, String> {
+    validate_id(&note.id, kind)?;
     if let Some(session_id) = note.source_session_id.as_deref() {
         if !session_id.is_empty() {
             validate_id(session_id, "session")?;
         }
     }
     if note.body.len() > BODY_MAX {
-        return Err("Note is too large".into());
+        return Err("Content is too large".into());
     }
     let conn = store.lock_conn()?;
-    upsert_note(&conn, &note).map_err(|e| e.to_string())
+    upsert_content(&conn, &note, kind, artifact_kind).map_err(|e| e.to_string())
 }
 
 #[tauri::command(async)]
@@ -269,29 +297,63 @@ fn remove_note_assets(app: &AppHandle, note_id: &str) -> Result<(), String> {
 }
 
 fn list_notes(conn: &Connection) -> rusqlite::Result<Vec<Note>> {
+    list_content(conn, "note")
+}
+
+pub(crate) fn list_content(conn: &Connection, kind: &str) -> rusqlite::Result<Vec<Note>> {
     let mut stmt = conn.prepare(
         "SELECT id, slug, title, body, source_session_id, source_cwd, tags_json,
                 created_at, updated_at
          FROM notes
+         WHERE content_kind = ?1
          ORDER BY updated_at DESC, id ASC",
     )?;
-    let rows = stmt.query_map([], read_note)?;
+    let rows = stmt.query_map(params![kind], read_note)?;
     rows.collect()
 }
 
 fn get_note(conn: &Connection, id: &str) -> rusqlite::Result<Option<Note>> {
+    get_content(conn, id, "note")
+}
+
+pub(crate) fn get_content(conn: &Connection, id: &str, kind: &str) -> rusqlite::Result<Option<Note>> {
     conn.query_row(
         "SELECT id, slug, title, body, source_session_id, source_cwd, tags_json,
                 created_at, updated_at
          FROM notes
-         WHERE id = ?1",
-        params![id],
+         WHERE id = ?1 AND content_kind = ?2",
+        params![id, kind],
         read_note,
     )
     .optional()
 }
 
+#[cfg(test)]
 fn upsert_note(conn: &Connection, note: &NoteUpsert) -> rusqlite::Result<Note> {
+    upsert_content(conn, note, "note", None)
+}
+
+pub(crate) fn upsert_content(
+    conn: &Connection,
+    note: &NoteUpsert,
+    kind: &str,
+    artifact_kind: Option<&str>,
+) -> rusqlite::Result<Note> {
+    let existing_kind: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT content_kind, artifact_kind FROM notes WHERE id = ?1",
+            params![note.id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if existing_kind
+        .as_ref()
+        .is_some_and(|(category, subtype)| category != kind || subtype.as_deref() != artifact_kind)
+    {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "Content belongs to a different kind".into(),
+        ));
+    }
     let title = normalize_title(&note.title);
     let body = note.body.replace("\r\n", "\n").replace('\r', "\n");
     let tags = normalize_tags(&note.tags);
@@ -309,40 +371,38 @@ fn upsert_note(conn: &Connection, note: &NoteUpsert) -> rusqlite::Result<Note> {
         .filter(|value| !value.is_empty());
     let now = now_millis();
 
-    let existing: Option<(String, i64, Option<String>, Option<String>)> = conn
-        .query_row(
-            "SELECT slug, created_at, source_session_id, source_cwd
-             FROM notes WHERE id = ?1",
-            params![note.id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .optional()?;
-
-    if let Some((slug, created_at, existing_session, existing_cwd)) = existing {
+    if let Some(existing) = get_content(conn, &note.id, kind)? {
+        let project_cwd = source_cwd.map(str::to_string).or(existing.source_cwd);
+        let updated_at =
+            if title == existing.title && body == existing.body && tags == existing.tags {
+                existing.updated_at
+            } else {
+                now
+            };
         conn.execute(
             "UPDATE notes
-             SET title = ?1, body = ?2, tags_json = ?3, updated_at = ?4
+             SET title = ?1, body = ?2, tags_json = ?3, updated_at = ?4, source_cwd = ?6
              WHERE id = ?5",
-            params![title, body, tags_json, now, note.id],
+            params![title, body, tags_json, updated_at, note.id, project_cwd],
         )?;
         Ok(Note {
             id: note.id.clone(),
-            slug,
+            slug: existing.slug,
             title,
             body,
             tags,
-            source_session_id: existing_session,
-            source_cwd: existing_cwd,
-            created_at,
-            updated_at: now,
+            source_session_id: existing.source_session_id,
+            source_cwd: project_cwd,
+            created_at: existing.created_at,
+            updated_at,
         })
     } else {
         let slug = unique_slug(conn, &title)?;
         conn.execute(
             "INSERT INTO notes (
                id, slug, title, body, source_session_id, source_cwd, tags_json,
-               created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+               created_at, updated_at, content_kind, artifact_kind
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 note.id,
                 slug,
@@ -352,7 +412,9 @@ fn upsert_note(conn: &Connection, note: &NoteUpsert) -> rusqlite::Result<Note> {
                 source_cwd,
                 tags_json,
                 now,
-                now
+                now,
+                kind,
+                artifact_kind
             ],
         )?;
         Ok(Note {
@@ -370,7 +432,10 @@ fn upsert_note(conn: &Connection, note: &NoteUpsert) -> rusqlite::Result<Note> {
 }
 
 fn delete_note(conn: &Connection, id: &str) -> rusqlite::Result<()> {
-    conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+    conn.execute(
+        "DELETE FROM notes WHERE id = ?1 AND content_kind = 'note'",
+        params![id],
+    )?;
     Ok(())
 }
 
@@ -578,9 +643,9 @@ mod tests {
         assert_eq!(updated.tags, vec!["ideas", "project-docs"]);
         assert_eq!(updated.created_at, first.created_at);
         assert!(updated.updated_at > first.updated_at);
-        // Provenance is capture-time only; later edits must not rewrite it.
+        // Keep the source session when changing the note's project.
         assert_eq!(updated.source_session_id, None);
-        assert_eq!(updated.source_cwd, None);
+        assert_eq!(updated.source_cwd.as_deref(), Some("/tmp/a"));
     }
 
     #[test]

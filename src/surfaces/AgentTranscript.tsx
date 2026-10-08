@@ -47,6 +47,7 @@ type Props = {
   onSaveSelectionNote?: (text: string) => void;
   onOpenFile?: (path: string) => void;
   onOpenDiff?: (path: string) => void;
+  onOpenArtifact?: (id: string) => void;
   onOpenPlan?: (blockId: string) => void;
   onBuildPlan?: (blockId: string, target?: PlanBuildTarget) => void;
   onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
@@ -87,6 +88,7 @@ function AgentTranscriptComponent({
   onSaveSelectionNote,
   onOpenFile,
   onOpenDiff,
+  onOpenArtifact,
   onOpenPlan,
   onBuildPlan,
   onSecondOpinion,
@@ -384,6 +386,7 @@ function AgentTranscriptComponent({
               onApproval={onApproval}
               onOpenFile={onOpenFile}
               onOpenDiff={onOpenDiff}
+              onOpenArtifact={onOpenArtifact}
               onOpenPlan={onOpenPlan}
               onBuildPlan={onBuildPlan}
               onSecondOpinion={onSecondOpinion}

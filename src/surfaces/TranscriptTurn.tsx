@@ -38,6 +38,8 @@ import {
   type HarnessId,
   type PlanBuildTarget,
 } from "../lib/session";
+import { ArtifactCard } from "../chrome/ArtifactCard";
+import { artifactCards } from "../lib/artifacts";
 
 type TranscriptTurnProps = {
   turn: Block[];
@@ -63,6 +65,7 @@ type TranscriptTurnProps = {
   onApproval?: (requestId: number, decision: ApprovalDecision) => void;
   onOpenFile?: (path: string) => void;
   onOpenDiff?: (path: string) => void;
+  onOpenArtifact?: (id: string) => void;
   onOpenPlan?: (blockId: string) => void;
   onBuildPlan?: (blockId: string, target?: PlanBuildTarget) => void;
   onSecondOpinion?: (harness: HarnessId, turn: Block[], model: string) => void;
@@ -279,6 +282,7 @@ function areTurnsEqual(
       prev.onApproval === next.onApproval &&
       prev.onOpenFile === next.onOpenFile &&
       prev.onOpenDiff === next.onOpenDiff &&
+      prev.onOpenArtifact === next.onOpenArtifact &&
       prev.onOpenPlan === next.onOpenPlan &&
       prev.onBuildPlan === next.onBuildPlan &&
       prev.onSecondOpinion === next.onSecondOpinion &&
@@ -301,6 +305,7 @@ function areTurnsEqual(
     prev.onApproval === next.onApproval &&
     prev.onOpenFile === next.onOpenFile &&
     prev.onOpenDiff === next.onOpenDiff &&
+    prev.onOpenArtifact === next.onOpenArtifact &&
     prev.onOpenPlan === next.onOpenPlan &&
     prev.onBuildPlan === next.onBuildPlan &&
     prev.onSecondOpinion === next.onSecondOpinion &&
@@ -335,6 +340,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
   onApproval,
   onOpenFile,
   onOpenDiff,
+  onOpenArtifact,
   onOpenPlan,
   onBuildPlan,
   onSecondOpinion,
@@ -350,6 +356,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
   const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
   const durationMs = userBlock?.durationMs;
   const settled = !(busy && isLastTurn);
+  const artifacts = useMemo(() => artifactCards(turn), [turn]);
   const items = useMemo(() => groupTurnItems(turn), [turn]);
   const foldedAt = useMemo(() => lastActivityIndex(items), [items]);
   const initialThinkingAt = useMemo(() => initialThinkingIndex(items), [items]);
@@ -545,6 +552,20 @@ const TranscriptTurn = memo(function TranscriptTurn({
         return [foldLineRow, row];
       })}
       {foldLineAt >= items.length ? foldLineRow : null}
+      {settled && artifacts.length > 0 ? (
+        <div
+          data-artifact-results
+          className="flex flex-col gap-2 px-4 pt-1 pb-3"
+        >
+          {artifacts.map((card) => (
+            <ArtifactCard
+              key={card.id}
+              card={card}
+              onOpen={onOpenArtifact}
+            />
+          ))}
+        </div>
+      ) : null}
       {isLastTurn && latestTurnAccessory ? latestTurnAccessory : null}
       {durationMs != null && settled ? (
         <TurnDuration
