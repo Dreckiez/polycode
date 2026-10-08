@@ -125,6 +125,7 @@ export function persistableAttachment(file: Attachment): Attachment {
 export function displayAttachments(files: Attachment[]): Attachment[] {
   return files.map((file) => ({
     ...persistableAttachment(file),
+    ...(file.path ? { copyFromPath: true } : {}),
     ...(file.previewUrl ? { previewUrl: file.previewUrl } : {}),
     ...(file.data ? { data: file.data } : {}),
   }));
@@ -283,6 +284,12 @@ export function promptBlocks(
   return blocks;
 }
 
+export const FOLDER_MIME = "inode/directory";
+
+export function isAttachmentFolder(file: Attachment): boolean {
+  return file.mimeType === FOLDER_MIME;
+}
+
 /** Require a deliverable source instead of silently dropping an attachment. */
 export function attachmentPath(file: Attachment): string {
   if (!file.path?.trim()) {
@@ -295,10 +302,16 @@ export function attachmentPath(file: Attachment): string {
 
 /** Native harnesses without file blocks can ask their tools to read this path. */
 export function attachmentPathText(file: Attachment): string {
+  if (isAttachmentFolder(file)) {
+    return `Attached folder (list or read the files inside from this path): ${JSON.stringify(attachmentPath(file))}`;
+  }
   return `Attached file (read from disk): ${JSON.stringify(attachmentPath(file))}`;
 }
 
 function contentBlockFor(file: Attachment): PromptContentBlock {
+  if (isAttachmentFolder(file)) {
+    return { type: "text", text: attachmentPathText(file) };
+  }
   if (file.data && isVisionImage(file.mimeType)) {
     return {
       type: "image",
@@ -317,9 +330,9 @@ function contentBlockFor(file: Attachment): PromptContentBlock {
 }
 
 async function attachmentFromPath(info: PathInfo): Promise<Attachment | null> {
-  if (info.isDir || skipName(info.name)) return null;
-  const mimeType = mimeFromName(info.name);
-  const kind = kindFromMime(mimeType);
+  if (skipName(info.name)) return null;
+  const mimeType = info.isDir ? FOLDER_MIME : mimeFromName(info.name);
+  const kind = info.isDir ? "file" : kindFromMime(mimeType);
   const file: Attachment = {
     id: crypto.randomUUID(),
     name: info.name,
@@ -329,6 +342,7 @@ async function attachmentFromPath(info: PathInfo): Promise<Attachment | null> {
     path: info.path,
   };
   if (
+    !info.isDir &&
     isVisionImage(mimeType) &&
     info.size > 0 &&
     info.size <= MAX_EMBED_BYTES
@@ -360,7 +374,7 @@ async function attachmentFromBlob(file: File): Promise<Attachment | null> {
       previewUrl,
     };
   }
-  if (!data) {
+  if (data === null) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     return null;
   }

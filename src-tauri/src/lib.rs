@@ -11,6 +11,7 @@ mod macos;
 mod menu;
 mod notes;
 mod notifications;
+mod pasteboard;
 mod project_logo;
 mod pty;
 mod rate_limits;
@@ -327,6 +328,9 @@ pub fn run() {
             project_logo::save_project_logo,
             project_logo::remove_project_logo,
             project_logo::forget_logo_file,
+            pasteboard::clipboard_file_paths,
+            pasteboard::clipboard_image,
+            pasteboard::copy_file_to_clipboard,
         ])
         .build(tauri::generate_context!())
         .expect("error while building PolyCode");
