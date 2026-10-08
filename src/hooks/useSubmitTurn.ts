@@ -1,9 +1,11 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type RefObject,
   type SetStateAction,
 } from "react";
+import { flushSync } from "react-dom";
 import {
   displayAttachments,
   prepareAttachments,
@@ -20,18 +22,25 @@ import {
 import {
   appendUser,
   appendSteerUser,
+  canRewindHarnessLastTurn,
   canSteerHarness,
   cancelHarnessTurn,
   forgetHarnessSession,
   generateHarnessTitle,
   isLiveHarness,
   promoteLastAssistantToPlan,
+  rewindHarnessLastTurn,
   sendHarnessTurn,
   steerHarnessTurn,
   stopHarnessSession,
   stopStreaming,
   type HarnessEvent,
 } from "../lib/harness";
+import {
+  createEditedResendAttempt,
+  createEditedResendCoordinator,
+  type EditedResendRejection,
+} from "../lib/editLastTurn";
 import {
   appendPreparingHandoff,
   buildDeterministicHandoff,
@@ -94,7 +103,7 @@ import { nudgeWatchedFiles } from "../lib/fileWatch";
 import { IS_WIN } from "../lib/platform";
 import { looksLikeProject } from "../lib/recents";
 
-type SubmitTurnOptions = {
+export type SubmitTurnOptions = {
   secondOpinion?: SecondOpinionMeta;
   followUpBehavior?: FollowUpBehavior;
   noteCard?: NoteComposerCard;
@@ -103,6 +112,8 @@ type SubmitTurnOptions = {
   intent?: TurnIntent;
   planBlockId?: string;
   buildTarget?: PlanBuildTarget;
+  resendEdited?: boolean;
+  onResendRejected?: (recovery: EditedResendRejection) => void;
 };
 
 export type SubmitTurnDeps = {
@@ -118,6 +129,7 @@ export type SubmitTurnDeps = {
 
 export function useSubmitTurn(deps: SubmitTurnDeps) {
   const d = deps;
+  const editedResends = useRef(createEditedResendCoordinator()).current;
 
   const onSubmit = useCallback(
     (
@@ -127,6 +139,7 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
       options?: SubmitTurnOptions,
     ) => {
       if (d.removingSessionIds.current.has(sessionId)) return;
+      if (editedResends.isActive(sessionId)) return;
       const storedCurrent = d.sessionsRef.current.find((s) => s.id === sessionId);
       if (!storedCurrent) return;
       if (IS_WIN && !looksLikeProject(storedCurrent.cwd)) {
@@ -137,9 +150,17 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
         d.flushHarnessEvents();
         return;
       }
-      const current = options?.buildTarget
+      let current = options?.buildTarget
         ? withPlanBuildTarget(storedCurrent, options.buildTarget)
         : storedCurrent;
+      const editedResend = options?.resendEdited
+        ? createEditedResendAttempt(current, options.onResendRejected)
+        : undefined;
+      if (options?.resendEdited && !editedResend) return;
+      const editedProviderTurnId = editedResend?.providerTurnId;
+      if (editedResend) {
+        current = { ...current, blocks: editedResend.blocks };
+      }
       const intent = options?.intent ?? "default";
       const approvedPlan = options?.planBlockId
         ? current.blocks.find(
@@ -314,84 +335,93 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
         void cancelHarnessTurn(pendingSwitch.from, sessionId);
       }
 
-      d.setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== sessionId) return s;
-          const selected = options?.buildTarget
-            ? withPlanBuildTarget(s, options.buildTarget)
-            : s;
-          const titled = isFirstTurn ? titleSeed : selected.title;
-          let next: Session = {
-            ...selected,
-            providerAccountId,
-            noteCard: rawCommand ? s.noteCard : undefined,
-            handoffCard: rawCommand ? s.handoffCard : undefined,
-          };
-          if (approvedPlan && intent === "build") {
-            next = {
-              ...next,
-              blocks: next.blocks.map((block) =>
-                block.id === approvedPlan.id
-                  ? {
-                      ...block,
-                      plan: {
-                        ...(block.plan ?? { status: "ready" as const }),
-                        status: "building" as const,
-                        approvedText: block.text,
-                      },
-                    }
-                  : block,
-              ),
+      const commitSubmittedTurn = () => {
+        d.setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id !== sessionId) return s;
+            const selected = options?.buildTarget
+              ? withPlanBuildTarget(s, options.buildTarget)
+              : s;
+            const titled = isFirstTurn ? titleSeed : selected.title;
+            let next: Session = {
+              ...selected,
+              providerAccountId,
+              noteCard: rawCommand ? s.noteCard : undefined,
+              handoffCard: rawCommand ? s.handoffCard : undefined,
             };
-          }
-          if (options?.queuedMessageId) {
-            next = dequeueQueuedMessage(next, options.queuedMessageId);
-          }
-          if (!live) {
-            return {
-              ...next,
-              title: titled,
-              pendingSwitch: undefined,
-              busy: false,
-              blocks: [
-                ...next.blocks,
-                {
-                  id: crypto.randomUUID(),
-                  role: "user",
-                  text: visibleText,
-                  ...(visible.length > 0 ? { attachments: visible } : {}),
-                  ...cards,
-                },
-                {
-                  id: crypto.randomUUID(),
-                  role: "system",
-                  text: `${next.harness} is not connected yet — install and sign in to that provider, then retry.`,
-                },
-              ],
-            };
-          }
-          if (pendingSwitch) {
-            const withLiveText = d.flushSessionLiveText(next.id, next);
-            const sealed = stopStreaming({
-              ...withLiveText,
-              title: titled,
-              pendingSwitch: undefined,
-            });
+            if (editedResend) {
+              next = editedResend.replace(next);
+            }
+            if (approvedPlan && intent === "build") {
+              next = {
+                ...next,
+                blocks: next.blocks.map((block) =>
+                  block.id === approvedPlan.id
+                    ? {
+                        ...block,
+                        plan: {
+                          ...(block.plan ?? { status: "ready" as const }),
+                          status: "building" as const,
+                          approvedText: block.text,
+                        },
+                      }
+                    : block,
+                ),
+              };
+            }
+            if (options?.queuedMessageId) {
+              next = dequeueQueuedMessage(next, options.queuedMessageId);
+            }
+            if (!live) {
+              return {
+                ...next,
+                title: titled,
+                pendingSwitch: undefined,
+                busy: false,
+                blocks: [
+                  ...next.blocks,
+                  {
+                    id: crypto.randomUUID(),
+                    role: "user",
+                    text: visibleText,
+                    ...(visible.length > 0 ? { attachments: visible } : {}),
+                    ...cards,
+                  },
+                  {
+                    id: crypto.randomUUID(),
+                    role: "system",
+                    text: `${next.harness} is not connected yet — install and sign in to that provider, then retry.`,
+                  },
+                ],
+              };
+            }
+            if (pendingSwitch) {
+              const withLiveText = d.flushSessionLiveText(next.id, next);
+              const sealed = stopStreaming({
+                ...withLiveText,
+                title: titled,
+                pendingSwitch: undefined,
+              });
+              return appendUser(
+                appendPreparingHandoff(sealed, pendingSwitch.from, next.harness),
+                visibleText,
+                visible,
+                cards,
+              );
+            }
             return appendUser(
-              appendPreparingHandoff(sealed, pendingSwitch.from, next.harness),
+              { ...next, title: titled },
               visibleText,
               visible,
               cards,
             );
-          }
-          return appendUser(
-            { ...next, title: titled },
-            visibleText,
-            visible,
-            cards,
-          );
-        }),
-      );
+          }),
+        );
+      };
+
+      if (!options?.resendEdited) {
+        flushSync(commitSubmittedTurn);
+      }
 
       if (isFirstTurn && live && placeholderTitle) {
         const titleMessage =
@@ -436,7 +466,17 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
         if (pendingSwitch) {
           void forgetHarnessSession(pendingSwitch.from, sessionId);
         }
+        editedResend?.reject();
         return;
+      }
+
+      if (editedResend && canRewindHarnessLastTurn(current.harness)) {
+        editedResends.start(sessionId);
+        const locked = d.sessionsRef.current.map((session) =>
+          session.id === sessionId ? { ...session, busy: true } : session,
+        );
+        d.sessionsRef.current = locked;
+        d.setSessions(locked);
       }
 
       void (async () => {
@@ -523,10 +563,85 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
           return event;
         };
 
+        const pendingEditedEvents: HarnessEvent[] = [];
+        const applyTurnEvent = (event: HarnessEvent) => {
+          if (
+            wrap &&
+            (event.type === "session.started" ||
+              event.type === "session.providerBound")
+          ) {
+            revealHandoff(wrap.text);
+          }
+          nudgeOpenEditors(event, workCwd);
+          trackSessionEdits(sessionId, workCwd, event);
+          const routed = routePlanEvent(event);
+          if (routed) d.enqueueHarnessEvent(sessionId, routed);
+        };
+        const routeTurnEvent = (event: HarnessEvent) => {
+          if (d.turnGen.current.get(sessionId) !== gen) return;
+          if (editedResend && !editedResend.isAccepted()) {
+            pendingEditedEvents.push(event);
+            return;
+          }
+          applyTurnEvent(event);
+        };
+        const acceptEditedResend = () => {
+          if (!editedResend || editedResend.isAccepted()) return;
+          flushSync(commitSubmittedTurn);
+          editedResend.markAccepted();
+          for (const event of pendingEditedEvents) applyTurnEvent(event);
+          pendingEditedEvents.length = 0;
+        };
+        const recoverEditedResend = () => {
+          if (!editedResend || editedResend.isAccepted()) return;
+          pendingEditedEvents.length = 0;
+          const previous = d.sessionsRef.current.find(
+            (session) => session.id === sessionId,
+          );
+          const recovered = previous
+            ? editedResend.recoverAfterFailure(previous)
+            : undefined;
+          flushSync(() => {
+            d.setSessions((prev) =>
+              prev.map((session) =>
+                session.id === sessionId && recovered ? recovered : session,
+              ),
+            );
+          });
+        };
+
         await beginSessionTurn(sessionId, workCwd).catch(() => undefined);
         if (d.turnGen.current.get(sessionId) !== gen) return;
         let buildSucceeded = false;
         try {
+          if (editedResend && canRewindHarnessLastTurn(current.harness)) {
+            try {
+              await rewindHarnessLastTurn({
+                harness: current.harness,
+                sessionId,
+                cwd: workCwd,
+                model: current.model,
+                modelSettings: current.modelSettings,
+                runtimeMode: current.runtimeMode,
+                ...(editedProviderTurnId
+                  ? { providerTurnId: editedProviderTurnId }
+                  : {}),
+                onEvent: (event) => {
+                  if (d.turnGen.current.get(sessionId) !== gen) return;
+                  d.enqueueHarnessEvent(sessionId, event);
+                },
+              });
+            } catch (error) {
+              d.flushHarnessEvents();
+              editedResend.reject();
+              throw error;
+            }
+            editedResend.markProviderRewound();
+            d.flushHarnessEvents();
+            if (d.turnGen.current.get(sessionId) !== gen) {
+              return;
+            }
+          }
           const prepared = await prepareAttachments(attachments);
           const prompt =
             intent === "build" && approvedPlan
@@ -561,21 +676,10 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
                   )
                 : turnPrompt,
             attachments: prepared,
-            onEvent: (event) => {
-              if (d.turnGen.current.get(sessionId) !== gen) return;
-              if (
-                wrap &&
-                (event.type === "session.started" ||
-                  event.type === "session.providerBound")
-              ) {
-                revealHandoff(wrap.text);
-              }
-              nudgeOpenEditors(event, workCwd);
-              trackSessionEdits(sessionId, workCwd, event);
-              const routed = routePlanEvent(event);
-              if (routed) d.enqueueHarnessEvent(sessionId, routed);
-            },
+            ...(editedResend ? { onAccepted: acceptEditedResend } : {}),
+            onEvent: routeTurnEvent,
           });
+          acceptEditedResend();
           if (d.turnGen.current.get(sessionId) !== gen) return;
           if (wrap) {
             d.setSessions((prev) =>
@@ -592,6 +696,7 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
           buildSucceeded = true;
         } catch (error: unknown) {
           if (d.turnGen.current.get(sessionId) !== gen) return;
+          recoverEditedResend();
           if (wrap) revealHandoff(wrap.text);
           let message =
             error instanceof Error
@@ -619,6 +724,8 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
           }
           providerFailureSeen = true;
         } finally {
+          editedResend?.reject();
+          if (editedResend) editedResends.finish(sessionId);
           if (d.turnGen.current.get(sessionId) !== gen) return;
           d.flushHarnessEvents();
           // A failed provider can leave its process alive with a dead event

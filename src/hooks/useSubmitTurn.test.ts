@@ -34,12 +34,14 @@ import { requestOutgoingHandoff } from "../lib/handoffTurn";
 import {
   appendSteerUser,
   appendUser,
+  canRewindHarnessLastTurn,
   canSteerHarness,
   cancelHarnessTurn,
   forgetHarnessSession,
   generateHarnessTitle,
   isLiveHarness,
   promoteLastAssistantToPlan,
+  rewindHarnessLastTurn,
   sendHarnessTurn,
   steerHarnessTurn,
   stopHarnessSession,
@@ -78,6 +80,8 @@ const lib = vi.hoisted(() => ({
   forgetHarnessSession: vi.fn(),
   generateHarnessTitle: vi.fn(),
   isLiveHarness: vi.fn(),
+  canRewindHarnessLastTurn: vi.fn(),
+  rewindHarnessLastTurn: vi.fn(),
   canSteerHarness: vi.fn(),
   stopHarnessSession: vi.fn(),
   stopStreaming: vi.fn(),
@@ -150,6 +154,8 @@ vi.mock("../lib/harness", () => ({
   forgetHarnessSession: lib.forgetHarnessSession,
   generateHarnessTitle: lib.generateHarnessTitle,
   isLiveHarness: lib.isLiveHarness,
+  canRewindHarnessLastTurn: lib.canRewindHarnessLastTurn,
+  rewindHarnessLastTurn: lib.rewindHarnessLastTurn,
   promoteLastAssistantToPlan: lib.promoteLastAssistantToPlan,
   sendHarnessTurn: lib.sendHarnessTurn,
   steerHarnessTurn: lib.steerHarnessTurn,
@@ -168,6 +174,8 @@ vi.mock("../lib/handoff", () => ({
   shouldAskOutgoingAgent: lib.shouldAskOutgoingAgent,
   userMessagesAfterHandoff: lib.userMessagesAfterHandoff,
   wrapHandoffPrompt: lib.wrapHandoffPrompt,
+  isProviderSessionRemovedError: vi.fn(() => false),
+  PROVIDER_SESSION_REMOVED_MESSAGE: "Session removed",
 }));
 vi.mock("../lib/checkpoint", () => ({
   beginSessionTurn: lib.beginSessionTurn,
@@ -252,6 +260,8 @@ const h = {
   wrapHandoffPrompt: vi.mocked(wrapHandoffPrompt),
   isPreparingHandoff: vi.mocked(isPreparingHandoff),
   isLiveHarness: vi.mocked(isLiveHarness),
+  canRewindHarnessLastTurn: vi.mocked(canRewindHarnessLastTurn),
+  rewindHarnessLastTurn: vi.mocked(rewindHarnessLastTurn),
   canSteerHarness: vi.mocked(canSteerHarness),
   userTurnCards: vi.mocked(userTurnCards),
   notifySession: vi.mocked(notifySession),
@@ -575,5 +585,77 @@ describe("useSubmitTurn", () => {
     expect(flushHarnessEvents).toHaveBeenCalled();
     expect(h.sendHarnessTurn).not.toHaveBeenCalled();
     expect(h.appendUser).not.toHaveBeenCalled();
+  });
+
+  it("onSubmit with resendEdited rewinds the harness and commits replaced turn on acceptance", async () => {
+    h.canRewindHarnessLastTurn.mockReturnValue(true);
+    const existing = session("s1", {
+      harness: "pi",
+      blocks: [
+        { id: "u1", role: "user", text: "first question" },
+        { id: "a1", role: "assistant", text: "first answer" },
+      ],
+    });
+    await mount([existing]);
+
+    let onAcceptedCb: (() => void) | undefined;
+    h.sendHarnessTurn.mockImplementation(async (opts: { onAccepted?: () => void }) => {
+      onAcceptedCb = opts.onAccepted;
+    });
+
+    await act(async () => {
+      api.onSubmit("s1", "new replacement question", [], {
+        resendEdited: true,
+      });
+    });
+
+    expect(h.rewindHarnessLastTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        harness: "pi",
+        sessionId: "s1",
+      }),
+    );
+    expect(h.sendHarnessTurn).toHaveBeenCalledTimes(1);
+    expect(onAcceptedCb).toBeDefined();
+
+    // Call onAccepted to simulate adapter accepting the new turn
+    act(() => {
+      onAcceptedCb?.();
+    });
+
+    expect(h.appendUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blocks: [], // Replaced! Truncated previous turn
+      }),
+      "new replacement question",
+      [],
+      undefined,
+    );
+  });
+
+  it("onSubmit with resendEdited calls onResendRejected if rewind fails", async () => {
+    h.canRewindHarnessLastTurn.mockReturnValue(true);
+    h.rewindHarnessLastTurn.mockRejectedValue(new Error("Rewind failed"));
+    const existing = session("s1", {
+      harness: "pi",
+      blocks: [
+        { id: "u1", role: "user", text: "first question" },
+        { id: "a1", role: "assistant", text: "first answer" },
+      ],
+    });
+    await mount([existing]);
+
+    const onResendRejected = vi.fn();
+    await act(async () => {
+      api.onSubmit("s1", "new replacement question", [], {
+        resendEdited: true,
+        onResendRejected,
+      });
+    });
+
+    expect(onResendRejected).toHaveBeenCalledWith({
+      providerRewound: false,
+    });
+    expect(h.sendHarnessTurn).not.toHaveBeenCalled();
   });
 });

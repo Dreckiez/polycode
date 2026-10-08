@@ -33,6 +33,11 @@ import {
 } from "../lib/session";
 import { AgentTranscript } from "./AgentTranscript";
 import { turnUserBlock } from "./transcriptShared";
+import {
+  canEditLastTurn,
+  lastTurnRecall,
+  type EditedResendRejection,
+} from "../lib/editLastTurn";
 import { EmptySession } from "./EmptySession";
 import { MOD } from "../lib/platform";
 import {
@@ -84,7 +89,11 @@ type Props = {
     sessionId: string,
     text: string,
     attachments: Attachment[],
-    options?: { intent?: TurnIntent },
+    options?: {
+      intent?: TurnIntent;
+      resendEdited?: boolean;
+      onResendRejected?: (recovery: EditedResendRejection) => void;
+    },
   ) => void;
   onStop: (sessionId: string) => void;
   onCompactContext: (sessionId: string) => boolean;
@@ -238,6 +247,13 @@ export const SessionPane = memo(function SessionPane({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const astraWelcomeSequence = useRef(0);
   const [astraWelcomeRun, setAstraWelcomeRun] = useState<number | null>(null);
+  const recallLastTurnRef = useRef<(() => void) | null>(null);
+  const editLastTurnSupported = canEditLastTurn(session);
+  const turnRecall = editLastTurnSupported ? lastTurnRecall(session) : null;
+  const [editingLastTurn, setEditingLastTurn] = useState(false);
+  useEffect(() => {
+    setEditingLastTurn(false);
+  }, [session.id, editLastTurnSupported]);
   const dismissAstraWelcome = useCallback(() => setAstraWelcomeRun(null), []);
   useEffect(() => {
     if (!visible) setAstraWelcomeRun(null);
@@ -368,7 +384,11 @@ export const SessionPane = memo(function SessionPane({
     (
       text: string,
       attachments: Attachment[],
-      options?: { intent?: TurnIntent },
+      options?: {
+        intent?: TurnIntent;
+        resendEdited?: boolean;
+        onResendRejected?: (recovery: EditedResendRejection) => void;
+      },
     ) => {
       onSubmit(session.id, text, attachments, options);
     },
@@ -489,6 +509,12 @@ export const SessionPane = memo(function SessionPane({
       onResumeQueue={onResumeQueueCb}
       onOpenFile={onOpenFile}
       busy={!!session.busy}
+      editLastTurnSupported={editLastTurnSupported}
+      lastTurnRecall={turnRecall}
+      onRecallLastTurnReady={(recall) => {
+        recallLastTurnRef.current = recall;
+      }}
+      onEditingLastTurnChange={setEditingLastTurn}
     />
   );
 
@@ -605,6 +631,15 @@ export const SessionPane = memo(function SessionPane({
                 onJumpToBottomReady={onJumpToBottomReady}
                 onRevealReady={onRevealReady}
                 latestTurnAccessory={latestTurnAccessory}
+                editingLastTurn={editingLastTurn}
+                onEditLastTurn={
+                  editLastTurnSupported
+                    ? () => {
+                        onFocus(session.id);
+                        recallLastTurnRef.current?.();
+                      }
+                    : undefined
+                }
               />
             </ErrorBoundary>
             <PromptOutline

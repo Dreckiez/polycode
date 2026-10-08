@@ -384,6 +384,12 @@ function sanitizeBlock(block: Block): Block | null {
   if (block.durationMs != null) next.durationMs = block.durationMs;
   const turnModel = sanitizeTurnModel(block.turnModel);
   if (block.role === "user" && turnModel) next.turnModel = turnModel;
+  if (
+    typeof block.providerTurnId === "string" &&
+    isPersistableId(block.providerTurnId)
+  ) {
+    next.providerTurnId = block.providerTurnId;
+  }
   if (block.tool) next.tool = block.tool;
   if (block.approval?.decided) {
     next.approval = {

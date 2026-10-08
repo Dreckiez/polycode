@@ -8,7 +8,7 @@ import {
 import type { ApprovalDecision } from "../lib/harness";
 import type { TranscriptLayout } from "../lib/appearance";
 import { AttachmentChip } from "../chrome/AttachmentChip";
-import { AlertCircle, RotateCcw, Sparkles } from "../chrome/icons";
+import { AlertCircle, Pencil, RotateCcw, Sparkles } from "../chrome/icons";
 import { HarnessIcon } from "../chrome/HarnessIcon";
 import { PROVIDER_SESSION_REMOVED_MESSAGE } from "../lib/handoff";
 import { NoteMiniCard } from "../chrome/NoteMiniCard";
@@ -21,6 +21,35 @@ import { AgentMarkdown } from "./AgentMarkdown";
 import { Shimmer } from "./Shimmer";
 import { legacyTaskListFromText } from "../lib/taskList";
 import { liveTextByBlock, useChatStore } from "../lib/chatStore";
+
+function EditLastTurnButton({
+  onEdit,
+  editing = false,
+}: {
+  onEdit: () => void;
+  editing?: boolean;
+}) {
+  const label = editing ? "Cancel edit" : "Edit and resend";
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={editing}
+      onClick={(event) => {
+        event.stopPropagation();
+        onEdit();
+      }}
+      className={`rounded-md p-1 transition-[background-color,color] duration-150 focus-visible:ring-1 focus-visible:ring-accent ${
+        editing
+          ? "edit-last-turn-button"
+          : "text-content/40 hover:bg-content/8 hover:text-content/70"
+      }`}
+    >
+      <Pencil className="size-3.5" strokeWidth={1.75} />
+    </button>
+  );
+}
 
 const TranscriptBlock = memo(function TranscriptBlock({
   block,
@@ -39,6 +68,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
   sessionId,
   onRetry,
   onContinueWithContext,
+  onEditLastTurn,
+  editing,
 }: {
   block: Block;
   layout: TranscriptLayout;
@@ -57,6 +88,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
   sessionId: string;
   onRetry?: () => void;
   onContinueWithContext?: () => void;
+  onEditLastTurn?: () => void;
+  editing?: boolean;
 }) {
   // For streaming assistant/reasoning blocks, read text from the narrow chatStore selector
   // so only this block re-renders on token deltas.
@@ -74,6 +107,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
         block={block}
         layout={layout}
         stickyIndex={stickyIndex}
+        onEdit={onEditLastTurn}
+        editing={editing}
       />
     );
   }
@@ -263,10 +298,14 @@ function UserMessageBlock({
   block,
   layout,
   stickyIndex,
+  onEdit,
+  editing = false,
 }: {
   block: Block;
   layout: TranscriptLayout;
   stickyIndex: number;
+  onEdit?: () => void;
+  editing?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -326,12 +365,15 @@ function UserMessageBlock({
   return (
     <div
       data-prompt-anchor={block.id}
-      className={
-        chat ? "flex justify-end pt-1.5 pr-4 pb-4 pl-14" : "p-1.5 pb-3"
-      }
+      data-editing-last-turn={editing ? "true" : undefined}
+      className={`user-message-row group/usermsg ${
+        chat ? "flex flex-col items-end pt-1.5 pr-4 pb-4 pl-14" : "p-1.5 pb-3"
+      }`}
     >
       <div
         className={`min-w-0 bg-content/10 px-3 py-2 font-sans text-content ${
+          editing ? "edit-last-turn-bubble" : ""
+        } ${
           chat
             ? `w-fit max-w-xl ${singleLine ? "rounded-full" : "rounded-xl"}`
             : "rounded-lg border border-content/10"
@@ -367,6 +409,11 @@ function UserMessageBlock({
           </pre>
         ) : null}
       </div>
+      {onEdit ? (
+        <div className="user-message-actions flex items-center gap-1 px-3 pt-1">
+          <EditLastTurnButton onEdit={onEdit} editing={editing} />
+        </div>
+      ) : null}
     </div>
   );
 }

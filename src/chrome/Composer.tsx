@@ -27,6 +27,16 @@ import {
   pickAttachments,
   revokeAttachment,
 } from "../lib/attachments";
+import {
+  captureDraft,
+  dropPastedText,
+  insertRestoredText,
+} from "../lib/draftRestore";
+import {
+  messageFilesFromClipboard,
+  isFileReferenceText,
+  nativeClipboardAttachments,
+} from "../lib/clipboard";
 import { COMPOSER_MAX_HEIGHT, resizeComposer } from "../lib/composerResize";
 import {
   EXPLORER_FILE_POINTER_DRAG_EVENT,
@@ -54,6 +64,7 @@ import type { HandoffComposerCard } from "../lib/handoff";
 import { looksLikeProject, type RecentProject } from "../lib/recents";
 import type {
   Attachment,
+  EditedResendRejection,
   HarnessId,
   MessageQueueStatus,
   QueuedMessage,
@@ -61,6 +72,7 @@ import type {
   TurnIntent,
 } from "../lib/session";
 import { HARNESS_TITLE, harnessSupportsAttachments } from "../lib/session";
+import type { LastTurnRecall } from "../lib/editLastTurn";
 import type {
   UserQuestionPrompt,
   UserQuestionReply,
@@ -154,6 +166,8 @@ type Props = {
   handoffCard?: HandoffComposerCard;
   question?: UserQuestionPrompt;
   busy?: boolean;
+  editLastTurnSupported?: boolean;
+  lastTurnRecall?: LastTurnRecall | null;
   queuedMessages?: QueuedMessage[];
   queueStatus?: MessageQueueStatus;
   hotkeys?: boolean;
@@ -172,7 +186,11 @@ type Props = {
   onSubmit: (
     text: string,
     attachments: Attachment[],
-    options?: { intent?: TurnIntent },
+    options?: {
+      intent?: TurnIntent;
+      resendEdited?: boolean;
+      onResendRejected?: (recovery: EditedResendRejection) => void;
+    },
   ) => void;
   onStop?: () => void;
   onCompactContext?: () => boolean;
@@ -184,6 +202,8 @@ type Props = {
   onResumeQueue?: () => void;
   onOpenFile?: (path: string) => void;
   onDraftChange?: (text: string) => void;
+  onRecallLastTurnReady?: (recall: () => void) => void;
+  onEditingLastTurnChange?: (editing: boolean) => void;
   onOpenProject?: () => void;
   children?: ReactNode;
 };
@@ -213,6 +233,8 @@ export const Composer = memo(function Composer({
   handoffCard,
   question,
   busy = false,
+  editLastTurnSupported = false,
+  lastTurnRecall = null,
   queuedMessages = [],
   queueStatus,
   onFocus,
@@ -238,6 +260,8 @@ export const Composer = memo(function Composer({
   onResumeQueue,
   onOpenFile,
   onDraftChange,
+  onRecallLastTurnReady,
+  onEditingLastTurnChange,
   onOpenProject,
   children,
 }: Props) {
@@ -248,6 +272,8 @@ export const Composer = memo(function Composer({
   const plusRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
+  const borrowedAttachmentIdsRef = useRef(new Set<string>());
+  const draftRevisionRef = useRef(0);
   const consumedQuoteId = useRef<number | null>(null);
   const slashRef = useRef<SlashToken | null>(null);
   const mentionRef = useRef<MentionToken | null>(null);
@@ -259,6 +285,19 @@ export const Composer = memo(function Composer({
       !!handoffCard,
   );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [resendEdited, setResendEdited] = useState(false);
+  const pasteGenerationRef = useRef(0);
+  const inFlightAttachmentReadRef = useRef<Promise<unknown> | null>(null);
+
+  const rememberAttachmentRead = useCallback((job: Promise<unknown>) => {
+    inFlightAttachmentReadRef.current = job;
+    void job.finally(() => {
+      if (inFlightAttachmentReadRef.current === job) {
+        inFlightAttachmentReadRef.current = null;
+      }
+    });
+  }, []);
   const [fileDrag, setFileDrag] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [planSelected, setPlanSelected] = useState(false);
@@ -392,13 +431,17 @@ export const Composer = memo(function Composer({
 
   const removeAttachment = useCallback(
     (id: string) => {
-      setAttachments((prev) => {
-        const removed = prev.find((file) => file.id === id);
-        if (removed) revokeAttachment(removed);
-        const next = prev.filter((file) => file.id !== id);
-        syncHasValue(ref.current?.value ?? "", next);
-        return next;
-      });
+      const previous = attachmentsRef.current;
+      const removed = previous.find((file) => file.id === id);
+      if (removed && !borrowedAttachmentIdsRef.current.delete(removed.id)) {
+        revokeAttachment(removed);
+      }
+      const next = previous.filter((file) => file.id !== id);
+      attachmentsRef.current = next;
+      draftRevisionRef.current += 1;
+      setAttachments(next);
+      setPasteError(null);
+      syncHasValue(ref.current?.value ?? "", next);
       ref.current?.focus();
     },
     [syncHasValue],
@@ -406,19 +449,131 @@ export const Composer = memo(function Composer({
 
   useEffect(() => {
     return () => {
-      for (const file of attachmentsRef.current) revokeAttachment(file);
+      for (const file of attachmentsRef.current) {
+        if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+          revokeAttachment(file);
+        }
+      }
+      attachmentsRef.current = [];
+      borrowedAttachmentIdsRef.current.clear();
     };
   }, []);
 
   useEffect(() => {
     if (harnessSupportsAttachments(harness)) return;
-    setAttachments((prev) => {
-      if (prev.length === 0) return prev;
-      for (const file of prev) revokeAttachment(file);
-      syncHasValue(ref.current?.value ?? "", []);
-      return [];
-    });
+    const previous = attachmentsRef.current;
+    if (previous.length === 0) return;
+    for (const file of previous) {
+      if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+        revokeAttachment(file);
+      }
+    }
+    attachmentsRef.current = [];
+    setAttachments([]);
+    syncHasValue(ref.current?.value ?? "", []);
   }, [harness, syncHasValue]);
+
+  const restoreDraft = useCallback(
+    (
+      text: string,
+      nextAttachments: Attachment[],
+      borrowedIds: ReadonlySet<string> = borrowedAttachmentIdsRef.current,
+    ) => {
+      setDraft(text);
+      onDraftChange?.(text);
+      if (ref.current) {
+        ref.current.value = text;
+        ref.current.style.height = "auto";
+        ref.current.style.height = `${Math.min(ref.current.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+      }
+
+      const nextIds = new Set(nextAttachments.map((file) => file.id));
+      for (const file of attachmentsRef.current) {
+        if (
+          nextIds.has(file.id) ||
+          borrowedAttachmentIdsRef.current.delete(file.id)
+        ) {
+          continue;
+        }
+        revokeAttachment(file);
+      }
+      borrowedAttachmentIdsRef.current = new Set(
+        nextAttachments
+          .filter((file) => borrowedIds.has(file.id))
+          .map((file) => file.id),
+      );
+      attachmentsRef.current = nextAttachments;
+      setAttachments(nextAttachments);
+      syncHasValue(text, nextAttachments);
+      ref.current?.focus();
+    },
+    [onDraftChange, syncHasValue],
+  );
+
+  const exitEditMode = useCallback(() => {
+    draftRevisionRef.current += 1;
+    pasteGenerationRef.current += 1;
+    if (ref.current) {
+      ref.current.value = "";
+      ref.current.style.height = "auto";
+    }
+    setDraft("");
+    onDraftChange?.("");
+    const previous = attachmentsRef.current;
+    for (const file of previous) {
+      if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+        revokeAttachment(file);
+      }
+    }
+    attachmentsRef.current = [];
+    setAttachments([]);
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+    setPlusOpen(false);
+    setSlash(null);
+    setMention(null);
+    syncHasValue("", []);
+    ref.current?.focus();
+  }, [onDraftChange, onEditingLastTurnChange, syncHasValue]);
+
+  const recallLastTurn = useCallback(() => {
+    if (!editLastTurnSupported || !lastTurnRecall) return;
+    if (resendEdited) {
+      exitEditMode();
+      return;
+    }
+    restoreDraft(
+      lastTurnRecall.text,
+      lastTurnRecall.attachments,
+      new Set(lastTurnRecall.attachments.map((file) => file.id)),
+    );
+    setResendEdited(true);
+    onEditingLastTurnChange?.(true);
+  }, [
+    editLastTurnSupported,
+    exitEditMode,
+    lastTurnRecall,
+    onEditingLastTurnChange,
+    resendEdited,
+    restoreDraft,
+  ]);
+
+  useEffect(() => {
+    draftRevisionRef.current += 1;
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+  }, [sessionId, onEditingLastTurnChange]);
+
+  useEffect(() => {
+    if (editLastTurnSupported) return;
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+  }, [editLastTurnSupported, onEditingLastTurnChange]);
+
+  useEffect(() => {
+    if (!editLastTurnSupported || !onRecallLastTurnReady) return;
+    onRecallLastTurnReady(recallLastTurn);
+  }, [editLastTurnSupported, onRecallLastTurnReady, recallLastTurn]);
 
   useEffect(() => {
     const refresh = () => setRunnerEnabled(loadComposerRunner());
@@ -862,6 +1017,9 @@ export const Composer = memo(function Composer({
       return;
     }
 
+    pasteGenerationRef.current++;
+    setPasteError(null);
+
     const command = consumePlanCommand(
       folderCommand.matched && sessionFolderSelected
         ? folderCommand.text
@@ -870,15 +1028,33 @@ export const Composer = memo(function Composer({
     const text = command.text;
     const files = attachments;
     if (!text && files.length === 0 && !noteCard && !handoffCard) return;
+    const resendDraftRevision = draftRevisionRef.current;
+    const resendBorrowedAttachmentIds = new Set(
+      borrowedAttachmentIdsRef.current,
+    );
     onSubmit(text, files, {
       intent: planSelected || command.planning ? "plan" : "default",
+      ...(resendEdited
+        ? {
+            resendEdited: true,
+            onResendRejected: ({ providerRewound }: EditedResendRejection) => {
+              if (draftRevisionRef.current !== resendDraftRevision) return;
+              restoreDraft(text, files, resendBorrowedAttachmentIds);
+              setResendEdited(!providerRewound);
+              onEditingLastTurnChange?.(!providerRewound);
+            },
+          }
+        : {}),
     });
     if (!ref.current) return;
     ref.current.value = "";
     ref.current.style.height = "auto";
     setDraft("");
     onDraftChange?.("");
+    borrowedAttachmentIdsRef.current.clear();
     setAttachments([]);
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
     setPlanSelected(false);
     setSessionFolderSelected(false);
     setSessionFolderOpen(false);
@@ -893,6 +1069,18 @@ export const Composer = memo(function Composer({
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isImeComposition(e.nativeEvent)) return;
     if (creatingSkill) return;
+
+    if (
+      e.key === "ArrowUp" &&
+      editLastTurnSupported &&
+      navigationEmpty &&
+      e.currentTarget.selectionStart === 0 &&
+      e.currentTarget.selectionEnd === 0
+    ) {
+      e.preventDefault();
+      recallLastTurn();
+      return;
+    }
 
     if (
       e.key === " " &&
@@ -1006,11 +1194,70 @@ export const Composer = memo(function Composer({
   };
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    setPasteError(null);
+    const messageFiles = messageFilesFromClipboard(e.clipboardData);
+    if (messageFiles) {
+      e.preventDefault();
+      const generation = pasteGenerationRef.current;
+      const captured = captureDraft(e.currentTarget);
+      const text = e.clipboardData.getData("text/plain");
+      if (captured) insertRestoredText(captured, text);
+      if (!attachmentsSupported) return;
+      rememberAttachmentRead(
+        attachmentsFromFiles(messageFiles).then((pasted) => {
+          if (pasteGenerationRef.current !== generation) {
+            pasted.forEach(revokeAttachment);
+            return;
+          }
+          addAttachments(pasted);
+        }),
+      );
+      return;
+    }
     const files = filesFromClipboard(e.clipboardData);
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      if (!attachmentsSupported) return;
+      const text = e.clipboardData.getData("text/plain");
+      if (text && !isFileReferenceText(text)) return;
+      e.preventDefault();
+      const generation = pasteGenerationRef.current;
+      const captured = isFileReferenceText(text)
+        ? captureDraft(e.currentTarget)
+        : null;
+      rememberAttachmentRead(
+        nativeClipboardAttachments(text)
+          .then(({ files: pasted, warning }) => {
+            if (pasteGenerationRef.current !== generation) {
+              pasted.forEach(revokeAttachment);
+              return;
+            }
+            if (pasted.length) {
+              if (captured) dropPastedText(captured, text);
+              addAttachments(pasted);
+            } else if (captured) insertRestoredText(captured, text);
+            if (warning) setPasteError(warning);
+          })
+          .catch((reason: unknown) => {
+            if (pasteGenerationRef.current !== generation) return;
+            setPasteError(
+              reason instanceof Error ? reason.message : String(reason),
+            );
+          }),
+      );
+      return;
+    }
     e.preventDefault();
     if (!attachmentsSupported) return;
-    void attachmentsFromFiles(files).then(addAttachments);
+    const generation = pasteGenerationRef.current;
+    rememberAttachmentRead(
+      attachmentsFromFiles(files).then((pasted) => {
+        if (pasteGenerationRef.current !== generation) {
+          pasted.forEach(revokeAttachment);
+          return;
+        }
+        addAttachments(pasted);
+      }),
+    );
   };
 
   const attachFromPicker = () => {
@@ -1159,10 +1406,17 @@ export const Composer = memo(function Composer({
         <div
           ref={boxRef}
           data-composer-box
-          className={`relative z-10 rounded-xl border bg-background-base shadow-lg ${
+          data-composer-editing={resendEdited ? "" : undefined}
+          className={`relative z-10 border bg-background-base shadow-lg ${
+            resendEdited
+              ? "edit-last-turn-composer rounded-xl"
+              : "rounded-xl border-content/12 has-focus:border-content/25"
+          } ${
             fileDrag
               ? "border-accent/60"
-              : "border-content/12 has-focus:border-content/25"
+              : resendEdited
+                ? ""
+                : "border-content/12 has-focus:border-content/25"
           }`}
         >
           {fileDrag ? (
@@ -1212,6 +1466,12 @@ export const Composer = memo(function Composer({
                   onRemove={() => removeAttachment(file.id)}
                 />
               ))}
+            </div>
+          ) : null}
+
+          {pasteError ? (
+            <div className="px-3.5 pt-2 text-xs text-amber-500 dark:text-amber-400">
+              {pasteError}
             </div>
           ) : null}
 
@@ -1412,6 +1672,19 @@ export const Composer = memo(function Composer({
               </div>
             </div>
 
+            {resendEdited ? (
+              <button
+                type="button"
+                title="Stop editing last message"
+                aria-label="Stop editing last message"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={exitEditMode}
+                className="edit-last-turn-button flex h-6.5 shrink-0 items-center gap-1 rounded-md border border-current/20 px-2 text-[11px] font-medium transition-[background-color,color,border-color] hover:border-current/35 hover:bg-content/15 hover:text-content focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              >
+                <X className="size-3" strokeWidth={1.8} />
+                <span>Cancel edit</span>
+              </button>
+            ) : null}
             <div className="flex shrink-0 items-center gap-1">
               <ComposerAction
                 busy={busy}

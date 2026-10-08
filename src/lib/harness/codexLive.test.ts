@@ -44,6 +44,10 @@ function notify(method: string, params: unknown) {
   onLine!(JSON.stringify({ method, params }));
 }
 
+function withoutTurnIdentity(events: HarnessEvent[]) {
+  return events.filter((event) => event.type !== "turn.started");
+}
+
 const waitFor = async (pred: () => boolean, label: string) => {
   for (let i = 0; i < 200; i++) {
     if (pred()) return;
@@ -136,7 +140,9 @@ describe("codex live turn sequence", () => {
     notify("warning", { threadId: "thr_1", message: fallback });
     await Promise.resolve();
     expect(settled).not.toHaveBeenCalled();
-    expect(events).toEqual(beforeRetries);
+    expect(withoutTurnIdentity(events)).toEqual(
+      withoutTurnIdentity(beforeRetries),
+    );
     expect(debug).toHaveBeenCalledTimes(6);
     expect(debug).toHaveBeenCalledWith(expect.any(String), fallback);
 
@@ -371,7 +377,7 @@ describe("codex live turn sequence", () => {
         willRetry: false,
       });
       await Promise.resolve();
-      expect(events).toEqual(before);
+      expect(withoutTurnIdentity(events)).toEqual(withoutTurnIdentity(before));
       expect(settled).not.toHaveBeenCalled();
       respondCodexApproval("codex-live", approval.requestId, decision);
       await waitFor(

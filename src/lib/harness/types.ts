@@ -12,6 +12,7 @@ export type HarnessEvent =
   | { type: "session.ended"; code?: number | null }
   | { type: "session.error"; message: string }
   | { type: "session.providerBound"; providerSessionId: string }
+  | { type: "turn.started"; providerTurnId: string }
   | {
       type: "session.configChanged";
       model?: string;
@@ -112,9 +113,24 @@ export type HarnessSessionInput = {
 export type SendTurnInput = HarnessSessionInput & {
   text: string;
   attachments?: Attachment[];
+  /** Called as soon as the provider acknowledges receipt of the prompt. */
+  onAccepted?: () => void;
 };
 
 export type CompactContextInput = HarnessSessionInput;
+
+export type RewindLastTurnInput = CompactContextInput & {
+  /** Provider turn boundary for the visible user message, when known. */
+  providerTurnId?: string;
+  /** When set, Cursor may resend via session/edit_prompt in one RPC. */
+  text?: string;
+  attachments?: Attachment[];
+};
+
+export type RewindLastTurnResult = {
+  /** True when the harness already ran the replacement turn. */
+  submitted: boolean;
+};
 
 export type SteerTurnInput = {
   sessionId: string;

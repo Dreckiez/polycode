@@ -63,6 +63,11 @@ export type TaskListMeta = {
 /** One-shot behavior selected in the composer for the next harness turn. */
 export type TurnIntent = "default" | "plan" | "build";
 
+export type EditedResendRejection = {
+  /** The provider removed the old turn, so retry as a normal unsent prompt. */
+  providerRewound: boolean;
+};
+
 export type PlanStatus = "streaming" | "ready" | "building" | "built";
 
 export type PlanBlockMeta = {
@@ -140,6 +145,8 @@ export type Attachment = {
   data?: string;
   /** Object URL for in-session thumbnails. Not persisted. */
   previewUrl?: string;
+  /** True for an active in-session attachment backed by a local path. */
+  copyFromPath?: boolean;
 };
 
 export type QueuedMessage = {
@@ -172,6 +179,16 @@ export type Block = {
   durationMs?: number;
   /** Stable model label for this turn. Present on newly created user blocks. */
   turnModel?: TurnModel;
+  /** Provider turn boundary used to replace this user message, when known. */
+  providerTurnId?: string;
+  /** User turn saved to the session but not submitted to the harness yet. */
+  draft?: boolean;
+  /** This user turn activated MonoCode app access for its thread. */
+  monocode?: boolean;
+  /** Hidden user block used for internal prompt orchestration. */
+  internal?: boolean;
+  /** Exact CI repair instructions and evidence supplied with this user turn. */
+  ciContext?: string;
   tool?: {
     callId?: string;
     title?: string;

@@ -10,7 +10,11 @@ import {
   unwatchChild,
   watchChild,
 } from "./child";
-import { OpenCodeClient, OpenCodeHttpError } from "./opencodeClient";
+import {
+  OpenCodeClient,
+  OpenCodeHttpError,
+  type OpenCodeMessage,
+} from "./opencodeClient";
 import {
   appendOpenCodeAssistantTextDelta,
   asRecord,
@@ -47,6 +51,8 @@ import type {
   CompactContextInput,
   HarnessEvent,
   HarnessSessionInput,
+  RewindLastTurnInput,
+  RewindLastTurnResult,
   SendTurnInput,
   SteerTurnInput,
 } from "./types";
@@ -173,6 +179,44 @@ export async function compactOpenCodeContext(
       }
     });
   await live.turns;
+}
+
+export async function rewindOpenCodeLastTurn(
+  input: RewindLastTurnInput,
+): Promise<RewindLastTurnResult> {
+  let live: Live;
+  try {
+    live = await ensureLive(input);
+  } catch (error) {
+    cancelledThreads.delete(input.sessionId);
+    throw error;
+  }
+  if (cancelledThreads.delete(input.sessionId)) return { submitted: false };
+
+  live.onEvent = input.onEvent;
+  await live.turns;
+  if (live.activeTurn) {
+    throw new Error("Stop the current turn before editing the last message");
+  }
+
+  const messageID = await latestOpenCodeUserMessageId(live);
+  await live.client.revertSession(live.openCodeSessionId, messageID);
+  return { submitted: false };
+}
+
+async function latestOpenCodeUserMessageId(live: Live): Promise<string> {
+  const messages = await live.client.getMessages(live.openCodeSessionId);
+  const candidates = messages.flatMap((message: OpenCodeMessage) => {
+    const info = asRecord(message.info);
+    if (stringField(info, "role") !== "user") return [];
+    const id = stringField(info, "id") ?? stringField(asRecord(message), "id");
+    return id ? [id] : [];
+  });
+  const messageID = candidates[candidates.length - 1];
+  if (!messageID) {
+    throw new Error("OpenCode did not expose a user message id to edit");
+  }
+  return messageID;
 }
 
 export async function steerOpenCodeTurn(input: SteerTurnInput): Promise<void> {
@@ -502,6 +546,7 @@ async function runTurn(live: Live, input: SendTurnInput): Promise<void> {
       variant: input.modelSettings?.variant,
       parts,
     });
+    input.onAccepted?.();
     settlePendingTurn(live);
     await turnPromise;
   } catch (error) {

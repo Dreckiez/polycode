@@ -70,6 +70,9 @@ type TranscriptTurnProps = {
   onSaveNote?: (text: string) => void;
   onRegenerate?: (turn: Block[]) => void;
   onContinueWithContext?: () => void;
+  onEditLastTurn?: () => void;
+  editingLastTurn?: boolean;
+  editableUserBlockId?: string;
   sessionId: string;
 };
 
@@ -339,6 +342,9 @@ const TranscriptTurn = memo(function TranscriptTurn({
   onSaveNote,
   onRegenerate,
   onContinueWithContext,
+  onEditLastTurn,
+  editingLastTurn = false,
+  editableUserBlockId,
   sessionId,
 }: TranscriptTurnProps) {
   const userBlock = useMemo(() => turnUserBlock(turn), [turn]);
@@ -461,6 +467,19 @@ const TranscriptTurn = memo(function TranscriptTurn({
         sessionId={sessionId}
         onRetry={onRegenerate ? handleRegenerate : undefined}
         onContinueWithContext={onContinueWithContext}
+        onEditLastTurn={
+          onEditLastTurn &&
+          item.block.role === "user" &&
+          item.block.id === editableUserBlockId &&
+          !item.block.draft
+            ? onEditLastTurn
+            : undefined
+        }
+        editing={
+          editingLastTurn &&
+          item.block.role === "user" &&
+          item.block.id === editableUserBlockId
+        }
       />
     );
 

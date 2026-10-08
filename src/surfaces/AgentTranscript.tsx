@@ -28,6 +28,7 @@ import {
 } from "./transcriptShared";
 import { TranscriptTurn } from "./TranscriptTurn";
 import { TranscriptSelectionMenu } from "./TranscriptSelectionMenu";
+import { lastUserTurnBlock } from "../lib/editLastTurn";
 
 const INITIAL_TURNS = 20;
 const TURN_PAGE_SIZE = 20;
@@ -52,6 +53,8 @@ type Props = {
   onHandoff?: (harness: HarnessId, turn: Block[], model: string) => void;
   onRegenerate?: (turn: Block[]) => void;
   onContinueWithContext?: () => void;
+  onEditLastTurn?: () => void;
+  editingLastTurn?: boolean;
   onJumpToBottomChange?: (show: boolean) => void;
   onJumpToBottomReady?: (jump: () => void) => void;
   /** Passes a function that renders the turn that holds a block. The render completes before the function returns. */
@@ -90,12 +93,18 @@ function AgentTranscriptComponent({
   onHandoff,
   onRegenerate,
   onContinueWithContext,
+  onEditLastTurn,
+  editingLastTurn = false,
   onJumpToBottomChange,
   onJumpToBottomReady,
   onRevealReady,
   latestTurnAccessory,
   visible = true,
 }: Props) {
+  const editableUserBlockId = useMemo(
+    () => lastUserTurnBlock(blocks)?.id,
+    [blocks],
+  );
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -382,6 +391,9 @@ function AgentTranscriptComponent({
               onSaveNote={onSaveNote}
               onRegenerate={onRegenerate}
               onContinueWithContext={onContinueWithContext}
+              onEditLastTurn={isLastTurn ? onEditLastTurn : undefined}
+              editingLastTurn={editingLastTurn}
+              editableUserBlockId={editableUserBlockId}
               sessionId={sessionId}
             />
           );
