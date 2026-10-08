@@ -182,7 +182,7 @@ describe("parseCodexRateLimits", () => {
 });
 
 describe("rateLimitWindowTooltip", () => {
-  it("includes used percent and remaining time", () => {
+  it("includes remaining percent and remaining time", () => {
     const now = Date.parse("2026-08-27T08:00:00Z");
     expect(
       rateLimitWindowTooltip(
@@ -193,7 +193,7 @@ describe("rateLimitWindowTooltip", () => {
         },
         now,
       ),
-    ).toBe("42% used · Resets in 2h 33m");
+    ).toBe("58% remaining · Resets in 2h 33m");
   });
 });
 

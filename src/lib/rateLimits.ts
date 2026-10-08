@@ -258,10 +258,9 @@ export function rateLimitWindowTooltip(
   window: RateLimitWindow,
   now = Date.now(),
 ): string {
-  const percentLabel =
-    window.remainingPercent != null
-      ? `${formatUsagePercent(window.remainingPercent)} remaining`
-      : `${formatUsagePercent(window.usedPercent)} used`;
+  const rem =
+    window.remainingPercent ?? clampUsedPercent(100 - window.usedPercent);
+  const percentLabel = `${formatUsagePercent(rem)} remaining`;
   if (window.resetsAt == null) {
     return `${percentLabel} · ${formatWindowLabel(window.windowMinutes)} window`;
   }

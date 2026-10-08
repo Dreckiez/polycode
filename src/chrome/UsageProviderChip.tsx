@@ -77,21 +77,15 @@ export function UsageProviderChip({
     windows.length === 0 &&
     (needsProviderLogin(limits) || reconnectState !== "idle"),
   );
-  const showsRemaining = windows.some(
-    (entry) => entry.window.remainingPercent != null,
-  );
   const primaryWindow = limits.session ?? windows[0]?.window;
   const tightest = windows.reduce<RateLimitWindow | null>((best, entry) => {
     if (!best) return entry.window;
-    if (showsRemaining) {
-      const bestRem =
-        best.remainingPercent ?? clampUsedPercent(100 - best.usedPercent);
-      const entryRem =
-        entry.window.remainingPercent ??
-        clampUsedPercent(100 - entry.window.usedPercent);
-      return entryRem < bestRem ? entry.window : best;
-    }
-    return entry.window.usedPercent > best.usedPercent ? entry.window : best;
+    const bestRem =
+      best.remainingPercent ?? clampUsedPercent(100 - best.usedPercent);
+    const entryRem =
+      entry.window.remainingPercent ??
+      clampUsedPercent(100 - entry.window.usedPercent);
+    return entryRem < bestRem ? entry.window : best;
   }, null);
   const tooltip = windows
     .map((entry) => rateLimitWindowTooltip(entry.window, now))
@@ -201,20 +195,17 @@ export function UsageProviderChip({
             {tightest || primaryWindow ? (
               <MiniBar
                 usedPct={
-                  showsRemaining
-                    ? (primaryWindow?.remainingPercent ??
-                      clampUsedPercent(100 - (primaryWindow?.usedPercent ?? 0)))
-                    : (tightest?.usedPercent ?? 0)
+                  primaryWindow?.remainingPercent ??
+                  clampUsedPercent(100 - (primaryWindow?.usedPercent ?? 0))
                 }
-                mode={showsRemaining ? "remaining" : "used"}
+                mode="remaining"
               />
             ) : null}
             <span className="flex min-w-0 items-center gap-1 tabular-nums">
               {windows.map((entry, index) => {
                 const displayPct =
-                  entry.window.remainingPercent != null
-                    ? entry.window.remainingPercent
-                    : entry.window.usedPercent;
+                  entry.window.remainingPercent ??
+                  clampUsedPercent(100 - entry.window.usedPercent);
                 return (
                   <span
                     key={entry.key}

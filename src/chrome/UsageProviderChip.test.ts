@@ -141,9 +141,9 @@ describe("UsageProviderChip", () => {
     expect(dialog?.querySelectorAll('[role="progressbar"]')).toHaveLength(2);
     expect(
       dialog
-        ?.querySelector('[aria-label="Weekly limit used"]')
+        ?.querySelector('[aria-label="Weekly limit remaining"]')
         ?.getAttribute("aria-valuenow"),
-    ).toBe("81");
+    ).toBe("19");
   });
 
   it("switches between named accounts from the usage popover", async () => {

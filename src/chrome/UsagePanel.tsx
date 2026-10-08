@@ -19,7 +19,6 @@ import {
   type ProviderSignInState,
 } from "./ProviderSignInPanel";
 import {
-  barClass,
   remainingBarClass,
   type ResetActionState,
   type UsageWindowEntry,
@@ -385,10 +384,9 @@ function UsageWindowCard({
   window: RateLimitWindow;
   now: number;
 }) {
-  const hasRemaining = window.remainingPercent != null;
-  const pct = clampUsedPercent(
-    hasRemaining ? window.remainingPercent! : window.usedPercent,
-  );
+  const remaining =
+    window.remainingPercent ?? clampUsedPercent(100 - window.usedPercent);
+  const pct = clampUsedPercent(remaining);
   const title =
     kind === "session"
       ? "5-hour limit"
@@ -402,31 +400,25 @@ function UsageWindowCard({
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-[11px] font-medium text-content/65">{title}</h3>
         <span className="shrink-0 text-[11px] font-medium tabular-nums">
-          {hasRemaining
-            ? `${formatUsagePercent(window.remainingPercent!)} remaining`
-            : `${formatUsagePercent(window.usedPercent)} used`}
+          {formatUsagePercent(remaining)} remaining
         </span>
       </div>
       <div
         className="mt-2 h-1.5 overflow-hidden rounded-full bg-content/10"
         role="progressbar"
-        aria-label={`${title} ${hasRemaining ? "remaining" : "used"}`}
+        aria-label={`${title} remaining`}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(pct)}
       >
         <span
-          className={`block h-full rounded-full ${
-            hasRemaining ? remainingBarClass(pct) : barClass(pct)
-          }`}
+          className={`block h-full rounded-full ${remainingBarClass(pct)}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] leading-4 text-content/40">
         <span className="tabular-nums">
-          {hasRemaining
-            ? `${formatUsagePercent(window.usedPercent)} used`
-            : `${Math.max(0, Math.round(100 - pct))}% remaining`}
+          {formatUsagePercent(window.usedPercent)} used
         </span>
         <span
           className="truncate text-right tabular-nums"
