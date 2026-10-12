@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { joinStreamText } from "./harness/streamText";
 
 /**
  * Live streaming-text store.
@@ -36,10 +37,12 @@ export function appendLiveText(entry: LiveTextEntry, delta: string): void {
   useChatStore.setState((state) => {
     const session = state.liveText[entry.sessionId] ?? {};
     const previous = session[entry.blockId] ?? "";
+    const nextText = joinStreamText(previous, delta);
+    if (nextText === previous) return state;
     return {
       liveText: {
         ...state.liveText,
-        [entry.sessionId]: { ...session, [entry.blockId]: previous + delta },
+        [entry.sessionId]: { ...session, [entry.blockId]: nextText },
       },
     };
   });
