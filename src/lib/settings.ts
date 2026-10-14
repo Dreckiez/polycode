@@ -88,6 +88,8 @@ export function saveSettingsSection(id: SettingsSectionId) {
 }
 
 const COMPOSER_RUNNER_KEY = "polycode.composerRunner";
+const PROJECT_PETS_KEY = "polycode.projectPetsEnabled";
+const PROJECT_PET_SCALE_KEY = "polycode.projectPetScale";
 
 const FOLLOW_UP_BEHAVIOR_KEY = "polycode.followUpBehavior";
 
@@ -139,6 +141,55 @@ export function saveComposerRunner(value: boolean) {
   window.dispatchEvent(
     new CustomEvent<boolean>(COMPOSER_RUNNER_CHANGE_EVENT, { detail: value }),
   );
+}
+
+export const PROJECT_PETS_DEFAULT = true;
+export const PROJECT_PETS_CHANGE_EVENT = "polycode:project-pets-enabled-change";
+export const PROJECT_PET_SCALE_DEFAULT = 70;
+export const PROJECT_PET_SCALE_CHANGE_EVENT = "polycode:project-pet-scale-change";
+
+export function loadProjectPetsEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(PROJECT_PETS_KEY);
+    if (raw == null) return PROJECT_PETS_DEFAULT;
+    return raw === "1" || raw === "true";
+  } catch {
+    return PROJECT_PETS_DEFAULT;
+  }
+}
+
+export function saveProjectPetsEnabled(value: boolean): void {
+  try {
+    localStorage.setItem(PROJECT_PETS_KEY, value ? "1" : "0");
+  } catch {
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<boolean>(PROJECT_PETS_CHANGE_EVENT, { detail: value }));
+  }
+}
+
+export function loadProjectPetScale(): number {
+  try {
+    const value = Number(localStorage.getItem(PROJECT_PET_SCALE_KEY));
+    return Number.isFinite(value) && value >= 50 && value <= 125
+      ? Math.round(value)
+      : PROJECT_PET_SCALE_DEFAULT;
+  } catch {
+    return PROJECT_PET_SCALE_DEFAULT;
+  }
+}
+
+export function saveProjectPetScale(value: number): void {
+  const next = Math.max(50, Math.min(125, Math.round(value)));
+  try {
+    localStorage.setItem(PROJECT_PET_SCALE_KEY, String(next));
+  } catch {
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<number>(PROJECT_PET_SCALE_CHANGE_EVENT, { detail: next }));
+  }
 }
 
 const NOTES_ENABLED_KEY = "polycode.notesEnabled";

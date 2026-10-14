@@ -66,7 +66,7 @@ export function NoteMiniCard({ card, onDismiss, embedded = false }: Props) {
               />
             ) : (
               <ProjectMascot
-                project={project}
+                project={key ?? project}
                 color={mascotColor}
                 name={mascotName}
                 className="size-3 shrink-0"

@@ -35,7 +35,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Body of the project rail while settings are open. */
+/** Sidebar body while settings are open. */
 export function SettingsNav({ section, onSelect, onClose }: Props) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
 

@@ -29,6 +29,7 @@ import {
 import { Popover } from "./Popover";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
 import { ProjectMascot } from "./ProjectMascot";
+import { ProjectPetsMenu } from "./ProjectPets";
 import { RemoveProjectDialog } from "./RemoveProjectDialog";
 
 export function SidebarProjectPicker({
@@ -49,6 +50,7 @@ export function SidebarProjectPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [petsProject, setPetsProject] = useState<string | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<{
     name: string;
     path: string;
@@ -91,6 +93,7 @@ export function SidebarProjectPicker({
     setOpen(false);
     setQuery("");
     setActive(0);
+    setPetsProject(null);
   };
 
   const openPicker = () => {
@@ -166,7 +169,7 @@ export function SidebarProjectPicker({
             />
           ) : inProject ? (
             <ProjectMascot
-              project={seed}
+              project={key}
               color={color}
               name={resolveTabGroupMascot(key, groupMascots)}
               className="size-3.5 shrink-0"
@@ -239,18 +242,19 @@ export function SidebarProjectPicker({
                     <div
                       key={item.path}
                       onMouseEnter={() => setActive(index)}
-                      className={`group relative flex h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left ${
+                      className={`group relative flex min-h-9 w-full flex-col rounded-lg px-2 text-left ${
                         active === index
                           ? "bg-content/10 text-content"
                           : "text-content/75 hover:bg-content/5 hover:text-content"
                       }`}
                     >
-                      <button
-                        type="button"
-                        title={item.path}
-                        onClick={() => pickProject(item.path)}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-1 text-left"
-                      >
+                      <div className="flex h-9 w-full min-w-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          title={item.path}
+                          onClick={() => pickProject(item.path)}
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-1 text-left"
+                        >
                         <span className="grid size-4 shrink-0 place-items-center">
                           {current ? (
                             <Check className="size-3.5" strokeWidth={2} />
@@ -262,7 +266,7 @@ export function SidebarProjectPicker({
                             />
                           ) : (
                             <ProjectMascot
-                              project={itemSeed}
+                              project={itemKey}
                               color={itemColor}
                               name={resolveTabGroupMascot(itemKey, groupMascots)}
                               className="size-3.5"
@@ -275,6 +279,21 @@ export function SidebarProjectPicker({
                         <span className="max-w-36 shrink truncate font-mono text-[11px] text-content/40">
                           {prettyParent(item.path)}
                         </span>
+                        </button>
+                      <button
+                        type="button"
+                        title={`Manage pets for ${itemLabel}`}
+                        aria-label={`Manage pets for ${itemLabel}`}
+                        aria-expanded={petsProject === item.path}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPetsProject((current) =>
+                            current === item.path ? null : item.path,
+                          );
+                        }}
+                        className="flex h-6 shrink-0 cursor-pointer items-center rounded px-1.5 text-[11px] font-medium text-content/55 hover:bg-content/10 hover:text-content"
+                      >
+                        Pets
                       </button>
                       {onRemoveProject ? (
                         <button
@@ -292,6 +311,12 @@ export function SidebarProjectPicker({
                         >
                           <Trash2 className="size-3.5" strokeWidth={1.75} />
                         </button>
+                      ) : null}
+                      </div>
+                      {petsProject === item.path ? (
+                        <div className="w-full px-1 pb-1">
+                          <ProjectPetsMenu project={itemKey} />
+                        </div>
                       ) : null}
                     </div>
                   );

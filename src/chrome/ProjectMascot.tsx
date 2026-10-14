@@ -1,4 +1,4 @@
-import { MASCOT_GRID, projectMascot } from "../lib/projectMascots";
+import { ProjectPetIcon } from "./ProjectPets";
 
 type Props = {
   project: string;
@@ -11,32 +11,13 @@ type Props = {
   active?: boolean;
 };
 
-/** Pixel mascot standing in for the project's color dot. */
+/** @deprecated Kept as a small compatibility wrapper while project marks become pets. */
 export function ProjectMascot({
   project,
-  color,
-  name,
+  color: _color,
+  name: _name,
   className = "size-3 shrink-0",
-  active = false,
+  active: _active = false,
 }: Props) {
-  const mascot = projectMascot(project, name);
-  return (
-    <svg
-      aria-hidden
-      viewBox={`0 0 ${MASCOT_GRID} ${MASCOT_GRID}`}
-      shapeRendering="crispEdges"
-      className={`${className} ${active ? "mascot-active" : ""}`}
-      fill="currentColor"
-      style={color ? { color } : undefined}
-    >
-      {active ? (
-        <>
-          <path className="mascot-rest" d={mascot.restPath} />
-          <path className="mascot-talk" d={mascot.talkPath} />
-        </>
-      ) : (
-        <path d={mascot.restPath} />
-      )}
-    </svg>
-  );
+  return <ProjectPetIcon project={project} className={className} />;
 }

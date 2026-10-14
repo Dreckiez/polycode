@@ -43,7 +43,7 @@ export function NoteProjectMark({
         />
       ) : (
         <ProjectMascot
-          project={project}
+          project={key}
           color={mascotColor}
           name={mascotName}
           className="size-3 shrink-0"

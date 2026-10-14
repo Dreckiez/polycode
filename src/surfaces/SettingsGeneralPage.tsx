@@ -10,13 +10,15 @@ import {
 } from "../lib/appearance";
 import {
   loadClaudeHooks,
-  loadComposerRunner,
+  loadProjectPetsEnabled,
+  loadProjectPetScale,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   saveClaudeHooks,
-  saveComposerRunner,
+  saveProjectPetsEnabled,
+  saveProjectPetScale,
   saveDiffViewer,
   saveFollowUpBehavior,
   saveLiveAgentsEnabled,
@@ -44,6 +46,7 @@ import { IS_MAC } from "../lib/platform";
 import {
   Heading,
   Row,
+  Slider,
   SecondaryButton,
   Segmented,
   Toggle,
@@ -61,7 +64,8 @@ export function GeneralPage({
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
-  const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
+  const [projectPets, setProjectPets] = useState(loadProjectPetsEnabled);
+  const [projectPetScale, setProjectPetScale] = useState(loadProjectPetScale);
   const [notesEnabled, setNotesEnabled] = useState(loadNotesEnabled);
   const [liveAgentsEnabled, setLiveAgentsEnabled] = useState(
     loadLiveAgentsEnabled,
@@ -116,9 +120,14 @@ export function GeneralPage({
     setFollowUpBehavior(next);
   };
 
-  const onComposerRunner = (next: boolean) => {
-    saveComposerRunner(next);
-    setComposerRunner(next);
+  const onProjectPets = (next: boolean) => {
+    saveProjectPetsEnabled(next);
+    setProjectPets(next);
+  };
+
+  const onProjectPetScale = (next: number) => {
+    saveProjectPetScale(next);
+    setProjectPetScale(next);
   };
 
   const onNotesEnabled = (next: boolean) => {
@@ -203,24 +212,39 @@ export function GeneralPage({
         />
       </Row>
       <Row
-        label="Composer mascot"
-        description="When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin."
+        label="Project pets"
+        description="Show the active project's pets above the composer. When off, PolyCode unmounts them and stops every pet timer and animation loop."
       >
         <Toggle
-          label="Composer mascot"
-          on={composerRunner}
-          onChange={onComposerRunner}
+          label="Project pets"
+          on={projectPets}
+          onChange={onProjectPets}
+        />
+      </Row>
+      <Row
+        label="Pet size"
+        description="Controls the size of pets above the composer."
+      >
+        <Slider
+          label="Pet size"
+          value={projectPetScale}
+          display={`${projectPetScale}%`}
+          min={50}
+          max={125}
+          step={5}
+          disabled={!projectPets}
+          onChange={onProjectPetScale}
         />
       </Row>
       <Row
         label="Notes"
-        description="A global markdown notebook on the project rail. Save a finished turn from the transcript, then mention it later with @note or add it to chat. Turn this off to hide Notes from the UI."
+        description="A global markdown notebook in the sidebar. Save a finished turn from the transcript, then mention it later with @note or add it to chat. Turn this off to hide Notes from the UI."
       >
         <Toggle label="Notes" on={notesEnabled} onChange={onNotesEnabled} />
       </Row>
       <Row
         label="Working agents"
-        description="When two or more chats are in flight, a card on the project rail lists them so you can jump across projects. Finished turns stay until you open that session. Turn this off to hide the card."
+        description="When two or more chats are in flight, a sidebar card lists them so you can jump across projects. Finished turns stay until you open that session. Turn this off to hide the card."
       >
         <Toggle
           label="Working agents"

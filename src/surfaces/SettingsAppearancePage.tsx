@@ -401,7 +401,7 @@ export function AppearancePage({ appearance }: { appearance: AppearanceSettings 
         description={
           glassDisabled
             ? "Light mode always uses an opaque window. Your dark-mode value is preserved."
-            : "How much of the desktop shows through the sidebar and the project rail."
+            : "How much of the desktop shows through the sidebar."
         }
       >
         <Slider

@@ -88,7 +88,7 @@ import {
   type SlashToken,
 } from "../lib/skills";
 import { AccessPicker } from "./AccessPicker";
-import { ComposerRunner } from "./ComposerRunner";
+import { ProjectPetBar } from "./ProjectPetBar";
 import { ContextMeter } from "./ContextMeter";
 import { AttachmentChip } from "./AttachmentChip";
 import { BranchPicker } from "./BranchPicker";
@@ -110,8 +110,10 @@ import { projectKey } from "../lib/paths";
 import { consumeQuoteRequest, type QuoteRequest } from "../lib/quoteDraft";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import {
-  COMPOSER_RUNNER_CHANGE_EVENT,
-  loadComposerRunner,
+  PROJECT_PETS_CHANGE_EVENT,
+  PROJECT_PET_SCALE_CHANGE_EVENT,
+  loadProjectPetsEnabled,
+  loadProjectPetScale,
   loadNotesEnabled,
   subscribeNotesEnabled,
 } from "../lib/settings";
@@ -322,10 +324,8 @@ export const Composer = memo(function Composer({
   const [notes, setNotes] = useState<Note[]>(() => peekNotes() ?? []);
   const [mention, setMention] = useState<MentionToken | null>(null);
   const [mentionActive, setMentionActive] = useState(0);
-  const [runnerEnabled, setRunnerEnabled] = useState(loadComposerRunner);
-  const [runnerLive, setRunnerLive] = useState(
-    () => busy && loadComposerRunner(),
-  );
+  const [petsEnabled, setPetsEnabled] = useState(loadProjectPetsEnabled);
+  const [petScale, setPetScale] = useState(loadProjectPetScale);
   const groupLogos = useTabGroupLogos();
   const projectLogoPath = resolveTabGroupLogo(projectKey(cwd), groupLogos);
 
@@ -576,19 +576,15 @@ export const Composer = memo(function Composer({
   }, [editLastTurnSupported, onRecallLastTurnReady, recallLastTurn]);
 
   useEffect(() => {
-    const refresh = () => setRunnerEnabled(loadComposerRunner());
-    window.addEventListener(COMPOSER_RUNNER_CHANGE_EVENT, refresh);
-    return () =>
-      window.removeEventListener(COMPOSER_RUNNER_CHANGE_EVENT, refresh);
+    const refreshEnabled = () => setPetsEnabled(loadProjectPetsEnabled());
+    const refreshScale = () => setPetScale(loadProjectPetScale());
+    window.addEventListener(PROJECT_PETS_CHANGE_EVENT, refreshEnabled);
+    window.addEventListener(PROJECT_PET_SCALE_CHANGE_EVENT, refreshScale);
+    return () => {
+      window.removeEventListener(PROJECT_PETS_CHANGE_EVENT, refreshEnabled);
+      window.removeEventListener(PROJECT_PET_SCALE_CHANGE_EVENT, refreshScale);
+    };
   }, []);
-
-  useEffect(() => {
-    if (!runnerEnabled) {
-      setRunnerLive(false);
-      return;
-    }
-    if (busy) setRunnerLive(true);
-  }, [busy, runnerEnabled]);
 
   useEffect(() => {
     setSkillActive(0);
@@ -974,10 +970,6 @@ export const Composer = memo(function Composer({
   const handleStop = useCallback(() => {
     onStop?.();
   }, [onStop]);
-
-  const handleRunnerExited = useCallback(() => {
-    setRunnerLive(false);
-  }, []);
 
   const submit = (value: string) => {
     if (projectRequired) {
@@ -1696,14 +1688,8 @@ export const Composer = memo(function Composer({
             </div>
           </div>
         </div>
-        {runnerLive && runnerEnabled ? (
-          <ComposerRunner
-            boxRef={boxRef}
-            cwd={cwd}
-            busy={busy}
-            enabled={enabled}
-            onExited={handleRunnerExited}
-          />
+        {petsEnabled && inProject ? (
+          <ProjectPetBar project={cwd} busy={busy} enabled={enabled} scale={petScale / 100} />
         ) : null}
       </div>
     </div>

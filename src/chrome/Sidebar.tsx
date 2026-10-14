@@ -110,7 +110,7 @@ import { FileTree } from "./FileTree";
 import { FolderColorSwatches } from "./FolderColorSwatches";
 import { FolderRenameRow } from "./FolderRenameRow";
 import { FolderRow } from "./FolderRow";
-import { LiveAgentsPreview } from "./ProjectRail";
+import { LiveAgentsPreview } from "./LiveAgentsPreview";
 import { ProjectSearch } from "./ProjectSearch";
 import { RailAction, RailSearch } from "./RailAction";
 import { SessionCard } from "./SessionCard";
