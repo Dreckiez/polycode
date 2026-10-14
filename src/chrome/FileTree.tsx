@@ -320,6 +320,7 @@ export const FileTree = memo(function FileTree({
   );
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const treeScrollRef = useRef<HTMLDivElement>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const name = basename(cwd);
 
@@ -395,6 +396,7 @@ export const FileTree = memo(function FileTree({
       let active = false;
       let restoreSelection: (() => void) | undefined;
       let preview: HTMLDivElement | null = null;
+      let autoScrollFrame: number | null = null;
 
       const movePreview = () => {
         if (!preview) return;
@@ -450,12 +452,59 @@ export const FileTree = memo(function FileTree({
         }
       };
 
+      const updateDropTarget = () => {
+        const folder = folderAtPoint(lastX, lastY);
+        const target =
+          folder && canMoveIntoFolder(path, isDir, folder) ? folder : null;
+        store.setState((current) =>
+          current.dragTargetPath === target
+            ? current
+            : { ...current, dragTargetPath: target },
+        );
+      };
+
+      const autoScroll = () => {
+        autoScrollFrame = null;
+        if (!active) return;
+        const scroller = treeScrollRef.current;
+        if (!scroller) return;
+        const rect = scroller.getBoundingClientRect();
+        const edge = 44;
+        if (
+          lastX < rect.left ||
+          lastX > rect.right ||
+          lastY < rect.top ||
+          lastY > rect.bottom
+        ) {
+          return;
+        }
+        const towardTop = Math.max(0, rect.top + edge - lastY);
+        const towardBottom = Math.max(0, lastY - (rect.bottom - edge));
+        const distance = towardTop || towardBottom;
+        if (!distance) return;
+        const delta = Math.round(4 + (Math.min(distance, edge) / edge) * 16);
+        const before = scroller.scrollTop;
+        scroller.scrollTop += towardTop ? -delta : delta;
+        if (scroller.scrollTop === before) return;
+        updateDropTarget();
+        autoScrollFrame = window.requestAnimationFrame(autoScroll);
+      };
+
+      const scheduleAutoScroll = () => {
+        if (autoScrollFrame == null)
+          autoScrollFrame = window.requestAnimationFrame(autoScroll);
+      };
+
       const reset = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onCancel);
         window.removeEventListener("keydown", onKey);
         window.removeEventListener("blur", onCancel);
+        if (autoScrollFrame != null) {
+          window.cancelAnimationFrame(autoScrollFrame);
+          autoScrollFrame = null;
+        }
         store.setState((current) =>
           current.dragTargetPath === null
             ? current
@@ -492,14 +541,8 @@ export const FileTree = memo(function FileTree({
         }
         moveEvent.preventDefault();
         movePreview();
-        const folder = folderAtPoint(lastX, lastY);
-        const target =
-          folder && canMoveIntoFolder(path, isDir, folder) ? folder : null;
-        store.setState((current) =>
-          current.dragTargetPath === target
-            ? current
-            : { ...current, dragTargetPath: target },
-        );
+        updateDropTarget();
+        scheduleAutoScroll();
         if (!isDir)
           emitExplorerFilePointerDrag({
             type: "move",
@@ -902,7 +945,7 @@ export const FileTree = memo(function FileTree({
       startRename(path);
       return;
     }
-    if (e.key === "Delete" || e.key === "Backspace") {
+    if (e.key === "Delete") {
       e.preventDefault();
       void run(() => removeEntry(path));
       return;
@@ -1011,6 +1054,7 @@ export const FileTree = memo(function FileTree({
   const vw = useVirtualWindow(flat.length, TREE_ROW_PX);
   const scrollerRef = useCallback(
     (el: HTMLDivElement | null) => {
+      treeScrollRef.current = el;
       lockOverscroll(el);
       vw.containerRef(el);
     },

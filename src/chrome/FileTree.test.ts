@@ -257,6 +257,58 @@ describe("FileTree render isolation", () => {
     });
   });
 
+  it("auto-scrolls the tree while dragging near its bottom edge", async () => {
+    await act(async () => render());
+    const source = row("first.ts");
+    const scroller = container.querySelector<HTMLElement>("[role='tree']")!
+      .parentElement as HTMLDivElement;
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      configurable: true,
+      value: () =>
+        ({ left: 0, right: 100, top: 0, bottom: 100 }) as DOMRect,
+    });
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => source),
+    });
+    let frame: FrameRequestCallback | null = null;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((next) => {
+      frame = next;
+      return 1;
+    });
+
+    act(() => {
+      source.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 50,
+          clientY: 80,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 50,
+          clientY: 96,
+        }),
+      );
+    });
+    expect(frame).not.toBeNull();
+    act(() => frame?.(0));
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent("pointerup", {
+          bubbles: true,
+          clientX: 50,
+          clientY: 96,
+        }),
+      );
+    });
+  });
+
   it("deletes the selected entry with the Delete key", async () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
     await act(async () => render());
@@ -270,6 +322,23 @@ describe("FileTree render isolation", () => {
 
     await act(async () => Promise.resolve());
     expect(invoke).toHaveBeenCalledWith("delete_path", {
+      path: `${cwd}/first.ts`,
+    });
+  });
+
+  it("does not delete the selected entry with Backspace", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    await act(async () => render());
+    const source = row("first.ts");
+    act(() => source.click());
+    act(() => {
+      source.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Backspace" }),
+      );
+    });
+
+    await act(async () => Promise.resolve());
+    expect(invoke).not.toHaveBeenCalledWith("delete_path", {
       path: `${cwd}/first.ts`,
     });
   });
