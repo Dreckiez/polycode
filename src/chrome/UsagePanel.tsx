@@ -547,8 +547,11 @@ function BankedResetMascot({
   happy: boolean;
 }) {
   const mascot = projectMascot(project, name);
-  const spritePath = `${mascot.restPath}${mascotFacePlatePath(mascot.rest)}`;
-  const maskId = `banked-reset-mascot-${useId().replace(/:/g, "")}`;
+  const restSpritePath = `${mascot.restPath}${mascotFacePlatePath(mascot.rest)}`;
+  const talkSpritePath = `${mascot.talkPath}${mascotFacePlatePath(mascot.talk)}`;
+  const maskBaseId = `banked-reset-mascot-${useId().replace(/:/g, "")}`;
+  const restMaskId = `${maskBaseId}-rest`;
+  const talkMaskId = `${maskBaseId}-talk`;
   return (
     <div
       className="reset-mascot-scene"
@@ -571,7 +574,7 @@ function BankedResetMascot({
       >
         <defs>
           <mask
-            id={maskId}
+            id={restMaskId}
             maskUnits="userSpaceOnUse"
             x="0"
             y="0"
@@ -579,30 +582,57 @@ function BankedResetMascot({
             height="8"
           >
             <rect width="8" height="8" fill="black" />
-            <path d={spritePath} fill="white" />
-            {happy ? (
-              <g fill="black">
-                <rect x="2" y="3" width="1" height="1" />
-                <rect x="5" y="3" width="1" height="1" />
-                <rect x="2" y="4" width="1" height="1" />
-                <rect x="5" y="4" width="1" height="1" />
-                <rect x="3" y="5" width="2" height="1" />
-              </g>
-            ) : (
-              <g fill="black">
-                <rect x="1" y="3" width="1" height="1" />
-                <rect x="4" y="3" width="1" height="1" />
-                <rect x="3" y="4" width="2" height="1" />
-                <rect x="2" y="5" width="1" height="1" />
-                <rect x="5" y="5" width="1" height="1" />
-              </g>
-            )}
+            <path d={restSpritePath} fill="white" />
+            <MascotFaceCutout happy={happy} />
+          </mask>
+          <mask
+            id={talkMaskId}
+            maskUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            width="8"
+            height="8"
+          >
+            <rect width="8" height="8" fill="black" />
+            <path d={talkSpritePath} fill="white" />
+            <MascotFaceCutout happy={happy} />
           </mask>
         </defs>
-        <path d={spritePath} fill="currentColor" mask={`url(#${maskId})`} />
+        <path
+          className="reset-mascot-frame-rest"
+          d={restSpritePath}
+          fill="currentColor"
+          mask={`url(#${restMaskId})`}
+        />
+        <path
+          className="reset-mascot-frame-talk"
+          d={talkSpritePath}
+          fill="currentColor"
+          mask={`url(#${talkMaskId})`}
+        />
       </svg>
       {!happy ? <span className="reset-mascot-tear" /> : null}
     </div>
+  );
+}
+
+function MascotFaceCutout({ happy }: { happy: boolean }) {
+  return happy ? (
+    <g fill="black">
+      <rect x="2" y="3" width="1" height="1" />
+      <rect x="5" y="3" width="1" height="1" />
+      <rect x="2" y="4" width="1" height="1" />
+      <rect x="5" y="4" width="1" height="1" />
+      <rect x="3" y="5" width="2" height="1" />
+    </g>
+  ) : (
+    <g fill="black">
+      <rect x="1" y="3" width="1" height="1" />
+      <rect x="4" y="3" width="1" height="1" />
+      <rect x="3" y="4" width="2" height="1" />
+      <rect x="2" y="5" width="1" height="1" />
+      <rect x="5" y="5" width="1" height="1" />
+    </g>
   );
 }
 
