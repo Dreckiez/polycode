@@ -83,6 +83,23 @@ type Clip = { mode: "copy" | "cut"; path: string; isDir: boolean };
 type MenuTarget = { path: string; isDir: boolean; isRoot: boolean };
 type MenuState = { x: number; y: number; target: MenuTarget };
 
+function folderAtPoint(x: number, y: number): string | null {
+  const target = document.elementFromPoint(x, y);
+  return (
+    target
+      ?.closest<HTMLElement>("[data-tree-folder-path]")
+      ?.dataset.treeFolderPath ?? null
+  );
+}
+
+function canMoveIntoFolder(from: string, isDir: boolean, target: string) {
+  return (
+    target !== parentPath(from) &&
+    target !== from &&
+    (!isDir || !target.startsWith(`${from}/`))
+  );
+}
+
 const REVEAL_LABEL = IS_MAC
   ? "Reveal in Finder"
   : IS_WIN
@@ -265,6 +282,7 @@ export const FileTree = memo(function FileTree({
       creating: null,
       renaming: null,
       cutPath: null,
+      dragTargetPath: null,
       epoch: 0,
       gitStatuses,
     });
@@ -325,6 +343,10 @@ export const FileTree = memo(function FileTree({
     store.subscribe,
     useCallback(() => store.getState().renaming, [store]),
   );
+  const dragTargetPath = useSyncExternalStore(
+    store.subscribe,
+    useCallback(() => store.getState().dragTargetPath, [store]),
+  );
 
   const toggle = useCallback(
     (path: string) => {
@@ -350,12 +372,17 @@ export const FileTree = memo(function FileTree({
     [cwd, store],
   );
 
+  const dropIntoFolderRef = useRef<
+    (from: string, isDir: boolean, target: string) => void
+  >(() => undefined);
+
   const fileDragCleanup = useRef<(() => void) | null>(null);
   const suppressFileClickUntil = useRef(0);
 
-  const onFilePointerDown = useCallback(
+  const onEntryPointerDown = useCallback(
     (
       path: string,
+      isDir: boolean,
       event: ReactPointerEvent<HTMLButtonElement>,
     ) => {
       if (event.button !== 0 || fileDragCleanup.current) return;
@@ -429,8 +456,14 @@ export const FileTree = memo(function FileTree({
         window.removeEventListener("pointercancel", onCancel);
         window.removeEventListener("keydown", onKey);
         window.removeEventListener("blur", onCancel);
+        store.setState((current) =>
+          current.dragTargetPath === null
+            ? current
+            : { ...current, dragTargetPath: null },
+        );
         release();
-        if (active) emitExplorerFilePointerDrag({ type: "end", path });
+        if (active && !isDir)
+          emitExplorerFilePointerDrag({ type: "end", path });
         fileDragCleanup.current = null;
       };
 
@@ -459,7 +492,21 @@ export const FileTree = memo(function FileTree({
         }
         moveEvent.preventDefault();
         movePreview();
-        emitExplorerFilePointerDrag({ type: "move", path, x: lastX, y: lastY });
+        const folder = folderAtPoint(lastX, lastY);
+        const target =
+          folder && canMoveIntoFolder(path, isDir, folder) ? folder : null;
+        store.setState((current) =>
+          current.dragTargetPath === target
+            ? current
+            : { ...current, dragTargetPath: target },
+        );
+        if (!isDir)
+          emitExplorerFilePointerDrag({
+            type: "move",
+            path,
+            x: lastX,
+            y: lastY,
+          });
       }
 
       function finish(commit: boolean, upEvent?: PointerEvent) {
@@ -467,12 +514,19 @@ export const FileTree = memo(function FileTree({
         if (active) {
           suppressFileClickUntil.current = performance.now() + 400;
           if (commit) {
-            emitExplorerFilePointerDrag({
-              type: "drop",
-              path,
-              x: lastX,
-              y: lastY,
-            });
+            const folder = folderAtPoint(lastX, lastY);
+            if (folder) {
+              if (canMoveIntoFolder(path, isDir, folder)) {
+                dropIntoFolderRef.current(path, isDir, folder);
+              }
+            } else if (!isDir) {
+              emitExplorerFilePointerDrag({
+                type: "drop",
+                path,
+                x: lastX,
+                y: lastY,
+              });
+            }
           }
         }
         reset();
@@ -497,7 +551,7 @@ export const FileTree = memo(function FileTree({
       window.addEventListener("keydown", onKey);
       window.addEventListener("blur", onCancel);
     },
-    [onSelect],
+    [onSelect, store],
   );
 
   const consumeFileClick = useCallback(
@@ -719,6 +773,24 @@ export const FileTree = memo(function FileTree({
     } catch (err: unknown) {
       setOpError(err instanceof Error ? err.message : String(err));
     }
+  };
+
+  const moveIntoFolder = useCallback(
+    async (from: string, isDir: boolean, destParent: string) => {
+      if (!canMoveIntoFolder(from, isDir, destParent)) return;
+      const moved = await movePath(from, destParent);
+      if (moved === from) return;
+      await refreshTouched(dirsTouchedByMove(from, moved), isDir ? [from] : []);
+      expandDirs([destParent]);
+      remapTreePaths(from, moved);
+      onSelect(moved);
+      onFileMoved?.(from, moved);
+    },
+    [expandDirs, onFileMoved, onSelect, refreshTouched, remapTreePaths],
+  );
+
+  dropIntoFolderRef.current = (from, isDir, target) => {
+    void run(() => moveIntoFolder(from, isDir, target));
   };
 
   const openMenu = useCallback(
@@ -949,7 +1021,7 @@ export const FileTree = memo(function FileTree({
     () => ({
       onToggle: toggle,
       onSelect,
-      onFilePointerDown,
+      onEntryPointerDown,
       consumeFileClick,
       onOpenFile,
       onCreateCommit,
@@ -961,7 +1033,7 @@ export const FileTree = memo(function FileTree({
     [
       toggle,
       onSelect,
-      onFilePointerDown,
+      onEntryPointerDown,
       consumeFileClick,
       onOpenFile,
       onCreateCommit,
@@ -1019,7 +1091,13 @@ export const FileTree = memo(function FileTree({
                   e.clientY,
                 );
               }}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 h-full pl-2 text-left"
+              data-tree-folder-path={cwd}
+              data-tree-drop-target={dragTargetPath === cwd || undefined}
+              className={`flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1 pl-2 text-left ${
+                dragTargetPath === cwd
+                  ? "bg-content/15 ring-1 ring-inset ring-content/20"
+                  : ""
+              }`}
             >
               <span className="grid size-4 shrink-0 place-items-center text-content/50">
                 {rootOpen ? (

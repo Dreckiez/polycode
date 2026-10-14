@@ -51,6 +51,7 @@ type TreeState = {
   creating: Creating | null;
   renaming: string | null;
   cutPath: string | null;
+  dragTargetPath: string | null;
   epoch: number;
   gitStatuses?: GitStatusMap;
 };
@@ -94,8 +95,9 @@ function useTreeStore(): TreeStore {
 export type TreeActionsValue = {
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
-  onFilePointerDown: (
+  onEntryPointerDown: (
     path: string,
+    isDir: boolean,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => void;
   consumeFileClick: () => boolean;
@@ -186,7 +188,7 @@ const EntryRow = memo(function EntryRow({
   const {
     onToggle,
     onSelect,
-    onFilePointerDown,
+    onEntryPointerDown,
     consumeFileClick,
     onOpenFile,
     onRenameCommit,
@@ -222,6 +224,13 @@ const EntryRow = memo(function EntryRow({
       [store, entry.path],
     ),
   );
+  const dropTarget = useSyncExternalStore(
+    store.subscribe,
+    useCallback(
+      () => store.getState().dragTargetPath === entry.path,
+      [store, entry.path],
+    ),
+  );
   const gitStatus = useSyncExternalStore(
     store.subscribe,
     useCallback(() => {
@@ -253,9 +262,9 @@ const EntryRow = memo(function EntryRow({
 
   const onPointerDownHandler = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (!entry.isDir) onFilePointerDown(entry.path, event);
+      onEntryPointerDown(entry.path, entry.isDir, event);
     },
-    [entry.isDir, entry.path, onFilePointerDown],
+    [entry.isDir, entry.path, onEntryPointerDown],
   );
 
   const onContextMenuHandler = useCallback(
@@ -293,9 +302,13 @@ const EntryRow = memo(function EntryRow({
       onClick={onClick}
       onPointerDown={onPointerDownHandler}
       onContextMenu={onContextMenuHandler}
+      data-tree-folder-path={entry.isDir ? entry.path : undefined}
+      data-tree-drop-target={dropTarget || undefined}
       style={rowStyle}
       className={`flex h-7.5 w-full cursor-pointer items-center gap-1 pr-2 text-left text-[14px] leading-normal data-[explorer-dragging]:opacity-50 ${
-        selected
+        dropTarget
+          ? "bg-content/15 text-content ring-1 ring-inset ring-content/20"
+          : selected
           ? "bg-content/10 text-content"
           : "text-content hover:bg-content/5"
       } ${cut ? "opacity-50" : ""}`}

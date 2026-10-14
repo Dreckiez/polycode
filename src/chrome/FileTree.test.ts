@@ -11,17 +11,21 @@ import {
 import type { FsEntry } from "../lib/fs";
 import { FileTree } from "./FileTree";
 
-const { iconRender, directories } = vi.hoisted(() => ({
+const { iconRender, directories, invoke } = vi.hoisted(() => ({
   iconRender: vi.fn(),
   directories: new Map<string, FsEntry[]>(),
+  invoke: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(async (command: string, args: { path: string }) => {
+  invoke: async (command: string, args: Record<string, string>) => {
+    invoke(command, args);
     if (command !== "list_dir")
-      throw new Error(`Unexpected command: ${command}`);
+      return command === "move_path"
+        ? `${args.destParent}/${args.from.split("/").at(-1)}`
+        : undefined;
     return directories.get(args.path) ?? [];
-  }),
+  },
 }));
 
 // Count row renders independently of FileTypeIcon's own memoization.
@@ -147,5 +151,151 @@ describe("FileTree render isolation", () => {
     const renderedNames = iconRender.mock.calls.map((call) => call[0]);
     expect(renderedNames).not.toContain("c.ts");
     expect(iconRender.mock.calls.length).toBe(2);
+  });
+
+  it("moves a file when it is dropped on a folder", async () => {
+    const folder: FsEntry = {
+      name: "nested",
+      path: `${cwd}/nested`,
+      isDir: true,
+      ignored: false,
+    };
+    directories.set(cwd, [file("first.ts"), folder]);
+    await refreshDir(cwd);
+    await act(async () => render());
+    const source = row("first.ts");
+    const target = row("nested");
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => target),
+    });
+
+    act(() => {
+      source.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 1,
+          clientY: 1,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 12,
+          clientY: 12,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointerup", {
+          bubbles: true,
+          clientX: 12,
+          clientY: 12,
+        }),
+      );
+    });
+
+    await act(async () => Promise.resolve());
+    expect(invoke).toHaveBeenCalledWith("move_path", {
+      from: `${cwd}/first.ts`,
+      destParent: `${cwd}/nested`,
+    });
+  });
+
+  it("moves a folder when it is dropped on another folder", async () => {
+    const sourceFolder: FsEntry = {
+      name: "source",
+      path: `${cwd}/source`,
+      isDir: true,
+      ignored: false,
+    };
+    const targetFolder: FsEntry = {
+      name: "target",
+      path: `${cwd}/target`,
+      isDir: true,
+      ignored: false,
+    };
+    directories.set(cwd, [sourceFolder, targetFolder]);
+    await refreshDir(cwd);
+    await act(async () => render());
+    const source = row("source");
+    const target = row("target");
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => target),
+    });
+
+    act(() => {
+      source.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 1,
+          clientY: 1,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 12,
+          clientY: 12,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointerup", {
+          bubbles: true,
+          clientX: 12,
+          clientY: 12,
+        }),
+      );
+    });
+
+    await act(async () => Promise.resolve());
+    expect(invoke).toHaveBeenCalledWith("move_path", {
+      from: `${cwd}/source`,
+      destParent: `${cwd}/target`,
+    });
+  });
+
+  it("deletes the selected entry with the Delete key", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    await act(async () => render());
+    const source = row("first.ts");
+    act(() => source.click());
+    act(() => {
+      source.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }),
+      );
+    });
+
+    await act(async () => Promise.resolve());
+    expect(invoke).toHaveBeenCalledWith("delete_path", {
+      path: `${cwd}/first.ts`,
+    });
+  });
+
+  it("deletes a selected folder with the Delete key", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    const folder: FsEntry = {
+      name: "obsolete",
+      path: `${cwd}/obsolete`,
+      isDir: true,
+      ignored: false,
+    };
+    directories.set(cwd, [folder]);
+    await refreshDir(cwd);
+    await act(async () => render());
+    const source = row("obsolete");
+    act(() => source.click());
+    act(() => {
+      source.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }),
+      );
+    });
+
+    await act(async () => Promise.resolve());
+    expect(invoke).toHaveBeenCalledWith("delete_path", {
+      path: `${cwd}/obsolete`,
+    });
   });
 });

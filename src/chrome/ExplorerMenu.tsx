@@ -187,7 +187,7 @@ export function ExplorerMenu({
             ? `${menuId}-submenu`
             : undefined
         }
-        disabled={item.disabled}
+        aria-disabled={item.disabled || undefined}
         onMouseDown={(e) => e.preventDefault()}
         onMouseEnter={(e) => {
           cancelClose();
@@ -217,7 +217,9 @@ export function ExplorerMenu({
         }}
         className={`flex ${item.description ? "py-1.5" : "h-7"} w-full items-center gap-3 rounded-lg px-2 text-left text-[13px] leading-none ${
           item.disabled
-            ? "text-content/30"
+            ? highlighted
+              ? "bg-content/5 text-content/30"
+              : "text-content/30 hover:bg-content/5"
             : item.danger
               ? highlighted
                 ? "bg-red-500/20 text-red-300"
