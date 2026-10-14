@@ -482,7 +482,7 @@ export const FileTree = memo(function FileTree({
         const towardBottom = Math.max(0, lastY - (rect.bottom - edge));
         const distance = towardTop || towardBottom;
         if (!distance) return;
-        const delta = Math.round(4 + (Math.min(distance, edge) / edge) * 16);
+        const delta = Math.round(3 + (Math.min(distance, edge) / edge) * 10);
         const before = scroller.scrollTop;
         scroller.scrollTop += towardTop ? -delta : delta;
         if (scroller.scrollTop === before) return;
