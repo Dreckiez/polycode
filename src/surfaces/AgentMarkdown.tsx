@@ -39,7 +39,9 @@ import { isAtxHeadingLine } from "../lib/markdownSource";
 import { useColorScheme } from "../hooks/useColorScheme";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { copyText } from "../lib/clipboard";
-import { revealPath } from "../lib/fs";
+import { readBinaryFile, revealPath } from "../lib/fs";
+import { sniffImageMime } from "../lib/filePreview";
+import { resolveMarkdownImagePath } from "../lib/markdownImagePath";
 import { isNoteImagePath } from "../lib/noteImages";
 import { IS_MAC, IS_WIN } from "../lib/platform";
 import { rehypeHardBreaks } from "../lib/hardBreaks";
@@ -398,19 +400,46 @@ function NoteAssetImage({
   );
 }
 
-function resolveLocalImagePath(url: string, cwd?: string): string | null {
-  if (url.startsWith("file://")) {
-    const withoutScheme = url.slice(7);
-    return withoutScheme.startsWith("/") && /^\/[a-zA-Z]:/.test(withoutScheme)
-      ? withoutScheme.slice(1)
-      : withoutScheme;
-  }
-  if (/^[a-zA-Z]:[\\/]/.test(url) || url.startsWith("/")) {
-    return url;
-  }
-  if (!cwd) return null;
-  const cleanUrl = url.replace(/^\.\//, "");
-  return `${cwd.replace(/[/\\]+$/, "")}/${cleanUrl}`;
+const markdownImageClass =
+  "my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs";
+
+/** Local workspace files bypass Tauri's app-data-only asset protocol scope. */
+function LocalFileImage({
+  path,
+  alt,
+  ...props
+}: Omit<MarkdownImageProps, "src" | "node"> & { path: string }) {
+  const [src, setSrc] = useState<string>();
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setSrc(undefined);
+    void readBinaryFile(path)
+      .then((bytes) => {
+        const mime =
+          sniffImageMime(bytes) ??
+          (path.toLowerCase().endsWith(".svg") ? "image/svg+xml" : null);
+        if (!mime || cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+        setSrc(objectUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [path]);
+
+  return src ? (
+    <img
+      {...props}
+      src={src}
+      alt={alt ?? ""}
+      className={markdownImageClass}
+      loading="lazy"
+    />
+  ) : null;
 }
 
 function MarkdownImage({
@@ -429,7 +458,7 @@ function MarkdownImage({
         {...props}
         src={url}
         alt={alt ?? ""}
-        className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
+        className={markdownImageClass}
         loading="lazy"
       />
     );
@@ -445,7 +474,7 @@ function MarkdownImage({
         {...props}
         src={url}
         alt={alt ?? ""}
-        className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
+        className={markdownImageClass}
         loading="lazy"
       />
     );
@@ -457,17 +486,9 @@ function MarkdownImage({
     /^[a-zA-Z]:[\\/]/.test(url) ||
     url.startsWith("file://")
   ) {
-    const fullPath = resolveLocalImagePath(url, cwd);
+    const fullPath = resolveMarkdownImagePath(url, cwd);
     if (fullPath) {
-      return (
-        <img
-          {...props}
-          src={convertFileSrc(fullPath)}
-          alt={alt ?? ""}
-          className="my-3 max-h-[500px] max-w-full rounded-lg border border-content/10 object-contain shadow-xs"
-          loading="lazy"
-        />
-      );
+      return <LocalFileImage {...props} path={fullPath} alt={alt} />;
     }
   }
 

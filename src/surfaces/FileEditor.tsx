@@ -53,7 +53,7 @@ import {
   writeTextFile,
 } from "../lib/fs";
 import { syncWatchedMtime, watchFile } from "../lib/fileWatch";
-import { displayPath } from "../lib/paths";
+import { displayPath, parentPath } from "../lib/paths";
 import type { EditorNavigation } from "../lib/search";
 import { MarkdownPreview } from "./AgentMarkdown";
 import {
@@ -408,7 +408,11 @@ export function FileEditor({
           onModeChange={setMode}
           preview={
             markdown ? (
-              <MarkdownPreview text={draft} cwd={cwd} onOpenFile={onOpenFile} />
+              <MarkdownPreview
+                text={draft}
+                cwd={parentPath(path)}
+                onOpenFile={onOpenFile}
+              />
             ) : (
               <SvgPreview source={draft} />
             )
