@@ -34,14 +34,17 @@ import {
   resolveWorkspaceFileReference,
 } from "../lib/paths";
 import type { EditorNavigation, OpenFileFn } from "../lib/search";
-import { remarkWorkspaceFileLinks } from "../lib/markdownFileLinks";
+import {
+  remarkWorkspaceFileLinks,
+  remarkWorkspaceImagePaths,
+} from "../lib/markdownFileLinks";
+import { MARKDOWN_LOCAL_ORIGIN, resolveMarkdownImagePath } from "../lib/markdownImagePath";
 import { isAtxHeadingLine } from "../lib/markdownSource";
 import { useColorScheme } from "../hooks/useColorScheme";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { copyText } from "../lib/clipboard";
 import { readBinaryFile, revealPath } from "../lib/fs";
 import { sniffImageMime } from "../lib/filePreview";
-import { resolveMarkdownImagePath } from "../lib/markdownImagePath";
 import { isNoteImagePath } from "../lib/noteImages";
 import { IS_MAC, IS_WIN } from "../lib/platform";
 import { rehypeHardBreaks } from "../lib/hardBreaks";
@@ -67,9 +70,10 @@ const MARKDOWN_REHYPE_PLUGINS: PluggableList = [
   [
     harden,
     {
-      // MarkdownImage remains the final allowlist. The wildcard lets app-owned
-      // relative note URLs reach that component without changing link parsing.
-      allowedImagePrefixes: ["*"],
+      defaultOrigin: MARKDOWN_LOCAL_ORIGIN,
+      // Preserve ordinary web images and local Markdown paths. The latter are
+      // tagged with MARKDOWN_LOCAL_ORIGIN and loaded from disk below.
+      allowedImagePrefixes: [MARKDOWN_LOCAL_ORIGIN, "*"],
       allowedLinkPrefixes: ["*"],
       allowDataImages: true,
       imageBlockPolicy: "remove" as const,
@@ -451,6 +455,9 @@ function MarkdownImage({
   const { cwd } = useContext(FileOpenContext);
   const url = typeof src === "string" ? src.trim() : "";
   if (!url) return null;
+  const localMarkdownPath = url.startsWith(`${MARKDOWN_LOCAL_ORIGIN}/`)
+    ? url.slice(MARKDOWN_LOCAL_ORIGIN.length + 1)
+    : null;
 
   if (url.startsWith("data:image/")) {
     return (
@@ -468,7 +475,10 @@ function MarkdownImage({
     return <NoteAssetImage {...props} asset={url} alt={alt} />;
   }
 
-  if (url.startsWith("https://") || url.startsWith("http://")) {
+  if (
+    !localMarkdownPath &&
+    (url.startsWith("https://") || url.startsWith("http://"))
+  ) {
     return (
       <img
         {...props}
@@ -481,12 +491,13 @@ function MarkdownImage({
   }
 
   if (
+    localMarkdownPath ||
     cwd ||
     url.startsWith("/") ||
     /^[a-zA-Z]:[\\/]/.test(url) ||
     url.startsWith("file://")
   ) {
-    const fullPath = resolveMarkdownImagePath(url, cwd);
+    const fullPath = resolveMarkdownImagePath(localMarkdownPath ?? url, cwd);
     if (fullPath) {
       return <LocalFileImage {...props} path={fullPath} alt={alt} />;
     }
@@ -712,6 +723,7 @@ function getRemarkPlugins(cwd: string | undefined): PluggableList {
     plugins = [
       ...Object.values(defaultRemarkPlugins),
       [remarkWorkspaceFileLinks, { cwd }],
+      remarkWorkspaceImagePaths,
     ];
     remarkPluginsCache.set(cwd, plugins);
   }

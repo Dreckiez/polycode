@@ -1,4 +1,5 @@
 import { resolveWorkspaceFileReference } from "./paths";
+import { MARKDOWN_LOCAL_ORIGIN } from "./markdownImagePath";
 
 type MarkdownNode = {
   type: string;
@@ -27,4 +28,28 @@ export function remarkWorkspaceFileLinks({ cwd }: { cwd?: string }) {
     for (const child of node.children ?? []) visit(child);
   }
   return visit;
+}
+
+/**
+ * Keep local image paths through rehype-harden. Bare Markdown paths such as
+ * `report_images/Truoc_Du.png` are otherwise treated as invalid URLs before
+ * the image renderer can resolve them against the current document.
+ */
+export function remarkWorkspaceImagePaths() {
+  function visit(node: MarkdownNode) {
+    if (node.type === "image" && node.url && isLocalImageUrl(node.url)) {
+      node.url = `${MARKDOWN_LOCAL_ORIGIN}/${node.url.replace(/^\.\//, "")}`;
+    }
+    for (const child of node.children ?? []) visit(child);
+  }
+  return visit;
+}
+
+function isLocalImageUrl(url: string): boolean {
+  const value = url.trim();
+  return !!value &&
+    !value.startsWith("/") &&
+    !value.startsWith("#") &&
+    !value.startsWith("//") &&
+    !/^[a-z][a-z0-9+.-]*:/i.test(value);
 }

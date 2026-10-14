@@ -1,5 +1,8 @@
 import { joinPath } from "./paths";
 
+/** Internal marker that carries a local Markdown path through URL sanitizing. */
+export const MARKDOWN_LOCAL_ORIGIN = "https://polycode.local";
+
 /** Resolve a local Markdown image URL against the directory containing its file. */
 export function resolveMarkdownImagePath(
   url: string,
