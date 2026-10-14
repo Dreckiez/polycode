@@ -400,7 +400,6 @@ export function UsageFooter({
             <UsageProviderChip
               limits={codex}
               now={now}
-              project={project}
               accounts={codexAccounts}
               accountId={codexAccountId}
               onSelectAccount={(accountId) => selectAccount("codex", accountId)}
@@ -410,13 +409,12 @@ export function UsageFooter({
             />
           ) : null}
           {showOpencodeChip ? (
-            <UsageProviderChip limits={opencode} now={now} project={project} />
+            <UsageProviderChip limits={opencode} now={now} />
           ) : null}
           {showAntigravityChip ? (
             <UsageProviderChip
               limits={antigravity}
               now={now}
-              project={project}
             />
           ) : null}
           <button

@@ -9,15 +9,7 @@ import {
   type RateLimitWindow,
 } from "../lib/rateLimits";
 import type { CodexRateLimitResetOutcome } from "../lib/rateLimitsFetch";
-import { projectKey, projectName } from "../lib/paths";
 import { HARNESS_TITLE } from "../lib/session";
-import {
-  loadTabGroupColors,
-  loadTabGroupCustomColors,
-  loadTabGroupMascots,
-  resolveTabGroupColor,
-  resolveTabGroupMascot,
-} from "../lib/tabGroups";
 import type { ProviderAccount } from "../lib/providerAccounts";
 import { HarnessIcon } from "./HarnessIcon";
 import { Popover, type PopoverDismissReason } from "./Popover";
@@ -35,7 +27,6 @@ export type ResetActionState =
 export function UsageProviderChip({
   limits,
   now,
-  project,
   accounts = [],
   accountId,
   onSelectAccount,
@@ -45,7 +36,6 @@ export function UsageProviderChip({
 }: {
   limits: ProviderRateLimits;
   now: number;
-  project?: string;
   accounts?: ProviderAccount[];
   accountId?: string;
   onSelectAccount?: (accountId: string) => void;
@@ -95,19 +85,6 @@ export function UsageProviderChip({
   const canManageAccounts = Boolean(
     activeAccount && onSelectAccount && onAddAccount,
   );
-  const mascotProject = project ? projectName(project) : providerLabel;
-  const appearanceKey = project ? projectKey(project) : mascotProject;
-  const mascotName = resolveTabGroupMascot(
-    appearanceKey,
-    loadTabGroupMascots(),
-  );
-  const mascotColor = resolveTabGroupColor(
-    appearanceKey,
-    loadTabGroupColors(),
-    loadTabGroupCustomColors(),
-    mascotProject,
-  );
-
   useEffect(() => {
     if (open) return;
     setResetAction("idle");
@@ -256,9 +233,6 @@ export function UsageProviderChip({
             resetAction={resetAction}
             activeResetKey={activeResetKey}
             resetError={resetError}
-            mascotProject={mascotProject}
-            mascotName={mascotName}
-            mascotColor={mascotColor}
             canUse={Boolean(onConsumeReset)}
             onAddAccount={onAddAccount}
             onViewChange={setAccountView}

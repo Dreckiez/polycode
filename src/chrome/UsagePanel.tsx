@@ -1,4 +1,4 @@
-import { useState, type FormEvent, useId } from "react";
+import { useState, type FormEvent } from "react";
 import {
   clampUsedPercent,
   formatResetCountdown,
@@ -10,7 +10,6 @@ import {
   type RateLimitWindow,
 } from "../lib/rateLimits";
 import type { CodexRateLimitResetOutcome } from "../lib/rateLimitsFetch";
-import { mascotPath, projectMascot } from "../lib/projectMascots";
 import type { ProviderAccount } from "../lib/providerAccounts";
 import { HarnessIcon } from "./HarnessIcon";
 import { ArrowLeft, Check, ChevronRight, Plus, RefreshCw } from "./icons";
@@ -40,9 +39,6 @@ export function UsagePanel({
   resetAction,
   activeResetKey,
   resetError,
-  mascotProject,
-  mascotName,
-  mascotColor,
   canUse,
   onAddAccount,
   onViewChange,
@@ -68,9 +64,6 @@ export function UsagePanel({
   resetAction: ResetActionState;
   activeResetKey: string | null;
   resetError: string | null;
-  mascotProject: string;
-  mascotName: string | null;
-  mascotColor: string;
   canUse: boolean;
   onAddAccount?: (label: string) => Promise<ProviderAccount>;
   onViewChange: (view: "usage" | "accounts" | "add") => void;
@@ -184,9 +177,6 @@ export function UsagePanel({
           action={resetAction}
           activeResetKey={activeResetKey}
           error={resetError}
-          mascotProject={mascotProject}
-          mascotName={mascotName}
-          mascotColor={mascotColor}
           onConfirm={onConfirmReset}
           onCancel={onCancelReset}
           onUse={onUseReset}
@@ -443,9 +433,6 @@ function BankedResets({
   action,
   activeResetKey,
   error,
-  mascotProject,
-  mascotName,
-  mascotColor,
   onConfirm,
   onCancel,
   onUse,
@@ -456,9 +443,6 @@ function BankedResets({
   action: ResetActionState;
   activeResetKey: string | null;
   error: string | null;
-  mascotProject: string;
-  mascotName: string | null;
-  mascotColor: string;
   onConfirm: (rowKey: string) => void;
   onCancel: () => void;
   onUse: (credit: RateLimitResetCredit | undefined, rowKey: string) => void;
@@ -474,33 +458,24 @@ function BankedResets({
     ...detailedCredits,
     ...Array.from({ length: unlistedCount }, () => null),
   ];
-  const hasBankedReset = count != null && count > 0;
   return (
     <section className="mt-2.5 border-t border-content/[0.08] pt-2.5">
-      <div className="relative min-h-[78px] overflow-hidden rounded-lg bg-content/[0.04] px-3 py-3 pr-[84px] ring-1 ring-inset ring-content/[0.06]">
-        <div className="relative z-10 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-[11px] font-medium">Banked resets</h3>
-            {count != null ? (
-              <span className="rounded-full bg-content/[0.07] px-1.5 py-px text-[9px] font-medium tabular-nums text-content/65 ring-1 ring-inset ring-content/[0.07]">
-                {count}
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-0.5 text-[10px] leading-4 text-content/40">
-            {count == null
-              ? "Not reported by this account"
-              : count === 0
-                ? "No resets available"
-                : `${count} ${count === 1 ? "reset" : "resets"} available`}
-          </p>
+      <div className="min-h-[78px] rounded-lg bg-content/[0.04] px-3 py-3 ring-1 ring-inset ring-content/[0.06]">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[11px] font-medium">Banked resets</h3>
+          {count != null ? (
+            <span className="rounded-full bg-content/[0.07] px-1.5 py-px text-[9px] font-medium tabular-nums text-content/65 ring-1 ring-inset ring-content/[0.07]">
+              {count}
+            </span>
+          ) : null}
         </div>
-        <BankedResetMascot
-          project={mascotProject}
-          name={mascotName}
-          color={mascotColor}
-          happy={hasBankedReset}
-        />
+        <p className="mt-0.5 text-[10px] leading-4 text-content/40">
+          {count == null
+            ? "Not reported by this account"
+            : count === 0
+              ? "No resets available"
+              : `${count} ${count === 1 ? "reset" : "resets"} available`}
+        </p>
       </div>
 
       {count != null && count > 0 ? (
@@ -532,120 +507,6 @@ function BankedResets({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function BankedResetMascot({
-  project,
-  name,
-  color,
-  happy,
-}: {
-  project: string;
-  name: string | null;
-  color: string;
-  happy: boolean;
-}) {
-  const mascot = projectMascot(project, name);
-  const restSpritePath = `${mascot.restPath}${mascotFacePlatePath(mascot.rest)}`;
-  const talkSpritePath = `${mascot.talkPath}${mascotFacePlatePath(mascot.talk)}`;
-  const maskBaseId = `banked-reset-mascot-${useId().replace(/:/g, "")}`;
-  const restMaskId = `${maskBaseId}-rest`;
-  const talkMaskId = `${maskBaseId}-talk`;
-  return (
-    <div
-      className="reset-mascot-scene"
-      data-reset-mascot-mood={happy ? "happy" : "sad"}
-      data-mascot-name={mascot.name}
-      style={{ color }}
-      aria-hidden
-    >
-      <span className="reset-mascot-glow" />
-      {happy ? (
-        <>
-          <span className="reset-mascot-spark reset-mascot-spark-a" />
-          <span className="reset-mascot-spark reset-mascot-spark-b" />
-        </>
-      ) : null}
-      <svg
-        className="reset-mascot-sprite"
-        viewBox="0 0 8 8"
-        shapeRendering="crispEdges"
-      >
-        <defs>
-          <mask
-            id={restMaskId}
-            maskUnits="userSpaceOnUse"
-            x="0"
-            y="0"
-            width="8"
-            height="8"
-          >
-            <rect width="8" height="8" fill="black" />
-            <path d={restSpritePath} fill="white" />
-            <MascotFaceCutout happy={happy} />
-          </mask>
-          <mask
-            id={talkMaskId}
-            maskUnits="userSpaceOnUse"
-            x="0"
-            y="0"
-            width="8"
-            height="8"
-          >
-            <rect width="8" height="8" fill="black" />
-            <path d={talkSpritePath} fill="white" />
-            <MascotFaceCutout happy={happy} />
-          </mask>
-        </defs>
-        <path
-          className="reset-mascot-frame-rest"
-          d={restSpritePath}
-          fill="currentColor"
-          mask={`url(#${restMaskId})`}
-        />
-        <path
-          className="reset-mascot-frame-talk"
-          d={talkSpritePath}
-          fill="currentColor"
-          mask={`url(#${talkMaskId})`}
-        />
-      </svg>
-      {!happy ? <span className="reset-mascot-tear" /> : null}
-    </div>
-  );
-}
-
-function MascotFaceCutout({ happy }: { happy: boolean }) {
-  return happy ? (
-    <g fill="black">
-      <rect x="2" y="3" width="1" height="1" />
-      <rect x="5" y="3" width="1" height="1" />
-      <rect x="2" y="4" width="1" height="1" />
-      <rect x="5" y="4" width="1" height="1" />
-      <rect x="3" y="5" width="2" height="1" />
-    </g>
-  ) : (
-    <g fill="black">
-      <rect x="1" y="3" width="1" height="1" />
-      <rect x="4" y="3" width="1" height="1" />
-      <rect x="3" y="4" width="2" height="1" />
-      <rect x="2" y="5" width="1" height="1" />
-      <rect x="5" y="5" width="1" height="1" />
-    </g>
-  );
-}
-
-/** Fill only the middle of each face row before cutting the mood back out. */
-function mascotFacePlatePath(rows: readonly string[]): string {
-  return mascotPath(
-    rows.map((row, y) => {
-      if (y < 2 || y > 5) return ".".repeat(row.length);
-      const first = row.indexOf("#");
-      const last = row.lastIndexOf("#");
-      if (first < 0) return ".".repeat(row.length);
-      return `${".".repeat(first)}${"#".repeat(last - first + 1)}${".".repeat(row.length - last - 1)}`;
-    }),
   );
 }
 
