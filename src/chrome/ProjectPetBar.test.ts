@@ -115,7 +115,7 @@ describe("project pet bar interactions", () => {
     expect(container.firstElementChild!.hasPointerCapture(1)).toBe(false);
   });
 
-  it("blocks mouse throws during a turn and throws automatically only once", () => {
+  it("blocks mouse throws and avoids extra launches on rerender or visibility changes", () => {
     const autoThrow = vi.spyOn(PetPlayground.prototype, "throwRandomBall");
     render(true);
     tick();
@@ -139,6 +139,28 @@ describe("project pet bar interactions", () => {
     render(false);
     render(true);
     tick();
+    expect(autoThrow).toHaveBeenCalledTimes(2);
+  });
+
+  it("repeats fetch two seconds after a catch and stops repeating when the turn ends", () => {
+    // Place each automatic throw within catch range to exercise the real catch
+    // and repeat scheduling through the mounted animation loop.
+    const autoThrow = vi
+      .spyOn(PetPlayground.prototype, "throwRandomBall")
+      .mockImplementation(function (this: PetPlayground) {
+        const pet = this.pets[0];
+        this.holdBall(pet.x + pet.width / 2, 4);
+        this.releaseBall(6, 0, 10);
+      });
+    render(true);
+    tick();
+    expect(autoThrow).toHaveBeenCalledTimes(1);
+    tick(118);
+    expect(autoThrow).toHaveBeenCalledTimes(1);
+    tick(3);
+    expect(autoThrow).toHaveBeenCalledTimes(2);
+    render(false);
+    tick(200);
     expect(autoThrow).toHaveBeenCalledTimes(2);
   });
 

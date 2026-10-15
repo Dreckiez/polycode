@@ -103,3 +103,66 @@ describe("throwing balls", () => {
     expect(world.pets[0].mode).not.toBe("with_ball");
   });
 });
+
+describe("playing fetch during a turn", () => {
+  function catchBall(world: PetPlayground) {
+    const pet = world.pets[0];
+    pet.mode = "walk";
+    world.holdBall(pet.x + pet.width / 2, 4);
+    world.releaseBall(6, 0, 10);
+    world.step(0.01);
+    expect(world.ball).toBeNull();
+    expect(pet.mode).toBe("with_ball");
+  }
+
+  function advance(world: PetPlayground, seconds: number) {
+    const frames = Math.round(seconds / 0.01);
+    for (let i = 0; i < frames; i++) world.step(0.01);
+  }
+
+  it("waits two seconds after each catch before another random throw", () => {
+    const world = playground();
+    world.syncPets([{ id: "cat", width: 40 }]);
+    world.setTurnRunning(true);
+    for (let cycle = 0; cycle < 3; cycle++) {
+      catchBall(world);
+      advance(world, 1.99);
+      expect(world.ball).toBeNull();
+      advance(world, 0.02);
+      expect(world.ball).toMatchObject({ held: false });
+    }
+  });
+
+  it("cancels the pending throw if the turn ends during the two-second wait", () => {
+    const world = playground();
+    world.syncPets([{ id: "cat", width: 40 }]);
+    world.setTurnRunning(true);
+    catchBall(world);
+    advance(world, 1);
+    world.setTurnRunning(false);
+    advance(world, 3);
+    expect(world.ball).toBeNull();
+    expect(world.pets[0].mode).not.toBe("with_ball");
+  });
+
+  it("keeps an uncaught ball after the turn ends until a pet reaches it", () => {
+    const world = playground();
+    world.resize(10000, 1);
+    world.syncPets([{ id: "cat", width: 40 }]);
+    world.pets[0].x = 0;
+    world.setTurnRunning(true);
+    world.holdBall(9000, 40);
+    world.releaseBall(100, 50, 0.5);
+    const ball = world.ball!;
+    world.setTurnRunning(false);
+    advance(world, 16);
+    expect(world.ball).toBe(ball);
+    expect(world.pets[0].mode).toBe("run");
+    world.pets[0].x = ball.x - world.pets[0].width / 2;
+    world.step(0.01);
+    expect(world.ball).toBeNull();
+    expect(world.pets[0].mode).toBe("with_ball");
+    advance(world, 3);
+    expect(world.ball).toBeNull();
+  });
+});

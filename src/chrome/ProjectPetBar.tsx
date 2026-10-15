@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent,
@@ -23,16 +24,19 @@ type Props = {
 
 export function ProjectPetBar({ project, busy, enabled, scale }: Props) {
   const [hidden, setHidden] = useState(() => document.hidden);
+  // Keep the paused scene state when its DOM is unmounted for visibility changes.
+  const world = useMemo(() => new PetPlayground(), [project]);
   const busyRef = useRef(busy);
   const projectRef = useRef(project);
   const pendingThrow = useRef(busy);
   useEffect(() => {
+    world.setTurnRunning(busy);
     if (busy && (!busyRef.current || projectRef.current !== project))
       pendingThrow.current = true;
     if (!busy) pendingThrow.current = false;
     busyRef.current = busy;
     projectRef.current = project;
-  }, [busy, project]);
+  }, [busy, project, world]);
   useEffect(() => {
     const update = () => setHidden(document.hidden);
     document.addEventListener("visibilitychange", update);
@@ -46,6 +50,7 @@ export function ProjectPetBar({ project, busy, enabled, scale }: Props) {
       project={project}
       busy={busy}
       scale={scale}
+      world={world}
       pendingThrow={pendingThrow}
     />
   ) : null;
@@ -56,16 +61,17 @@ function PetScene({
   busy,
   scale,
   pendingThrow,
-}: Omit<Props, "enabled"> & { pendingThrow: RefObject<boolean> }) {
+  world,
+}: Omit<Props, "enabled"> & {
+  pendingThrow: RefObject<boolean>;
+  world: PetPlayground;
+}) {
   const [pets, setPets] = useState<ProjectPet[]>(() =>
     loadProjectPets(project),
   );
   const stageRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLSpanElement>(null);
   const petEls = useRef(new Map<string, HTMLImageElement>());
-  const worldRef = useRef<PetPlayground | null>(null);
-  if (!worldRef.current) worldRef.current = new PetPlayground();
-  const world = worldRef.current;
   const drag = useRef<{
     pointerId: number;
     x: number;
@@ -77,6 +83,16 @@ function PetScene({
     const reload = () => setPets(loadProjectPets(project));
     return subscribeProjectPets(reload);
   }, [project]);
+
+  useEffect(
+    () => () => {
+      if (drag.current) {
+        drag.current = null;
+        world.ball = null;
+      }
+    },
+    [world],
+  );
 
   useLayoutEffect(() => {
     const stage = stageRef.current;

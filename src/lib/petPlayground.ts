@@ -13,7 +13,6 @@ export type PetBall = {
   vx: number;
   vy: number;
   held: boolean;
-  age: number;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -26,8 +25,16 @@ export class PetPlayground {
   width = 0;
   scale = 1;
   time = 0;
+  private turnRunning = false;
+  private nextThrowAt: number | null = null;
 
   constructor(private readonly random: () => number = Math.random) {}
+
+  setTurnRunning(running: boolean): void {
+    this.turnRunning = running;
+    // End the repeat cycle without interrupting a loose ball or its chase.
+    if (!running) this.nextThrowAt = null;
+  }
 
   resize(width: number, scale: number): void {
     const oldWidth = this.width;
@@ -66,13 +73,13 @@ export class PetPlayground {
   }
 
   holdBall(x: number, y: number): void {
+    this.nextThrowAt = null;
     this.ball = {
       x: this.boundBallX(x),
       y: Math.max(4 * this.scale, y),
       vx: 0,
       vy: 0,
       held: true,
-      age: 0,
     };
   }
 
@@ -102,10 +109,17 @@ export class PetPlayground {
   step(seconds: number): void {
     const dt = clamp(seconds, 0, 0.05);
     this.time += dt;
+    if (
+      this.turnRunning &&
+      this.nextThrowAt !== null &&
+      this.time >= this.nextThrowAt &&
+      !this.ball
+    ) {
+      this.throwRandomBall();
+    }
     const ball = this.ball;
     const radius = 4 * this.scale;
     if (ball && !ball.held) {
-      ball.age += dt;
       ball.vy -= 700 * this.scale * dt;
       ball.x += ball.vx * dt;
       ball.y += ball.vy * dt;
@@ -120,7 +134,6 @@ export class PetPlayground {
           Math.abs(ball.vy) > 45 * this.scale ? Math.abs(ball.vy) * 0.62 : 0;
         ball.vx *= Math.exp(-3.5 * dt);
       }
-      if (ball.age > 15) this.ball = null;
     }
 
     for (const pet of this.pets) {
@@ -142,6 +155,7 @@ export class PetPlayground {
           this.ball = null;
           pet.mode = "with_ball";
           pet.nextAction = this.time + 1.8;
+          this.nextThrowAt = this.turnRunning ? this.time + 2 : null;
           speed = 0;
         }
       } else {
