@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   PROJECT_PET_LIMIT,
+  PET_TYPES,
   addProjectPet,
   loadProjectPets,
+  petIconUrl,
   removeProjectPet,
   setLeadProjectPet,
 } from "./projectPets";
@@ -18,6 +23,22 @@ beforeEach(() => {
       setItem: (key: string, value: string) => data.set(key, value),
       removeItem: (key: string) => data.delete(key),
     },
+  });
+});
+
+describe("bundled pet icons", () => {
+  const publicRoot = fileURLToPath(new URL("../../public", import.meta.url));
+  const suffix = "_walk_8fps.gif";
+
+  it.each(PET_TYPES)("has an icon for every bundled %s color", (type) => {
+    const colors = readdirSync(join(publicRoot, "pets", type))
+      .filter((name) => name.endsWith(suffix))
+      .map((name) => name.slice(0, -suffix.length));
+    expect(colors.length).toBeGreaterThan(0);
+    for (const color of colors) {
+      const url = petIconUrl({ type, color });
+      expect(existsSync(join(publicRoot, url.slice(1))), `${type}/${color}: ${url}`).toBe(true);
+    }
   });
 });
 

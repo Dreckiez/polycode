@@ -40,6 +40,21 @@ const COLORS: Record<PetType, readonly string[]> = {
   rat: ["gray", "brown", "white"],
 };
 
+// The color in icon.png is independent of our preferred/default roster color.
+const BASE_ICON_COLORS: Record<PetType, string> = {
+  cat: "brown",
+  chicken: "white",
+  cockatiel: "gray",
+  crab: "red",
+  deno: "green",
+  dog: "brown",
+  fox: "red",
+  horse: "brown",
+  panda: "black",
+  raccoon: "gray",
+  rat: "gray",
+};
+
 const LABELS: Record<PetType, string> = {
   cat: "Cat", chicken: "Chicken", cockatiel: "Cockatiel", crab: "Crab",
   deno: "Deno", dog: "Dog", fox: "Fox", horse: "Horse", panda: "Panda",
@@ -118,7 +133,7 @@ export function petIconUrl(pet: Pick<ProjectPet, "type" | "color">): string {
   if (pet.type === "cockatiel" && pet.color === "brown") {
     return "/pets/cockatiel/brown_icon.png";
   }
-  const suffix = pet.color === COLORS[pet.type][0] ? "" : `_${pet.color}`;
+  const suffix = pet.color === BASE_ICON_COLORS[pet.type] ? "" : `_${pet.color}`;
   return `/pets/${pet.type}/icon${suffix}.png`;
 }
 
