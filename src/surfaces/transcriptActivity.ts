@@ -66,6 +66,19 @@ export function toolCallLabel(block: Block, cwd?: string): string {
   );
 }
 
+/** Shorten a shell's executable path for display without changing its arguments. */
+export function compactCommandLabel(label: string): string {
+  const executable = label.match(
+    /^(\s*(?:&\s+)?)(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s"']+))(?=\s|$)/,
+  );
+  if (!executable) return label;
+  const path = executable[2] ?? executable[3] ?? executable[4];
+  if (!/[\\/]/.test(path)) return label;
+  const name = path.split(/[\\/]/).pop() ?? "";
+  if (!/^(?:powershell|pwsh)(?:\.exe)?$/i.test(name)) return label;
+  return `${executable[1]}${name.replace(/\.exe$/i, "")}${label.slice(executable[0].length)}`;
+}
+
 export function isIncompleteTool(
   block: Block,
   label: string,

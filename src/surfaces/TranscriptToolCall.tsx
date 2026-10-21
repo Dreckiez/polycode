@@ -10,6 +10,7 @@ import {
   stubFilePreview,
 } from "../lib/harness/preview";
 import {
+  compactCommandLabel,
   editVerb,
   isIncompleteTool,
   needsApproval,
@@ -198,11 +199,12 @@ function ToolCallSummary({
   if (!action || !target) {
     return (
       <span
+        title={label}
         className={`min-w-0 flex-1 truncate font-mono text-[13px] ${
           failed ? "text-red-400" : chip ? "text-content/65" : "text-content/80"
         }`}
       >
-        {label}
+        {compactCommandLabel(label)}
       </span>
     );
   }

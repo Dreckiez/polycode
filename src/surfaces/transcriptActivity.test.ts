@@ -4,6 +4,7 @@ import {
   activityPhaseTitle,
   activityStillRunning,
   buildActivityPhases,
+  compactCommandLabel,
   editVerb,
   firstFoldableIndex,
   foldableWork,
@@ -759,6 +760,34 @@ describe("lastActivityIndex", () => {
         groupTurnItems([{ id: "a", role: "assistant", text: "Hi." }]),
       ),
     ).toBe(-1);
+  });
+});
+
+describe("compactCommandLabel", () => {
+  it.each([
+    String.raw`"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"`,
+    String.raw`"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"`,
+    String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`,
+  ])("shortens %s and preserves the command and its quoting", (executable) => {
+    const args = String.raw` -Command "Get-Content 'C:\my project\a.txt'; Write-Output 'done'"`;
+    expect(compactCommandLabel(executable + args)).toBe("powershell" + args);
+  });
+
+  it("supports quoted PowerShell 7 paths and the PowerShell call operator", () => {
+    const command = String.raw`& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -Command "git status --short"`;
+    expect(compactCommandLabel(command)).toBe('& pwsh -NoProfile -Command "git status --short"');
+  });
+
+  it("leaves unrelated commands and paths inside arguments intact", () => {
+    for (const command of [
+      'powershell -Command "Get-Date"',
+      'git status --short',
+      String.raw`"C:\Tools\other.exe" -Command "Get-Date"`,
+      String.raw`Write-Output 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'`,
+      'Read src/PowerShell.ts',
+    ]) {
+      expect(compactCommandLabel(command)).toBe(command);
+    }
   });
 });
 
