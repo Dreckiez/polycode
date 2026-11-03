@@ -333,8 +333,8 @@ export function renamePath(path: string, name: string): Promise<string> {
   return invoke<string>("rename_path", { path, name }).then(slash);
 }
 
-export function deletePath(path: string): Promise<void> {
-  return invoke<void>("delete_path", { path });
+export function trashPath(path: string): Promise<void> {
+  return invoke<void>("trash_path", { path });
 }
 
 export function copyPath(from: string, destParent: string): Promise<string> {

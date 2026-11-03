@@ -309,8 +309,11 @@ describe("FileTree render isolation", () => {
     });
   });
 
-  it("deletes the selected entry with the Delete key", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => true));
+  it("recycles the selected entry with the Delete key", async () => {
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
     await act(async () => render());
     const source = row("first.ts");
     act(() => source.click());
@@ -321,13 +324,51 @@ describe("FileTree render isolation", () => {
     });
 
     await act(async () => Promise.resolve());
-    expect(invoke).toHaveBeenCalledWith("delete_path", {
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /Move “first\.ts” to the (Recycle Bin|Trash)\? You can restore it from there\./,
+      ),
+    );
+    expect(invoke).toHaveBeenCalledWith("trash_path", {
+      path: `${cwd}/first.ts`,
+    });
+    expect(invoke).not.toHaveBeenCalledWith("delete_path", {
+      path: `${cwd}/first.ts`,
+    });
+  });
+
+  it("keeps the entry and shows the error when recycling fails", async () => {
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+    props = { ...props, onFileDeleted: vi.fn() };
+    await act(async () => render());
+    const source = row("first.ts");
+    act(() => source.click());
+    invoke.mockImplementationOnce(() => {
+      throw new Error("Could not move file to the Recycle Bin");
+    });
+    await act(async () => {
+      source.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }),
+      );
+    });
+    expect(row("first.ts")).not.toBeNull();
+    expect(container.textContent).toContain(
+      "Could not move file to the Recycle Bin",
+    );
+    expect(props.onFileDeleted).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("delete_path", {
       path: `${cwd}/first.ts`,
     });
   });
 
   it("does not delete the selected entry with Backspace", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
     await act(async () => render());
     const source = row("first.ts");
     act(() => source.click());
@@ -341,10 +382,16 @@ describe("FileTree render isolation", () => {
     expect(invoke).not.toHaveBeenCalledWith("delete_path", {
       path: `${cwd}/first.ts`,
     });
+    expect(invoke).not.toHaveBeenCalledWith("trash_path", {
+      path: `${cwd}/first.ts`,
+    });
   });
 
-  it("deletes a selected folder with the Delete key", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => true));
+  it("recycles a selected folder with the Delete key", async () => {
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
     const folder: FsEntry = {
       name: "obsolete",
       path: `${cwd}/obsolete`,
@@ -363,7 +410,10 @@ describe("FileTree render isolation", () => {
     });
 
     await act(async () => Promise.resolve());
-    expect(invoke).toHaveBeenCalledWith("delete_path", {
+    expect(invoke).toHaveBeenCalledWith("trash_path", {
+      path: `${cwd}/obsolete`,
+    });
+    expect(invoke).not.toHaveBeenCalledWith("delete_path", {
       path: `${cwd}/obsolete`,
     });
   });

@@ -41,7 +41,7 @@ import {
   basename,
   copyPath,
   createPath,
-  deletePath,
+  trashPath,
   movePath,
   renamePath,
   revealPath,
@@ -742,13 +742,14 @@ export const FileTree = memo(function FileTree({
     if (path === cwd) return;
     const isDir = isDirAt(cwd, path);
     const label = basename(path);
+    const destination = IS_WIN ? "Recycle Bin" : "Trash";
     const ok = window.confirm(
       isDir
-        ? `Delete folder “${label}” and everything inside it?`
-        : `Delete “${label}”?`,
+        ? `Move folder “${label}” and everything inside it to the ${destination}? You can restore it from there.`
+        : `Move “${label}” to the ${destination}? You can restore it from there.`,
     );
     if (!ok) return;
-    await deletePath(path);
+    await trashPath(path);
     await refreshTouched([parentPath(path)], isDir ? [path] : []);
     store.setState((prev) => {
       if (

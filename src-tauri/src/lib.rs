@@ -243,6 +243,7 @@ pub fn run() {
             fs::create_path,
             fs::rename_path,
             fs::delete_path,
+            fs::trash_path,
             fs::copy_path,
             fs::move_path,
             fs::reveal_path,

@@ -2801,6 +2801,37 @@ pub async fn rename_path(path: String, name: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?
 }
 
+fn trash_path_with(
+    path: &str,
+    recycle: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<(), String> {
+    let path = expand_home(path);
+    // symlink_metadata also permits recycling a broken link without following it.
+    std::fs::symlink_metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    recycle(&path).map_err(|error| {
+        let destination = if cfg!(windows) {
+            "Recycle Bin"
+        } else {
+            "Trash"
+        };
+        format!(
+            "Could not move {} to the {destination}: {error}",
+            path.display()
+        )
+    })
+}
+
+/// User-initiated deletion must be recoverable. Never fall back to remove_file/remove_dir_all.
+#[tauri::command]
+pub async fn trash_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        trash_path_with(&path, |path| trash::delete(path).map_err(|e| e.to_string()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// Permanent removal is reserved for internal temporary-file cleanup.
 fn delete_path_sync(path: &str) -> Result<(), String> {
     let path = expand_home(path);
     if !path.exists() {
@@ -3042,6 +3073,60 @@ mod tests {
         assert_eq!(split_stem_ext("foo.d.ts"), ("foo.d", ".ts"));
         assert_eq!(split_stem_ext(".gitignore"), (".gitignore", ""));
         assert_eq!(split_stem_ext("Makefile"), ("Makefile", ""));
+    }
+
+    #[test]
+    fn recycling_moves_files_and_whole_folders_through_the_recycler() {
+        let dir = tmp("recycle");
+        let bin = dir.0.join("test-bin");
+        std::fs::create_dir(&bin).unwrap();
+        let file = dir.0.join("notes.md");
+        std::fs::write(&file, "keep this file\n").unwrap();
+        let folder = dir.0.join("docs");
+        std::fs::create_dir_all(folder.join("nested")).unwrap();
+        std::fs::write(folder.join("nested/report.md"), "keep this report\n").unwrap();
+
+        for path in [&file, &folder] {
+            // An injected recycler keeps this unit test out of the user's real bin.
+            trash_path_with(&path.to_string_lossy(), |source| {
+                std::fs::rename(source, bin.join(source.file_name().unwrap()))
+                    .map_err(|error| error.to_string())
+            })
+            .unwrap();
+            assert!(!path.exists());
+        }
+        assert_eq!(
+            std::fs::read_to_string(bin.join("notes.md")).unwrap(),
+            "keep this file\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(bin.join("docs/nested/report.md")).unwrap(),
+            "keep this report\n"
+        );
+    }
+
+    #[test]
+    fn recycling_failure_keeps_the_file_and_folder_contents() {
+        let dir = tmp("recycle-failure");
+        let file = dir.0.join("notes.md");
+        std::fs::write(&file, "keep this file\n").unwrap();
+        let folder = dir.0.join("docs");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("report.md"), "keep this report\n").unwrap();
+
+        for path in [&file, &folder] {
+            let error = trash_path_with(&path.to_string_lossy(), |_| {
+                Err("Recycling is unavailable".into())
+            })
+            .unwrap_err();
+            assert!(error.contains("Recycling is unavailable"));
+            assert!(path.exists());
+        }
+        assert_eq!(std::fs::read_to_string(file).unwrap(), "keep this file\n");
+        assert_eq!(
+            std::fs::read_to_string(folder.join("report.md")).unwrap(),
+            "keep this report\n"
+        );
     }
 
     #[test]
