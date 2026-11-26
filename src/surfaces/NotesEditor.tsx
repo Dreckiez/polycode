@@ -58,6 +58,7 @@ function NoteDetailTab({
 
 export function NoteDetail({
   note,
+  compact,
   logos,
   mascots,
   colors,
@@ -67,6 +68,7 @@ export function NoteDetail({
   onAddToChat,
 }: {
   note: Note | null;
+  compact: boolean;
   onSaved: (note: Note) => void;
   onDelete: (id: string) => void | Promise<void>;
   onAddToChat: (note: Note) => void;
@@ -83,6 +85,7 @@ export function NoteDetail({
     <NoteEditor
       key={note.id}
       note={note}
+      compact={compact}
       logos={logos}
       mascots={mascots}
       colors={colors}
@@ -96,6 +99,7 @@ export function NoteDetail({
 
 function NoteEditor({
   note,
+  compact,
   logos,
   mascots,
   colors,
@@ -105,6 +109,7 @@ function NoteEditor({
   onAddToChat,
 }: {
   note: Note;
+  compact: boolean;
   onSaved: (note: Note) => void;
   onDelete: (id: string) => void | Promise<void>;
   onAddToChat: (note: Note) => void;
@@ -314,7 +319,11 @@ function NoteEditor({
       ref={lockOverscroll}
       className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none"
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-8 py-8">
+      <div
+        className={`mx-auto flex w-full max-w-5xl flex-col gap-5 ${
+          compact ? "p-4" : "px-8 py-8"
+        }`}
+      >
         <header className="flex flex-col gap-3">
           <div className="flex min-w-0 items-center gap-2 text-[12px] text-content/50">
             <File className="size-3.5 shrink-0" strokeWidth={1.75} />

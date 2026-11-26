@@ -338,6 +338,7 @@ export default function App({
   const [searchViewFocusToken, setSearchViewFocusToken] = useState(0);
 
   const [notesViewOpen, setNotesViewOpen] = useState(false);
+  const [notesBesideSession, setNotesBesideSession] = useState(false);
   const notesEnabled = useSyncExternalStore(
     subscribeNotesEnabled,
     loadNotesEnabled,
@@ -356,6 +357,7 @@ export default function App({
 
   const onOpenArtifact = useCallback(
     (sessionId: string, artifactId: string) => {
+      setNotesBesideSession(false);
       setActiveArtifact({ id: artifactId, sessionId });
     },
     [],
@@ -457,7 +459,9 @@ export default function App({
   whatsNewVersionRef.current = whatsNewVersion;
 
   useEffect(() => {
-    if (!notesEnabled) setNotesViewOpen(false);
+    if (notesEnabled) return;
+    setNotesViewOpen(false);
+    setNotesBesideSession(false);
   }, [notesEnabled]);
 
   const projectReturnRef = useRef<ProjectReturnMemory>(
@@ -2035,11 +2039,19 @@ export default function App({
     setFilePickerOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
+    setNotesBesideSession(false);
     setNotesViewOpen(true);
+  }, []);
+
+  const onOpenNoteBesideSession = useCallback(() => {
+    setActiveArtifact(null);
+    setNotesViewOpen(false);
+    setNotesBesideSession(true);
   }, []);
 
   const onLeaveNotes = useCallback(() => {
     setNotesViewOpen(false);
+    setNotesBesideSession(false);
   }, []);
 
   const { onOpenSettings, openSettings } = useOpenSettings({
@@ -2349,7 +2361,7 @@ export default function App({
         onOpenNotes={notesEnabled ? onOpenNotes : undefined}
         onGoToFile={onGoToFile}
         searchActive={searchViewOpen}
-        notesActive={notesViewOpen}
+        notesActive={notesViewOpen || notesBesideSession}
         notesEnabled={notesEnabled}
         projectRailOpen={projectRailOpen}
         onToggleProjectRail={onToggleProjectRail}
@@ -2367,75 +2379,80 @@ export default function App({
       <div className="body-glass flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           className={
-            searchViewOpen || settingsOpen || notesViewOpen
+            searchViewOpen || settingsOpen
               ? "hidden"
-              : "flex min-h-0 min-w-0 flex-1 flex-col"
+              : `grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] ${
+                  notesBesideSession
+                    ? "grid-cols-[minmax(0,1fr)_min(440px,45%)]"
+                    : "grid-cols-1"
+                }`
           }
-          aria-hidden={
-            searchViewOpen || settingsOpen || notesViewOpen
-          }
-          inert={
-            searchViewOpen ||
-            settingsOpen ||
-            notesViewOpen ||
-            undefined
-          }
+          aria-hidden={searchViewOpen || settingsOpen}
+          inert={searchViewOpen || settingsOpen || undefined}
         >
-          {!IS_MAC ? (
-            <MenuBar
+          <div className={notesViewOpen ? "hidden" : "col-span-full row-start-1"}>
+            {!IS_MAC ? (
+              <MenuBar
+                onNew={onNew}
+                onNewTerminal={projectTerminal.onNewTerminal}
+                onToggleTerminal={projectTerminal.onToggleProjectTerminal}
+                onGoToFile={onGoToFile}
+                onToggleSidebar={onToggleSidebar}
+                onShowSourceControl={onToggleChanges}
+                onCloseCurrentTab={
+                  activeTabId ? () => onCloseTab(activeTabId) : undefined
+                }
+                onCloseOtherTabs={onCloseOtherTabs}
+                onPickProject={pickProject}
+                onFindInProject={onFindInProject}
+                onSearch={onOpenSearch}
+                onOpenNotes={notesEnabled ? onOpenNotes : undefined}
+                onZoomIn={() => {
+                  const next = saveUiScale(zoomInUiScale(loadUiScale()));
+                  void applyUiScale(next);
+                }}
+                onZoomOut={() => {
+                  const next = saveUiScale(zoomOutUiScale(loadUiScale()));
+                  void applyUiScale(next);
+                }}
+                onZoomReset={() => {
+                  saveUiScale(UI_SCALE_DEFAULT);
+                  void applyUiScale(UI_SCALE_DEFAULT);
+                }}
+              />
+            ) : null}
+            <TitleBar
+              tabs={titleTabs}
+              activeId={activeTabId}
+              cwd={sidebarCwd}
+              projectRailOpen={projectRailOpen}
+              onToggleSidebar={onToggleSidebar}
+              onSelect={activateTab}
               onNew={onNew}
               onNewTerminal={projectTerminal.onNewTerminal}
-              onToggleTerminal={projectTerminal.onToggleProjectTerminal}
-              onGoToFile={onGoToFile}
-              onToggleSidebar={onToggleSidebar}
-              onShowSourceControl={onToggleChanges}
-              onCloseCurrentTab={
-                activeTabId ? () => onCloseTab(activeTabId) : undefined
+              onShowTerminal={projectTerminal.onShowProjectTerminal}
+              projectTerminalActive={
+                !!currentProjectDock && currentProjectDock.pane.files.length > 0
               }
-              onCloseOtherTabs={onCloseOtherTabs}
-              onPickProject={pickProject}
-              onFindInProject={onFindInProject}
-              onSearch={onOpenSearch}
+              onOpenSettings={onOpenSettings}
               onOpenNotes={notesEnabled ? onOpenNotes : undefined}
-              onZoomIn={() => {
-                const next = saveUiScale(zoomInUiScale(loadUiScale()));
-                void applyUiScale(next);
-              }}
-              onZoomOut={() => {
-                const next = saveUiScale(zoomOutUiScale(loadUiScale()));
-                void applyUiScale(next);
-              }}
-              onZoomReset={() => {
-                saveUiScale(UI_SCALE_DEFAULT);
-                void applyUiScale(UI_SCALE_DEFAULT);
-              }}
+              onClose={onCloseTitleTab}
+              onCloseMany={onCloseTabs}
+              onReorder={onReorderTabs}
+              onGoToFile={onGoToFile}
+              recents={recents}
+              onSelectProject={onSelectProject}
+              onOpenProject={pickProject}
             />
-          ) : null}
-          <TitleBar
-            tabs={titleTabs}
-            activeId={activeTabId}
-            cwd={sidebarCwd}
-            projectRailOpen={projectRailOpen}
-            onToggleSidebar={onToggleSidebar}
-            onSelect={activateTab}
-            onNew={onNew}
-            onNewTerminal={projectTerminal.onNewTerminal}
-            onShowTerminal={projectTerminal.onShowProjectTerminal}
-            projectTerminalActive={
-              !!currentProjectDock && currentProjectDock.pane.files.length > 0
-            }
-            onOpenSettings={onOpenSettings}
-            onOpenNotes={notesEnabled ? onOpenNotes : undefined}
-            onClose={onCloseTitleTab}
-            onCloseMany={onCloseTabs}
-            onReorder={onReorderTabs}
-            onGoToFile={onGoToFile}
-            recents={recents}
-            onSelectProject={onSelectProject}
-            onOpenProject={pickProject}
-          />
+          </div>
 
-          <main className="relative min-h-0 min-w-0 flex-1">
+          <main
+            className={
+              notesViewOpen
+                ? "hidden"
+                : "relative col-start-1 row-start-2 min-h-0 min-w-0"
+            }
+          >
             <div
               ref={dockGridRef}
               className="absolute inset-0 grid h-full min-h-0 min-w-0"
@@ -2546,6 +2563,23 @@ export default function App({
               </div>
             </div>
           </main>
+          {notesViewOpen || notesBesideSession ? (
+            <div
+              className={`row-start-2 flex min-h-0 min-w-0 ${
+                notesBesideSession ? "col-start-2" : "col-start-1"
+              }`}
+            >
+              <NotesView
+                besideRail={projectRailOpen}
+                besideSession={notesBesideSession}
+                cwd={projectCwd}
+                onClose={onLeaveNotes}
+                onOpenBesideSession={active ? onOpenNoteBesideSession : undefined}
+                onOpenFull={onOpenNotes}
+                onToggleSidebar={onToggleSidebar}
+              />
+            </div>
+          ) : null}
         </div>
         {searchViewOpen ? (
           <SearchView
@@ -2561,14 +2595,6 @@ export default function App({
             onOpenFile={onOpenFile}
             onOpenSession={onSelectHistorySession}
             onOpenProject={onSelectProject}
-          />
-        ) : null}
-        {notesViewOpen ? (
-          <NotesView
-            besideRail={projectRailOpen}
-            cwd={projectCwd}
-            onClose={onLeaveNotes}
-            onToggleSidebar={onToggleSidebar}
           />
         ) : null}
         {settingsOpen ? (

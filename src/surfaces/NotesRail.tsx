@@ -1,7 +1,16 @@
 import {
+  useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { LoaderCircle, Plus, Search } from "../chrome/icons";
+import {
+  LoaderCircle,
+  MoreHorizontal,
+  PanelRight,
+  Plus,
+  Search,
+} from "../chrome/icons";
+import { Popover } from "../chrome/Popover";
 import { ProjectLogoIcon } from "../chrome/ProjectLogoIcon";
 import { ProjectMascot } from "../chrome/ProjectMascot";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
@@ -62,22 +71,23 @@ function NoteCard({
   colors,
   customColors,
   onSelect,
+  onOpenBesideSession,
 }: {
   note: Note;
   active: boolean;
   onSelect: () => void;
+  onOpenBesideSession?: () => void;
 } & ProjectMarks) {
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const menuItem = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const preview = notePreview(note.body, note.title);
   const project = noteSourceProject(note.sourceCwd);
   const time = formatRelativeTime(new Date(note.updatedAt).toISOString());
   const hint = [note.title, project].filter(Boolean).join(" · ");
   return (
-    <button
-      type="button"
-      title={hint}
-      aria-current={active ? "true" : undefined}
-      onClick={onSelect}
-      className={`flex w-full flex-col rounded-md border px-2.5 py-2 text-left ${
+    <li
+      className={`relative flex min-w-0 flex-col rounded-md border px-2.5 py-2 ${
         active
           ? "border-transparent bg-content/10 text-content"
           : "border-transparent text-content/80 hover:bg-content/5 hover:text-content"
@@ -103,14 +113,40 @@ function NoteCard({
           </span>
         ) : null}
       </span>
-      <span className="mt-1 line-clamp-1 text-[13px] font-semibold leading-snug text-content">
-        {note.title}
-      </span>
-      {preview ? (
-        <span className="mt-1 line-clamp-1 text-[12px] leading-snug text-content/45">
-          {preview}
-        </span>
-      ) : null}
+      <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5">
+        <button
+          type="button"
+          title={hint}
+          aria-current={active ? "true" : undefined}
+          onClick={onSelect}
+          className={`row-start-1 min-w-0 text-left text-[13px] font-semibold leading-snug text-content after:absolute after:inset-0 after:rounded-md after:content-[''] ${
+            preview ? "col-span-full" : "col-start-1"
+          }`}
+        >
+          <span className="block truncate">{note.title}</span>
+        </button>
+        {preview ? (
+          <span className="col-start-1 row-start-2 mt-1 line-clamp-1 text-[12px] leading-snug text-content/45">
+            {preview}
+          </span>
+        ) : null}
+        {onOpenBesideSession ? (
+          <button
+            ref={menuTrigger}
+            type="button"
+            title="Note actions"
+            aria-label={`Actions for ${note.title}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+            className={`relative z-[1] col-start-2 grid size-5 place-items-center rounded text-content/50 hover:bg-content/10 hover:text-content ${
+              preview ? "row-start-2 mt-1" : "row-start-1"
+            }`}
+          >
+            <MoreHorizontal className="size-3.5" strokeWidth={1.75} />
+          </button>
+        ) : null}
+      </div>
       {note.tags.length > 0 ? (
         <span className="mt-1.5 flex min-w-0 items-center gap-1 overflow-hidden">
           {note.tags.slice(0, 3).map((tag) => (
@@ -128,7 +164,48 @@ function NoteCard({
           ) : null}
         </span>
       ) : null}
-    </button>
+      {menuOpen && onOpenBesideSession ? (
+        <Popover
+          anchor={menuTrigger}
+          align="end"
+          gap={4}
+          autoFocus
+          role="menu"
+          aria-label={`Actions for ${note.title}`}
+          tabIndex={-1}
+          className="p-1"
+          onFocus={(event) => {
+            if (event.target === event.currentTarget) menuItem.current?.focus();
+          }}
+          onBlur={(event) => {
+            if (
+              event.relatedTarget !== menuTrigger.current &&
+              !event.currentTarget.contains(event.relatedTarget)
+            ) {
+              setMenuOpen(false);
+            }
+          }}
+          onDismiss={(reason) => {
+            setMenuOpen(false);
+            if (reason === "escape") menuTrigger.current?.focus();
+          }}
+        >
+          <button
+            ref={menuItem}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false);
+              onOpenBesideSession();
+            }}
+            className="flex w-full cursor-pointer items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-[12px] text-content hover:bg-content/10 focus-visible:bg-content/10"
+          >
+            <PanelRight className="size-3.5" strokeWidth={1.75} />
+            Open beside session
+          </button>
+        </Popover>
+      ) : null}
+    </li>
   );
 }
 
@@ -147,6 +224,7 @@ type Props = {
   visible: Note[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpenBesideSession?: (id: string) => void;
 } & ProjectMarks;
 
 export function NotesRail({
@@ -164,6 +242,7 @@ export function NotesRail({
   visible,
   selectedId,
   onSelect,
+  onOpenBesideSession,
   logos,
   mascots,
   colors,
@@ -225,17 +304,21 @@ export function NotesRail({
         ) : (
           <ul className="flex flex-col gap-0.5 p-1.5">
             {visible.map((note) => (
-              <li key={note.id}>
-                <NoteCard
-                  note={note}
-                  active={selectedId === note.id}
-                  logos={logos}
-                  mascots={mascots}
-                  colors={colors}
-                  customColors={customColors}
-                  onSelect={() => onSelect(note.id)}
-                />
-              </li>
+              <NoteCard
+                key={note.id}
+                note={note}
+                active={selectedId === note.id}
+                logos={logos}
+                mascots={mascots}
+                colors={colors}
+                customColors={customColors}
+                onSelect={() => onSelect(note.id)}
+                onOpenBesideSession={
+                  onOpenBesideSession
+                    ? () => onOpenBesideSession(note.id)
+                    : undefined
+                }
+              />
             ))}
           </ul>
         )}

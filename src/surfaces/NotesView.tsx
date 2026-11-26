@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { File } from "../chrome/icons";
-import { OverlayNav } from "../chrome/TitleBar";
+import { File, Maximize2, X } from "../chrome/icons";
+import { IconButton, OverlayNav } from "../chrome/TitleBar";
 import { WindowControls } from "../chrome/WindowControls";
 import { useDragResize } from "../hooks/useDragResize";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
@@ -31,15 +31,21 @@ let rememberedNoteId: string | null = null;
 
 type Props = {
   besideRail?: boolean;
+  besideSession?: boolean;
   cwd?: string;
   onClose: () => void;
+  onOpenBesideSession?: () => void;
+  onOpenFull?: () => void;
   onToggleSidebar?: () => void;
 };
 
 export function NotesView({
   besideRail = false,
+  besideSession = false,
   cwd,
   onClose,
+  onOpenBesideSession,
+  onOpenFull,
   onToggleSidebar,
 }: Props) {
   const onCloseRef = useRef(onClose);
@@ -92,15 +98,16 @@ export function NotesView({
   }, [selectedId]);
 
   useEffect(() => {
+    if (besideSession) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
       event.stopPropagation();
       onCloseRef.current();
     };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [besideSession]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -170,19 +177,28 @@ export function NotesView({
     onClose();
   };
 
+  const openBesideSession = (id: string) => {
+    setSelectedId(id);
+    onOpenBesideSession?.();
+  };
+
   return (
     <div
       role="region"
-      aria-label="Notes"
+      aria-label={besideSession ? "Note beside session" : "Notes"}
       data-app-notes
-      className="flex min-h-0 min-w-0 flex-1 flex-col text-content"
+      className={`flex min-h-0 min-w-0 flex-1 flex-col text-content ${
+        besideSession ? "border-l border-content/10" : ""
+      }`}
     >
       <div
         className="flex h-10 shrink-0 select-none items-center border-b border-content/10"
-        data-tauri-drag-region="deep"
+        data-tauri-drag-region={besideSession ? undefined : "deep"}
       >
-        {IS_MAC && !besideRail ? <div className="w-[78px] shrink-0" /> : null}
-        {besideRail ? null : (
+        {IS_MAC && !besideRail && !besideSession ? (
+          <div className="w-[78px] shrink-0" />
+        ) : null}
+        {besideRail || besideSession ? null : (
           <OverlayNav onBack={onClose} onToggleSidebar={onToggleSidebar} />
         )}
         <div className="flex min-w-0 flex-1 items-center gap-2 px-3 text-[13px]">
@@ -190,33 +206,52 @@ export function NotesView({
             className="size-3.5 shrink-0 text-content/45"
             strokeWidth={1.75}
           />
-          <span className="min-w-0 truncate text-content">Notes</span>
+          <span className="min-w-0 truncate text-content">
+            {besideSession ? (selected?.title ?? "Note") : "Notes"}
+          </span>
         </div>
-        {IS_MAC ? null : <WindowControls />}
+        {besideSession ? (
+          <div className="flex shrink-0 items-center gap-1 px-2">
+            <IconButton label="Open full Notes" onClick={onOpenFull}>
+              <Maximize2 className="size-3.5" />
+            </IconButton>
+            <IconButton label="Close note pane" onClick={onClose}>
+              <X className="size-3.5" />
+            </IconButton>
+          </div>
+        ) : IS_MAC ? null : (
+          <WindowControls />
+        )}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1">
-        <NotesRail
-          paneRef={resize.setPaneRef}
-          dragging={resize.dragging}
-          onResizeStart={resize.onPointerDown}
-          onResizeReset={resize.onDoubleClick}
-          query={query}
-          onQueryChange={setQuery}
-          creating={creating}
-          onCreate={onCreate}
-          error={error}
-          loading={loading}
-          notes={notes}
-          visible={visible}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-          logos={logos}
-          mascots={groupMascots}
-          colors={groupColors}
-          customColors={groupCustomColors}
-        />
+        {besideSession ? null : (
+          <NotesRail
+            paneRef={resize.setPaneRef}
+            dragging={resize.dragging}
+            onResizeStart={resize.onPointerDown}
+            onResizeReset={resize.onDoubleClick}
+            query={query}
+            onQueryChange={setQuery}
+            creating={creating}
+            onCreate={onCreate}
+            error={error}
+            loading={loading}
+            notes={notes}
+            visible={visible}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
+            onOpenBesideSession={
+              onOpenBesideSession ? openBesideSession : undefined
+            }
+            logos={logos}
+            mascots={groupMascots}
+            colors={groupColors}
+            customColors={groupCustomColors}
+          />
+        )}
         <NoteDetail
           note={selected}
+          compact={besideSession}
           logos={logos}
           mascots={groupMascots}
           colors={groupColors}

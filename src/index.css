@@ -79,7 +79,8 @@ html:not(.is-mac) #root {
   text-rendering: optimizeLegibility;
 }
 
-/* Interactive controls in settings (tabs, buttons, switches, sliders) show cursor: pointer */
+/* Interactive controls in Notes and Settings show a pointer cursor. */
+[data-app-notes] button:not(:disabled),
 [data-app-settings] button:not(:disabled),
 [data-app-settings] [role="switch"]:not(:disabled),
 [data-app-settings] [role="radio"]:not(:disabled),
