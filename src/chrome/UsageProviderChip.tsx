@@ -31,6 +31,7 @@ export function UsageProviderChip({
   accountId,
   onSelectAccount,
   onAddAccount,
+  onManageAccounts,
   onConsumeReset,
   onReconnect,
 }: {
@@ -40,6 +41,7 @@ export function UsageProviderChip({
   accountId?: string;
   onSelectAccount?: (accountId: string) => void;
   onAddAccount?: (label: string) => Promise<ProviderAccount>;
+  onManageAccounts?: () => void;
   onConsumeReset?: (creditId?: string) => Promise<CodexRateLimitResetOutcome>;
   onReconnect?: () => Promise<void>;
 }) {
@@ -82,9 +84,7 @@ export function UsageProviderChip({
     .join(" · ");
   const providerLabel = HARNESS_TITLE[limits.provider];
   const activeAccount = accounts.find((account) => account.id === accountId);
-  const canManageAccounts = Boolean(
-    activeAccount && onSelectAccount && onAddAccount,
-  );
+  const canManageAccounts = Boolean(onSelectAccount && onAddAccount);
   useEffect(() => {
     if (open) return;
     setResetAction("idle");
@@ -235,6 +235,10 @@ export function UsageProviderChip({
             resetError={resetError}
             canUse={Boolean(onConsumeReset)}
             onAddAccount={onAddAccount}
+            onManageAccounts={onManageAccounts && (() => {
+                setOpen(false);
+                onManageAccounts();
+              })}
             onViewChange={setAccountView}
             onSelectAccount={(nextAccountId) => {
               onSelectAccount?.(nextAccountId);

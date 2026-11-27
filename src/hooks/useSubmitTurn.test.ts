@@ -205,6 +205,7 @@ vi.mock("../lib/settings", () => ({
   loadFollowUpBehavior: lib.loadFollowUpBehavior,
 }));
 vi.mock("../lib/providerAccounts", () => ({
+  isProviderAccountRemoved: () => false,
   selectedProviderAccountId: lib.selectedProviderAccountId,
 }));
 vi.mock("../lib/models", () => ({

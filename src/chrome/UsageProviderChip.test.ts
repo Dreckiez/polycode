@@ -177,7 +177,8 @@ describe("UsageProviderChip", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("does not display another account when the pinned account is missing", async () => {
+  it("keeps account management available when the pinned account was removed", async () => {
+    const onManageAccounts = vi.fn();
     act(() =>
       root.render(
         createElement(UsageProviderChip, {
@@ -195,6 +196,7 @@ describe("UsageProviderChip", () => {
           ],
           onSelectAccount: vi.fn(),
           onAddAccount: vi.fn(),
+          onManageAccounts,
         }),
       ),
     );
@@ -202,9 +204,12 @@ describe("UsageProviderChip", () => {
     const trigger = button("Codex usage details");
     expect(trigger.textContent).not.toContain("Default account");
     await act(async () => trigger.click());
-    expect(
-      document.querySelector('[aria-label="Switch Codex account"]'),
-    ).toBeNull();
+    const switchAccount = button("Switch Codex account");
+    expect(switchAccount.textContent).toContain("Removed account");
+    await act(async () => switchAccount.click());
+    await act(async () => button("Manage accounts…").click());
+    expect(onManageAccounts).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("shows and deliberately consumes a banked reset", async () => {

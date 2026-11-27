@@ -22,6 +22,7 @@ import {
   idleRateLimits,
   RATE_LIMIT_POLL_MS,
   shouldFetchProvider,
+  unavailableRateLimits,
   type ProviderRateLimits,
   type RateLimitProvider,
 } from "../lib/rateLimits";
@@ -67,6 +68,7 @@ export function UsageFooter({
   onShowTerminal,
   projectTerminalActive = false,
   onSelectAccount,
+  onManageAccounts,
 }: {
   providers: RateLimitProvider[];
   session?: UsageFooterSession;
@@ -78,6 +80,7 @@ export function UsageFooter({
   onShowTerminal?: () => void;
   projectTerminalActive?: boolean;
   onSelectAccount?: (provider: RateLimitProvider, accountId: string) => void;
+  onManageAccounts?: () => void;
 }) {
   const wantClaude = providers.includes("claude");
   const wantCodex = providers.includes("codex");
@@ -118,6 +121,12 @@ export function UsageFooter({
       : selectedProviderAccountId("codex", project);
   const claudeAccounts = providerAccounts("claude");
   const codexAccounts = providerAccounts("codex");
+  const claudeAccountAvailable = claudeAccounts.some(
+    ({ id }) => id === claudeAccountId,
+  );
+  const codexAccountAvailable = codexAccounts.some(
+    ({ id }) => id === codexAccountId,
+  );
   const claudeAccountRef = useRef(claudeAccountId);
   const codexAccountRef = useRef(codexAccountId);
   claudeAccountRef.current = claudeAccountId;
@@ -137,9 +146,12 @@ export function UsageFooter({
       const visible = document.visibilityState === "visible";
       const fetchClaude =
         wantClaude &&
+        claudeAccountAvailable &&
         shouldFetchProvider(claudeRef.current, { force, visible });
       const fetchCodex =
-        wantCodex && shouldFetchProvider(codexRef.current, { force, visible });
+        wantCodex &&
+        codexAccountAvailable &&
+        shouldFetchProvider(codexRef.current, { force, visible });
       const fetchOpencode =
         wantOpencode &&
         shouldFetchProvider(opencodeRef.current, { force, visible });
@@ -195,7 +207,9 @@ export function UsageFooter({
       return run;
     },
     [
+      claudeAccountAvailable,
       claudeAccountId,
+      codexAccountAvailable,
       codexAccountId,
       model,
       wantAntigravity,
@@ -385,7 +399,11 @@ export function UsageFooter({
         <>
           {wantClaude ? (
             <UsageProviderChip
-              limits={claude}
+              limits={
+                claudeAccountAvailable
+                  ? claude
+                  : unavailableRateLimits("claude", "This conversation uses a removed account")
+              }
               now={now}
               accounts={claudeAccounts}
               accountId={claudeAccountId}
@@ -393,19 +411,27 @@ export function UsageFooter({
                 selectAccount("claude", accountId)
               }
               onAddAccount={(label) => addAccount("claude", label)}
-              onReconnect={reconnectClaude}
+              onManageAccounts={onManageAccounts}
+              onReconnect={claudeAccountAvailable ? reconnectClaude : undefined}
             />
           ) : null}
           {wantCodex ? (
             <UsageProviderChip
-              limits={codex}
+              limits={
+                codexAccountAvailable
+                  ? codex
+                  : unavailableRateLimits("codex", "This conversation uses a removed account")
+              }
               now={now}
               accounts={codexAccounts}
               accountId={codexAccountId}
               onSelectAccount={(accountId) => selectAccount("codex", accountId)}
               onAddAccount={(label) => addAccount("codex", label)}
-              onConsumeReset={consumeCodexReset}
-              onReconnect={reconnectCodex}
+              onManageAccounts={onManageAccounts}
+              onConsumeReset={
+                codexAccountAvailable ? consumeCodexReset : undefined
+              }
+              onReconnect={codexAccountAvailable ? reconnectCodex : undefined}
             />
           ) : null}
           {showOpencodeChip ? (

@@ -41,6 +41,7 @@ export function UsagePanel({
   resetError,
   canUse,
   onAddAccount,
+  onManageAccounts,
   onViewChange,
   onSelectAccount,
   onReconnect,
@@ -66,6 +67,7 @@ export function UsagePanel({
   resetError: string | null;
   canUse: boolean;
   onAddAccount?: (label: string) => Promise<ProviderAccount>;
+  onManageAccounts?: () => void;
   onViewChange: (view: "usage" | "accounts" | "add") => void;
   onSelectAccount: (accountId: string) => void;
   onReconnect: () => void;
@@ -77,13 +79,14 @@ export function UsagePanel({
   onCancelReset: () => void;
   onClose: () => void;
 }) {
-  return accountView === "accounts" && activeAccount ? (
+  return accountView === "accounts" ? (
     <ProviderAccountPicker
       providerLabel={providerLabel}
       accounts={accounts}
-      accountId={activeAccount.id}
+      accountId={activeAccount?.id}
       onBack={() => onViewChange("usage")}
       onAdd={() => onViewChange("add")}
+      onManage={onManageAccounts}
       onSelect={onSelectAccount}
     />
   ) : accountView === "add" ? (
@@ -121,14 +124,14 @@ export function UsagePanel({
           <p className="mt-0.5 text-[10px] leading-4 text-content/40">
             {updatedLabel(limits, now)}
           </p>
-          {canManageAccounts && activeAccount ? (
+          {canManageAccounts ? (
             <button
               type="button"
               className="mt-1 -ml-1 inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] text-content/55 hover:bg-content/10 hover:text-content"
               aria-label={`Switch ${providerLabel} account`}
               onClick={() => onViewChange("accounts")}
             >
-              <span className="truncate">{activeAccount.label}</span>
+              <span className="truncate">{activeAccount?.label ?? "Removed account"}</span>
               <ChevronRight
                 className="size-2.5 shrink-0"
                 strokeWidth={1.75}
@@ -220,13 +223,15 @@ function ProviderAccountPicker({
   accountId,
   onBack,
   onAdd,
+  onManage,
   onSelect,
 }: {
   providerLabel: string;
   accounts: ProviderAccount[];
-  accountId: string;
+  accountId?: string;
   onBack: () => void;
   onAdd: () => void;
+  onManage?: () => void;
   onSelect: (accountId: string) => void;
 }) {
   return (
@@ -281,6 +286,15 @@ function ProviderAccountPicker({
         <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
         Add account
       </button>
+      {onManage ? (
+        <button
+          type="button"
+          className="mt-0.5 flex h-8 w-full cursor-pointer items-center rounded-lg px-2.5 text-left text-[11px] text-content/55 hover:bg-content/[0.07] hover:text-content"
+          onClick={onManage}
+        >
+          Manage accounts…
+        </button>
+      ) : null}
     </div>
   );
 }

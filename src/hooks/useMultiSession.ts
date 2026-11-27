@@ -46,7 +46,11 @@ import {
   type HarnessEvent,
 } from "../lib/harness";
 import { syncDockBadge } from "../lib/dockBadge";
-import { selectedProviderAccountId } from "../lib/providerAccounts";
+import {
+  isProviderAccountRemoved,
+  REMOVED_PROVIDER_ACCOUNT_MESSAGE,
+  selectedProviderAccountId,
+} from "../lib/providerAccounts";
 import { requestAddToChat } from "../lib/quoteDraft";
 
 export type MultiSessionDeps = {
@@ -195,6 +199,18 @@ export function useMultiSession(deps: MultiSessionDeps) {
         d.sessionsRef.current = unsupported;
         syncDockBadge(unsupported);
         d.setSessions(unsupported);
+        return true;
+      }
+
+      if (
+        (current.harness === "claude" || current.harness === "codex") &&
+        isProviderAccountRemoved(current.harness, current.providerAccountId)
+      ) {
+        d.enqueueHarnessEvent(sessionId, {
+          type: "session.error",
+          message: REMOVED_PROVIDER_ACCOUNT_MESSAGE,
+        });
+        d.flushHarnessEvents();
         return true;
       }
 

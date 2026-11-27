@@ -33,9 +33,9 @@ export const SETTINGS_SECTIONS: {
   },
   {
     id: "providers",
-    label: "Providers",
+    label: "Models & accounts",
     description:
-      "Agent CLIs PolyCode can drive, and the model new sessions start with.",
+      "Manage provider profiles and choose the models new sessions start with.",
   },
   {
     id: "skills",

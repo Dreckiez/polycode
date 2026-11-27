@@ -2626,6 +2626,7 @@ export default function App({
             session={usageSession}
             project={active?.cwd ?? projectCwd}
             onSelectAccount={onSelectProviderAccount}
+            onManageAccounts={() => openSettings("providers")}
             terminals={runningTerminals}
             terminalOpen={runningTerminalOpen}
             onToggleTerminal={projectTerminal.onToggleRunningTerminal}

@@ -71,6 +71,7 @@ vi.mock("../lib/dockBadge", () => ({
   syncDockBadge: mocks.syncDockBadge,
 }));
 vi.mock("../lib/providerAccounts", () => ({
+  isProviderAccountRemoved: () => false,
   selectedProviderAccountId: mocks.selectedProviderAccountId,
 }));
 

@@ -86,7 +86,11 @@ import {
   loadFollowUpBehavior,
   type FollowUpBehavior,
 } from "../lib/settings";
-import { selectedProviderAccountId } from "../lib/providerAccounts";
+import {
+  isProviderAccountRemoved,
+  REMOVED_PROVIDER_ACCOUNT_MESSAGE,
+  selectedProviderAccountId,
+} from "../lib/providerAccounts";
 import { saveRecentModelChoice } from "../lib/models";
 import { preparePrompt } from "../lib/promptPreparation";
 import {
@@ -198,6 +202,17 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
           ? (current.providerAccountId ??
             selectedProviderAccountId(current.harness, current.cwd))
           : undefined;
+      if (
+        (current.harness === "claude" || current.harness === "codex") &&
+        isProviderAccountRemoved(current.harness, current.providerAccountId)
+      ) {
+        d.enqueueHarnessEvent(sessionId, {
+          type: "session.error",
+          message: REMOVED_PROVIDER_ACCOUNT_MESSAGE,
+        });
+        d.flushHarnessEvents();
+        return;
+      }
       const submittedText = intent === "build" ? "Build approved plan" : text;
       const rawCommand = isNativeCommandPrompt(submittedText, current.harness);
       const harnessText = rawCommand

@@ -35,6 +35,7 @@ import {
   Select,
   Toggle,
 } from "./SettingsControls";
+import { SettingsProviderAccounts } from "./SettingsProviderAccounts";
 
 export function ProvidersPage() {
   useSyncExternalStore(subscribeModels, getModelSnapshot, getModelSnapshot);
@@ -71,6 +72,7 @@ export function ProvidersPage() {
 
   return (
     <>
+      <SettingsProviderAccounts />
       <p className="pb-3 text-[13px] leading-relaxed text-content/50">
         A provider is listed as installed once its CLI is found on your PATH.
         Uninstalled CLIs stay listed here but are omitted from the model picker.

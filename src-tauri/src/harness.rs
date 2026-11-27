@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -25,7 +25,7 @@ const SSE_END_EVENT: &str = "harness-sse-end";
 
 const DEFAULT_PROVIDER_ACCOUNT_ID: &str = "default";
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct HarnessAccount {
     provider: String,
@@ -77,6 +77,7 @@ pub struct CursorBinary {
 struct LiveChild {
     stdin: Mutex<ChildStdin>,
     pid: u32,
+    account: Option<HarnessAccount>,
 }
 
 struct LiveSse {
@@ -91,6 +92,9 @@ struct HarnessInner {
 pub struct HarnessHost {
     inner: Mutex<HarnessInner>,
     sse: Mutex<HashMap<String, Arc<LiveSse>>>,
+    // Serialize named-profile starts with removal so no child can reopen a
+    // profile directory while its credentials are being deleted.
+    removed_accounts: Mutex<HashSet<HarnessAccount>>,
     /// Bumped by `kill_all` so a spawn that started before quit cannot reinsert.
     kill_all_gen: AtomicU64,
 }
@@ -103,12 +107,19 @@ impl HarnessHost {
                 epochs: HashMap::new(),
             }),
             sse: Mutex::new(HashMap::new()),
+            removed_accounts: Mutex::new(HashSet::new()),
             kill_all_gen: AtomicU64::new(0),
         }
     }
 
     fn lock_inner(&self) -> std::sync::MutexGuard<'_, HarnessInner> {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn lock_removed_accounts(&self) -> std::sync::MutexGuard<'_, HashSet<HarnessAccount>> {
+        self.removed_accounts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     fn get(&self, session_id: &str) -> Option<Arc<LiveChild>> {
@@ -166,6 +177,34 @@ impl HarnessHost {
             return None;
         }
         inner.children.remove(session_id)
+    }
+
+    fn kill_account(&self, account: &HarnessAccount) {
+        let children: Vec<(String, Arc<LiveChild>)> = {
+            let mut inner = self.lock_inner();
+            let session_ids: Vec<String> = inner
+                .children
+                .iter()
+                .filter(|(_, live)| live.account.as_ref() == Some(account))
+                .map(|(session_id, _)| session_id.clone())
+                .collect();
+            session_ids
+                .into_iter()
+                .filter_map(|session_id| {
+                    *inner.epochs.entry(session_id.clone()).or_insert(0) += 1;
+                    inner
+                        .children
+                        .remove(&session_id)
+                        .map(|child| (session_id, child))
+                })
+                .collect()
+        };
+        for (session_id, _) in &children {
+            self.stop_sse(session_id);
+        }
+        let pids: Vec<u32> = children.iter().map(|(_, child)| child.pid).collect();
+        drop(children);
+        terminate_all(&pids);
     }
 
     pub(crate) fn kill_all(&self) {
@@ -369,6 +408,15 @@ pub fn harness_spawn(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     prepare_child(&mut cmd, &command);
+    let account_guard = account
+        .as_ref()
+        .filter(|account| account.id != DEFAULT_PROVIDER_ACCOUNT_ID)
+        .map(|_| host.lock_removed_accounts());
+    if let (Some(removed), Some(account)) = (&account_guard, &account) {
+        if removed.contains(account) {
+            return Err("This provider account has been removed".into());
+        }
+    }
     apply_provider_account(&app, &mut cmd, account.as_ref())?;
 
     let mut child =
@@ -391,6 +439,7 @@ pub fn harness_spawn(
     let live = Arc::new(LiveChild {
         stdin: Mutex::new(stdin),
         pid,
+        account,
     });
     if let Some(rejected) = host.install_spawn(session_id.clone(), epoch, kill_all, live) {
         // A kill, or a newer spawn, won the race while this one was forking.
@@ -403,6 +452,7 @@ pub fn harness_spawn(
         });
         return Err(SPAWN_CANCELLED.to_string());
     }
+    drop(account_guard);
 
     let stdout_app = app.clone();
     let stdout_id = session_id.clone();
@@ -465,8 +515,19 @@ pub(crate) fn provider_account_dir(
     let Some(account_id) = account_id.filter(|id| *id != DEFAULT_PROVIDER_ACCOUNT_ID) else {
         return Ok(None);
     };
+    provider_account_path(app, provider, account_id).map(Some)
+}
+
+fn provider_account_path(
+    app: &AppHandle,
+    provider: &str,
+    account_id: &str,
+) -> Result<PathBuf, String> {
     if provider != "claude" && provider != "codex" {
-        return Err("Provider account profiles are only supported for Claude and Codex".into());
+        return Err("Provider account profiles are not supported for this provider".into());
+    }
+    if account_id == DEFAULT_PROVIDER_ACCOUNT_ID {
+        return Err("The default provider account cannot be removed".into());
     }
     if account_id.is_empty()
         || account_id.len() > 80
@@ -476,20 +537,61 @@ pub(crate) fn provider_account_dir(
     {
         return Err("Invalid provider account id".into());
     }
-    let dir = app
+    Ok(app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join("provider-accounts")
         .join(provider)
-        .join(account_id);
-    std::fs::create_dir_all(&dir).map_err(|error| {
+        .join(account_id))
+}
+
+#[tauri::command(async)]
+pub fn provider_account_remove(
+    app: AppHandle,
+    host: State<'_, HarnessHost>,
+    provider: String,
+    account_id: String,
+) -> Result<(), String> {
+    let dir = provider_account_path(&app, &provider, &account_id)?;
+    let account = HarnessAccount {
+        provider: provider.clone(),
+        id: account_id,
+    };
+    let mut removed = host.lock_removed_accounts();
+    host.kill_account(&account);
+
+    #[cfg(target_os = "macos")]
+    if provider == "claude" {
+        crate::rate_limits::delete_claude_keychain_credentials(&dir)?;
+    }
+
+    let metadata = match std::fs::symlink_metadata(&dir) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            removed.insert(account);
+            return Ok(());
+        }
+        Err(error) => {
+            return Err(format!(
+                "Could not inspect the {provider} account directory {}: {error}",
+                dir.display()
+            ));
+        }
+    };
+    if metadata.file_type().is_symlink() || metadata.is_file() {
+        std::fs::remove_file(&dir)
+    } else {
+        std::fs::remove_dir_all(&dir)
+    }
+    .map_err(|error| {
         format!(
-            "Could not create the {provider} account directory {}: {error}",
+            "Could not remove the {provider} account directory {}: {error}",
             dir.display()
         )
     })?;
-    Ok(Some(dir))
+    removed.insert(account);
+    Ok(())
 }
 
 fn apply_provider_account(
@@ -503,6 +605,13 @@ fn apply_provider_account(
     let Some(dir) = provider_account_dir(app, &account.provider, Some(&account.id))? else {
         return Ok(());
     };
+    std::fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "Could not create the {} account directory {}: {error}",
+            account.provider,
+            dir.display()
+        )
+    })?;
     match account.provider.as_str() {
         "claude" => {
             cmd.env("CLAUDE_CONFIG_DIR", &dir)
@@ -2188,6 +2297,7 @@ mod tests {
             Arc::new(LiveChild {
                 stdin: Mutex::new(stdin),
                 pid,
+                account: None,
             }),
             child,
         )
@@ -2317,6 +2427,7 @@ mod tests {
             Arc::new(LiveChild {
                 stdin: Mutex::new(stdin),
                 pid,
+                account: None,
             }),
             child,
         )
