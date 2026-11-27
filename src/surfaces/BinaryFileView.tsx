@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AlertCircle, Folder, Minus, Plus, RotateCcw } from "../chrome/icons";
 import { FileTypeIcon } from "../chrome/FileTypeIcon";
+import { useImagePan } from "../hooks/useImagePan";
 import { copyText } from "../lib/clipboard";
 import { formatFileSize, sniffImageMime } from "../lib/filePreview";
 import { watchFile } from "../lib/fileWatch";
@@ -9,6 +16,7 @@ import { displayPath } from "../lib/paths";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 16;
+const ZOOM_STEP = 1.5;
 
 type Props = { path: string; cwd: string };
 
@@ -129,11 +137,89 @@ function ImageView({
 }) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState<number | "fit">("fit");
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const anchor = useRef<{
+    imageX: number;
+    imageY: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+  const { didDrag, dragging, handlers } = useImagePan(
+    zoom !== "fit",
+    (dx, dy) => {
+      const scroller = scrollerRef.current;
+      if (!scroller) return;
+      scroller.scrollLeft -= dx;
+      scroller.scrollTop -= dy;
+    },
+  );
+
+  const currentScale = useCallback(() => {
+    const image = imageRef.current;
+    if (!image?.naturalWidth) return 1;
+    const width = image.getBoundingClientRect().width;
+    return width ? width / image.naturalWidth : 1;
+  }, []);
+
+  const zoomAt = useCallback(
+    (scale: number, clientX: number, clientY: number) => {
+      const image = imageRef.current;
+      const next = clampZoom(scale);
+      if (!image?.naturalWidth || next === zoom) return;
+      const previous = currentScale();
+      const rect = image.getBoundingClientRect();
+      anchor.current = {
+        imageX: (clientX - rect.left) / previous,
+        imageY: (clientY - rect.top) / previous,
+        clientX,
+        clientY,
+      };
+      setZoom(next);
+    },
+    [currentScale, zoom],
+  );
+
+  const zoomAtCenter = (factor: number) => {
+    const rect = scrollerRef.current?.getBoundingClientRect();
+    if (rect)
+      zoomAt(
+        currentScale() * factor,
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+  };
+
+  useLayoutEffect(() => {
+    const point = anchor.current;
+    anchor.current = null;
+    const scroller = scrollerRef.current;
+    const image = imageRef.current;
+    if (!point || !scroller || !image || zoom === "fit") return;
+    const rect = image.getBoundingClientRect();
+    scroller.scrollLeft += rect.left + point.imageX * zoom - point.clientX;
+    scroller.scrollTop += rect.top + point.imageY * zoom - point.clientY;
+  }, [zoom]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.deltaY === 0) return;
+      const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+      const factor = Math.exp(-event.deltaY * unit * 0.01);
+      zoomAt(currentScale() * factor, event.clientX, event.clientY);
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, [currentScale, zoomAt]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
-        className="grid min-h-0 flex-1 place-items-center overflow-auto overscroll-contain p-4"
+        ref={scrollerRef}
+        className="flex min-h-0 flex-1 overflow-auto overscroll-contain p-4"
         style={{
           // A checkerboard so transparent PNGs read as transparent rather than
           // as whatever the theme background happens to be.
@@ -144,6 +230,7 @@ function ImageView({
         }}
       >
         <img
+          ref={imageRef}
           src={url}
           alt=""
           draggable={false}
@@ -153,12 +240,17 @@ function ImageView({
               h: event.currentTarget.naturalHeight,
             })
           }
-          onClick={() => setZoom((value) => (value === "fit" ? 1 : "fit"))}
-          className={
+          {...handlers}
+          onClick={(event) => {
+            if (didDrag.current) return;
+            if (zoom === "fit") zoomAt(1, event.clientX, event.clientY);
+            else setZoom("fit");
+          }}
+          className={`m-auto shrink-0 select-none object-contain ${
             zoom === "fit"
-              ? "max-h-full max-w-full object-contain"
-              : "max-w-none object-contain"
-          }
+              ? "max-h-full max-w-full cursor-zoom-in"
+              : `max-w-none touch-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`
+          }`}
           style={
             zoom === "fit" || !natural
               ? undefined
@@ -175,9 +267,7 @@ function ImageView({
         <span className="flex-1" />
         <ZoomButton
           label="Zoom out"
-          onClick={() =>
-            setZoom((value) => clampZoom((value === "fit" ? 1 : value) / 1.5))
-          }
+          onClick={() => zoomAtCenter(1 / ZOOM_STEP)}
         >
           <Minus className="size-3" strokeWidth={1.75} />
         </ZoomButton>
@@ -189,12 +279,7 @@ function ImageView({
         >
           {zoom === "fit" ? "Fit" : `${Math.round(zoom * 100)}%`}
         </button>
-        <ZoomButton
-          label="Zoom in"
-          onClick={() =>
-            setZoom((value) => clampZoom((value === "fit" ? 1 : value) * 1.5))
-          }
-        >
+        <ZoomButton label="Zoom in" onClick={() => zoomAtCenter(ZOOM_STEP)}>
           <Plus className="size-3" strokeWidth={1.75} />
         </ZoomButton>
       </footer>

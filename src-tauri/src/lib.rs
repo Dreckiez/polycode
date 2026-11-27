@@ -7,6 +7,7 @@ mod cursor_store;
 mod file_watch;
 mod fs;
 mod harness;
+mod harness_updates;
 #[cfg(target_os = "macos")]
 mod macos;
 mod menu;
@@ -279,6 +280,8 @@ pub fn run() {
             harness::harness_sse_open,
             harness::harness_sse_close,
             harness::harness_exec,
+            harness_updates::harness_latest_version,
+            harness_updates::harness_update_check_claim,
             rate_limits::fetch_claude_usage,
             rate_limits::fetch_opencode_go_usage,
             pty::pty_spawn,

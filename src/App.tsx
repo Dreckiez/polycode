@@ -169,6 +169,7 @@ import { liveAgentsFromSessions } from "./lib/liveAgents";
 import { hiddenApprovalNotices } from "./lib/approvalToast";
 import { useSessionReminders } from "./hooks/useSessionReminders";
 import { ReminderNotices } from "./chrome/ReminderNotices";
+import { HarnessUpdateNotice } from "./chrome/HarnessUpdateNotice";
 import { nextUnseenFinishedSessions } from "./lib/sessionDone";
 import {
   loadNotificationsEnabled,
@@ -813,6 +814,9 @@ export default function App({
     [sessions, activeTabId, tabs, composerFocused],
   );
   const [reminderNoticesHeight, setReminderNoticesHeight] = useState(0);
+  const [harnessUpdateHeight, setHarnessUpdateHeight] = useState(0);
+  const harnessUpdateTop =
+    12 + (reminderNoticesHeight ? reminderNoticesHeight + 8 : 0);
 
   useEffect(() => {
     syncDockBadge(sessions);
@@ -2644,7 +2648,9 @@ export default function App({
 
       <ApprovalToasts
         notices={hiddenApprovalToasts}
-        topOffset={12 + (reminderNoticesHeight ? reminderNoticesHeight + 8 : 0)}
+        topOffset={
+          harnessUpdateTop + (harnessUpdateHeight ? harnessUpdateHeight + 8 : 0)
+        }
         onFocusSession={onOpenApprovalSession}
         onApproval={onApproval}
       />
@@ -2657,6 +2663,10 @@ export default function App({
         onRetry={sessionReminders.refresh}
         onOpenSettings={() => openSettings()}
         onHeightChange={setReminderNoticesHeight}
+      />
+      <HarnessUpdateNotice
+        topOffset={harnessUpdateTop}
+        onHeightChange={setHarnessUpdateHeight}
       />
       {whatsNewVersion ? (
         <WhatsNewDialog

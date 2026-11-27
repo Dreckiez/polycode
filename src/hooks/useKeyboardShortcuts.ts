@@ -78,6 +78,7 @@ export function useKeyboardShortcuts(
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.isComposing) {
         const zoom = uiScaleCommand(e);
         if (zoom) {
+          if (document.querySelector("[data-image-zoom]")) return;
           e.preventDefault();
           e.stopPropagation();
           if (zoom === "zoom-in") {
