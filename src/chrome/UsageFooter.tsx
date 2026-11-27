@@ -39,6 +39,7 @@ import {
   type ProviderSignInState,
 } from "./ProviderSignInPanel";
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   newProviderAccount,
   providerAccounts,
   saveProviderAccount,
@@ -119,6 +120,16 @@ export function UsageFooter({
     session?.harness === "codex" && session.providerAccountId
       ? session.providerAccountId
       : selectedProviderAccountId("codex", project);
+  const antigravityAccountId =
+    session?.harness === "antigravity" && session.providerAccountId
+      ? session.providerAccountId
+      : selectedProviderAccountId("antigravity", project);
+  const useDefaultAntigravity = antigravityAccountId === DEFAULT_PROVIDER_ACCOUNT_ID;
+  const antigravityAccounts = wantAntigravity ? providerAccounts("antigravity") : [];
+  const antigravityAccountAvailable = antigravityAccounts.some(
+    ({ id }) => id === antigravityAccountId,
+  );
+  const antigravityNeedsLogin = session?.harness === "antigravity" && session.authRequired;
   const claudeAccounts = providerAccounts("claude");
   const codexAccounts = providerAccounts("codex");
   const claudeAccountAvailable = claudeAccounts.some(
@@ -157,6 +168,7 @@ export function UsageFooter({
         shouldFetchProvider(opencodeRef.current, { force, visible });
       const fetchAntigravity =
         wantAntigravity &&
+        useDefaultAntigravity &&
         shouldFetchProvider(antigravityRef.current, { force, visible });
       if (!fetchClaude && !fetchCodex && !fetchOpencode && !fetchAntigravity) {
         return;
@@ -212,6 +224,7 @@ export function UsageFooter({
       codexAccountAvailable,
       codexAccountId,
       model,
+      useDefaultAntigravity,
       wantAntigravity,
       wantClaude,
       wantCodex,
@@ -374,6 +387,8 @@ export function UsageFooter({
   const showAntigravityChip = wantAntigravity;
   const showUsage =
     wantClaude || wantCodex || showOpencodeChip || showAntigravityChip;
+  const canRefreshUsage =
+    wantClaude || wantCodex || wantOpencode || (wantAntigravity && useDefaultAntigravity);
   const showTerminals = terminals.length > 0;
   const showTerminalButton = Boolean(onNewTerminal || onShowTerminal);
   const terminalLabel = projectTerminalActive
@@ -439,24 +454,42 @@ export function UsageFooter({
           ) : null}
           {showAntigravityChip ? (
             <UsageProviderChip
-              limits={antigravity}
+              limits={
+                !antigravityAccountAvailable
+                  ? unavailableRateLimits("antigravity", "This conversation uses a removed account")
+                  : antigravityNeedsLogin
+                    ? errorRateLimits("antigravity", "Antigravity sign-in expired")
+                    : useDefaultAntigravity
+                      ? antigravity
+                      : errorRateLimits("antigravity", "Usage totals are unavailable for named Antigravity profiles.")
+              }
               now={now}
+              accounts={antigravityAccounts}
+              accountId={antigravityAccountId}
+              onSelectAccount={(accountId) => selectAccount("antigravity", accountId)}
+              onAddAccount={(label) => addAccount("antigravity", label)}
+              onManageAccounts={onManageAccounts}
+              onReconnect={antigravityAccountAvailable && antigravityNeedsLogin
+                ? () => loginHarness("antigravity", antigravityAccountId)
+                : undefined}
             />
           ) : null}
-          <button
-            type="button"
-            className="grid size-4.5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content disabled:opacity-50"
-            aria-label="Refresh usage"
-            title="Refresh usage"
-            disabled={refreshing}
-            onClick={() => void refresh(true)}
-          >
-            <RefreshCw
-              className={`size-2.5 ${refreshing ? "animate-spin" : ""}`}
-              strokeWidth={1.75}
-              aria-hidden
-            />
-          </button>
+          {canRefreshUsage ? (
+            <button
+              type="button"
+              className="grid size-4.5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content disabled:opacity-50"
+              aria-label="Refresh usage"
+              title="Refresh usage"
+              disabled={refreshing}
+              onClick={() => void refresh(true)}
+            >
+              <RefreshCw
+                className={`size-2.5 ${refreshing ? "animate-spin" : ""}`}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </button>
+          ) : null}
         </>
       ) : session ? (
         <SessionChip key={session.id ?? session.harness} session={session} />

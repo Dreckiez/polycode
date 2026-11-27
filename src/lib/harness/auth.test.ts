@@ -6,13 +6,17 @@ const child = vi.hoisted(() => ({
   unwatchChild: vi.fn(),
   watchChild: vi.fn(),
   resolveClaudeBinary: vi.fn(async () => ({ path: "/bin/claude" })),
+  resolveAntigravityBinary: vi.fn(async () => ({ path: "/bin/agy" })),
   resolveCodexBinary: vi.fn(async () => ({ path: "/bin/codex" })),
   resolveCursorBinary: vi.fn(async () => ({ path: "/bin/agent" })),
   resolveGrokBinary: vi.fn(async () => ({ path: "/bin/grok" })),
   resolveFxBinary: vi.fn(async () => ({ path: "/bin/fx" })),
+  writeChild: vi.fn<(_id: string, _line: string) => Promise<void>>(),
 }));
+const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 
 vi.mock("./child", () => child);
+vi.mock("@tauri-apps/api/core", () => native);
 vi.mock("../fs", () => ({ homeDir: vi.fn(async () => "/home/alice") }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ label: "test-window" }),
@@ -101,6 +105,34 @@ describe("harness login", () => {
       | undefined;
     onExit?.(0);
     await expect(login).resolves.toBeUndefined();
+  });
+
+  it("opens Antigravity browser sign-in in the named profile and verifies its local token", async () => {
+    native.invoke.mockResolvedValue(true);
+    child.writeChild.mockImplementation(async (_id, line) => {
+      const request = JSON.parse(line);
+      const onLine = child.watchChild.mock.calls[0]?.[1] as (line: string) => void;
+      onLine(JSON.stringify({ id: request.id, result: {} }));
+    });
+
+    await loginHarness("antigravity", "account-work");
+
+    const sessionId = "polycode-provider-login-test-window-antigravity-account-work";
+    expect(child.spawnChild).toHaveBeenCalledWith(
+      sessionId,
+      "/bin/agy",
+      ["acp", "--stdio"],
+      "/home/alice",
+      { provider: "antigravity", id: "account-work" },
+    );
+    expect(child.writeChild.mock.calls.map(([, line]) => JSON.parse(line))).toEqual([
+      expect.objectContaining({ method: "initialize" }),
+      expect.objectContaining({ method: "authenticate", params: { methodId: "oauth-personal" } }),
+    ]);
+    expect(native.invoke).toHaveBeenCalledWith("antigravity_account_signed_in", {
+      accountId: "account-work",
+    });
+    expect(child.killChild).toHaveBeenLastCalledWith(sessionId);
   });
 
   it("deduplicates repeated login clicks", async () => {

@@ -6,25 +6,28 @@ import { Plus } from "../chrome/icons";
 import { loginHarness } from "../lib/harness/auth";
 import {
   newProviderAccount,
-  PROVIDER_ACCOUNT_PROVIDERS,
   providerAccounts,
   removeProviderAccount,
   renameProviderAccount,
   saveProviderAccount,
   subscribeProviderAccounts,
   type ProviderAccount,
+  type ProfileProvider,
 } from "../lib/providerAccounts";
 import { HARNESS_TITLE } from "../lib/session";
 import { Heading, SecondaryButton } from "./SettingsControls";
 
-type AccountProvider = (typeof PROVIDER_ACCOUNT_PROVIDERS)[number];
 type AccountEditor = {
-  provider: AccountProvider;
+  provider: ProfileProvider;
   accountId?: string;
   label: string;
 };
 
-export function SettingsProviderAccounts() {
+export function SettingsProviderAccounts({
+  providers,
+}: {
+  providers: readonly ProfileProvider[];
+}) {
   const [, setVersion] = useState(0);
   const [editor, setEditor] = useState<AccountEditor | null>(null);
   const [working, setWorking] = useState(false);
@@ -121,6 +124,8 @@ export function SettingsProviderAccounts() {
     </form>
   );
 
+  if (providers.length === 0) return null;
+
   return (
     <section aria-labelledby="provider-accounts" className="mb-8">
       <Heading id="provider-accounts" title="Accounts" first />
@@ -128,7 +133,7 @@ export function SettingsProviderAccounts() {
         Manage saved profiles here and switch between them from the usage menu in the footer.
       </p>
       <div className="grid gap-3">
-        {PROVIDER_ACCOUNT_PROVIDERS.map((provider) => {
+        {providers.map((provider) => {
           const current = editor?.provider === provider ? editor : null;
           return (
             <div key={provider} className="overflow-hidden rounded-xl border border-content/10">

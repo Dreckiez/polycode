@@ -1,5 +1,7 @@
 import type { RuntimeMode } from "../session";
 import { sameProjectPath } from "../recents";
+import { DEFAULT_PROVIDER_ACCOUNT_ID } from "../providerAccounts";
+import { isHarnessAuthError } from "./authSupport";
 import {
   killChild,
   resolveAntigravityBinary,
@@ -28,6 +30,7 @@ import type {
 type LiveCli = {
   sessionId: string;
   cwd: string;
+  accountId: string;
   conversationId?: string;
   model: string;
   modelSettings?: Record<string, string>;
@@ -49,6 +52,7 @@ type LiveCli = {
 type Resume = {
   conversationId: string;
   cwd: string;
+  accountId: string;
 };
 
 const liveByThread = new Map<string, LiveCli>();
@@ -157,10 +161,11 @@ export function bindAntigravitySession(
   threadId: string,
   providerSessionId: string,
   cwd: string,
+  accountId = DEFAULT_PROVIDER_ACCOUNT_ID,
 ): void {
   const conversationId = providerSessionId.trim();
   if (!threadId || !conversationId || !cwd.trim()) return;
-  resumeByThread.set(threadId, { conversationId, cwd });
+  resumeByThread.set(threadId, { conversationId, cwd, accountId });
 }
 
 export function respondAntigravityApproval(
@@ -172,6 +177,7 @@ export function respondAntigravityApproval(
 async function ensureLive(input: HarnessSessionInput): Promise<LiveCli> {
   const planning = input.intent === "plan";
   const existing = liveByThread.get(input.sessionId);
+  const accountId = input.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
 
   const currentEffort =
     input.modelSettings?.effort ??
@@ -185,6 +191,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<LiveCli> {
 
   if (
     existing &&
+    existing.accountId === accountId &&
     sameProjectPath(existing.cwd, input.cwd) &&
     existing.model === input.model &&
     (existingEffort ?? "high") === (currentEffort ?? "high") &&
@@ -196,15 +203,16 @@ async function ensureLive(input: HarnessSessionInput): Promise<LiveCli> {
   }
 
   if (existing) {
-    if (!sameProjectPath(existing.cwd, input.cwd)) {
-      resumeByThread.delete(input.sessionId);
-    }
     await stopAntigravitySession(input.sessionId);
   }
 
-  const resume = resumeByThread.get(input.sessionId);
-  if (resume && !sameProjectPath(resume.cwd, input.cwd)) {
+  let resume = resumeByThread.get(input.sessionId);
+  if (
+    resume &&
+    (resume.accountId !== accountId || !sameProjectPath(resume.cwd, input.cwd))
+  ) {
     resumeByThread.delete(input.sessionId);
+    resume = undefined;
   }
 
   const { path } = await binaryResolver();
@@ -219,10 +227,12 @@ async function ensureLiveCli(
   currentEffort?: string,
 ): Promise<LiveCli> {
   const liveRef: { current: LiveCli | null } = { current: null };
+  let authRequired = false;
 
   const live: LiveCli = {
     sessionId: input.sessionId,
     cwd: input.cwd,
+    accountId: input.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID,
     conversationId: resume?.conversationId,
     model: input.model,
     modelSettings: input.modelSettings,
@@ -252,11 +262,16 @@ async function ensureLiveCli(
       if (!current?.muteUpdates) {
         (current?.onEvent ?? input.onEvent)({ type: "session.ended", code });
       }
-      current?.turnFailed?.(new Error("Antigravity CLI exited"));
+      current?.turnFailed?.(new Error(
+        authRequired ? "Antigravity sign-in expired" : "Antigravity CLI exited",
+      ));
       if (current) {
         current.turnDone = null;
         current.turnFailed = null;
       }
+    },
+    (line) => {
+      authRequired ||= isHarnessAuthError(line);
     },
   );
 
@@ -268,7 +283,19 @@ async function ensureLiveCli(
     cwd: input.cwd,
   });
 
-  await spawnChild(input.sessionId, path, spawnArgs, input.cwd);
+  try {
+    if (live.accountId === DEFAULT_PROVIDER_ACCOUNT_ID) {
+      await spawnChild(input.sessionId, path, spawnArgs, input.cwd);
+    } else {
+      await spawnChild(input.sessionId, path, spawnArgs, input.cwd, {
+        provider: "antigravity",
+        id: live.accountId,
+      });
+    }
+  } catch (error) {
+    unwatchChild(input.sessionId);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
 
   liveByThread.set(input.sessionId, live);
   return live;
@@ -309,6 +336,7 @@ function handleLine(sessionId: string, live: LiveCli, line: string): void {
       resumeByThread.set(sessionId, {
         conversationId: convId,
         cwd: live.cwd,
+        accountId: live.accountId,
       });
       if (!live.muteUpdates) {
         live.onEvent({

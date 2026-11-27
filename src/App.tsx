@@ -385,6 +385,7 @@ export default function App({
     key: string;
     sessionId: string;
     harness: HarnessId;
+    accountId?: string;
   } | null>(null);
   const seenProviderSignInRequestsRef = useRef<Set<string> | null>(null);
   const seenProviderSignInRequests =
@@ -719,6 +720,7 @@ export default function App({
       key: providerSignInRequestKey(active),
       sessionId: active.id,
       harness: active.harness,
+      accountId: active.harness === "antigravity" ? active.providerAccountId : undefined,
     };
   }, [active]);
   useEffect(() => {
@@ -2679,6 +2681,7 @@ export default function App({
         <ProviderSignInDialog
           key={providerSignInRequest.key}
           harness={providerSignInRequest.harness}
+          accountId={providerSignInRequest.accountId}
           onClose={() => setProviderSignInRequest(null)}
         />
       ) : null}

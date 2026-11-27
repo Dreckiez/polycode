@@ -34,7 +34,9 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  act(() => root.render(createElement(SettingsProviderAccounts)));
+  act(() => root.render(createElement(SettingsProviderAccounts, {
+    providers: ["codex"],
+  })));
 });
 
 afterEach(() => {
@@ -56,6 +58,14 @@ function enterAccountName(label: string) {
   );
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
+
+it("shows account controls only for installed providers", () => {
+  expect(Array.from(container.querySelectorAll("h3"), (heading) => heading.textContent))
+    .toEqual(["Codex"]);
+
+  act(() => root.render(createElement(SettingsProviderAccounts, { providers: [] })));
+  expect(container.querySelector('[aria-labelledby="provider-accounts"]')).toBeNull();
+});
 
 it("renames an existing profile without signing in again or changing its selection", async () => {
   act(() => getButton("Rename Work").click());

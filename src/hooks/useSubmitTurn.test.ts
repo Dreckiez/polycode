@@ -204,7 +204,8 @@ vi.mock("../lib/skills", () => ({
 vi.mock("../lib/settings", () => ({
   loadFollowUpBehavior: lib.loadFollowUpBehavior,
 }));
-vi.mock("../lib/providerAccounts", () => ({
+vi.mock("../lib/providerAccounts", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../lib/providerAccounts")>(),
   isProviderAccountRemoved: () => false,
   selectedProviderAccountId: lib.selectedProviderAccountId,
 }));
@@ -415,6 +416,21 @@ afterEach(async () => {
 });
 
 describe("useSubmitTurn", () => {
+  it.each([
+    { blocks: [], accountId: "acct-1" },
+    { blocks: [{ id: "previous", role: "user" as const, text: "Old turn" }], accountId: "default" },
+  ])("starts or preserves the Antigravity account as $accountId", async ({ blocks, accountId }) => {
+    await mount([session("agy", { harness: "antigravity", blocks })]);
+
+    await act(async () => api.onSubmit("agy", "Continue"));
+
+    expect(h.sendHarnessTurn).toHaveBeenCalledWith(expect.objectContaining({
+      harness: "antigravity",
+      providerAccountId: accountId,
+    }));
+    expect(sessionsRef.current[0].providerAccountId).toBe(accountId);
+  });
+
   it("onSubmit with a new session dispatches the turn through sendHarnessTurn with the real run args", async () => {
     await mount([session("s1", { title: "" })]);
 

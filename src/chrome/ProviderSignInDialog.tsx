@@ -9,10 +9,11 @@ import {
 
 type Props = {
   harness: HarnessId;
+  accountId?: string;
   onClose: () => void;
 };
 
-export function ProviderSignInDialog({ harness, onClose }: Props) {
+export function ProviderSignInDialog({ harness, accountId, onClose }: Props) {
   const [state, setState] = useState<ProviderSignInState>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +25,8 @@ export function ProviderSignInDialog({ harness, onClose }: Props) {
   const signIn = useCallback(() => {
     setState("running");
     setError(null);
-    void loginHarness(harness).then(
+    const login = accountId ? loginHarness(harness, accountId) : loginHarness(harness);
+    void login.then(
       () => setState("complete"),
       (reason: unknown) => {
         setState("error");
@@ -35,7 +37,7 @@ export function ProviderSignInDialog({ harness, onClose }: Props) {
         );
       },
     );
-  }, [harness]);
+  }, [harness, accountId]);
 
   return (
     <Modal

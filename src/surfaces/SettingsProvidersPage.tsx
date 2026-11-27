@@ -24,6 +24,7 @@ import {
   savePickerProviderVisible,
   subscribeModels,
 } from "../lib/models";
+import { PROVIDER_ACCOUNT_PROVIDERS } from "../lib/providerAccounts";
 import {
   HARNESSES,
   HARNESS_TITLE,
@@ -72,7 +73,9 @@ export function ProvidersPage() {
 
   return (
     <>
-      <SettingsProviderAccounts />
+      <SettingsProviderAccounts
+        providers={PROVIDER_ACCOUNT_PROVIDERS.filter(isHarnessAvailable)}
+      />
       <p className="pb-3 text-[13px] leading-relaxed text-content/50">
         A provider is listed as installed once its CLI is found on your PATH.
         Uninstalled CLIs stay listed here but are omitted from the model picker.

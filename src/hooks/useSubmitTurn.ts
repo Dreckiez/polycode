@@ -87,9 +87,11 @@ import {
   type FollowUpBehavior,
 } from "../lib/settings";
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   isProviderAccountRemoved,
   REMOVED_PROVIDER_ACCOUNT_MESSAGE,
   selectedProviderAccountId,
+  supportsProviderAccounts,
 } from "../lib/providerAccounts";
 import { saveRecentModelChoice } from "../lib/models";
 import { preparePrompt } from "../lib/promptPreparation";
@@ -197,13 +199,16 @@ export function useSubmitTurn(deps: SubmitTurnDeps) {
       if (isPreparingHandoff(current)) return;
       saveRecentModelChoice(current.harness, current.model);
       const workCwd = sessionWorkCwd(current);
-      const providerAccountId =
-        current.harness === "claude" || current.harness === "codex"
-          ? (current.providerAccountId ??
-            selectedProviderAccountId(current.harness, current.cwd))
-          : undefined;
+      const legacyAntigravitySession = current.harness === "antigravity" &&
+        !current.pendingSwitch && current.blocks.some((block) => block.role === "user");
+      const providerAccountId = supportsProviderAccounts(current.harness)
+        ? (current.providerAccountId ??
+          (legacyAntigravitySession
+            ? DEFAULT_PROVIDER_ACCOUNT_ID
+            : selectedProviderAccountId(current.harness, current.cwd)))
+        : undefined;
       if (
-        (current.harness === "claude" || current.harness === "codex") &&
+        supportsProviderAccounts(current.harness) &&
         isProviderAccountRemoved(current.harness, current.providerAccountId)
       ) {
         d.enqueueHarnessEvent(sessionId, {

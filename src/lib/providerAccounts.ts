@@ -1,5 +1,6 @@
 import { pathKey } from "./paths";
 import type { RateLimitProvider } from "./rateLimits";
+import type { HarnessId } from "./session";
 
 const ACCOUNTS_KEY = "polycode.providerAccounts.v1";
 const SELECTIONS_KEY = "polycode.providerAccountSelections.v1";
@@ -8,7 +9,12 @@ const CHANGE_EVENT = "polycode-provider-accounts-changed";
 export const DEFAULT_PROVIDER_ACCOUNT_ID = "default";
 const DEFAULT_PROVIDER_ACCOUNT_LABEL = "Default account";
 
-export const PROVIDER_ACCOUNT_PROVIDERS = ["claude", "codex"] as const;
+export const PROVIDER_ACCOUNT_PROVIDERS = ["claude", "codex", "antigravity"] as const;
+export type ProfileProvider = (typeof PROVIDER_ACCOUNT_PROVIDERS)[number];
+
+export function supportsProviderAccounts(harness: HarnessId): harness is ProfileProvider {
+  return PROVIDER_ACCOUNT_PROVIDERS.some((provider) => provider === harness);
+}
 export const REMOVED_PROVIDER_ACCOUNT_MESSAGE =
   "This conversation uses a removed account. Switch accounts from the usage menu to start a new conversation.";
 

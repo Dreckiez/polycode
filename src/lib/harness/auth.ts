@@ -1,8 +1,11 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { homeDir } from "../fs";
+import { DEFAULT_PROVIDER_ACCOUNT_ID, supportsProviderAccounts } from "../providerAccounts";
 import { HARNESS_TITLE, type HarnessId } from "../session";
 import * as child from "./child";
 import { harnessLoginArgs } from "./authSupport";
+import { JsonRpcClient } from "./jsonRpc";
 
 export {
   harnessLoginArgs,
@@ -56,11 +59,41 @@ export function loginHarness(
   const current = inflight.get(key);
   if (current) return current;
 
-  const run = runHarnessLogin(harness, accountId).finally(() => {
+  const login = harness === "antigravity"
+    ? loginAntigravity(accountId)
+    : runHarnessLogin(harness, accountId);
+  const run = login.finally(() => {
     if (inflight.get(key) === run) inflight.delete(key);
   });
   inflight.set(key, run);
   return run;
+}
+
+async function loginAntigravity(accountId?: string): Promise<void> {
+  const [{ path }, cwd] = await Promise.all([child.resolveAntigravityBinary(), homeDir()]);
+  const id = loginChildId("antigravity", accountId);
+  const named = accountId != null && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID;
+  await child.killChild(id).catch(() => undefined);
+  const rpc = new JsonRpcClient(id, {}, { label: "antigravity-login" });
+  child.watchChild(id, (line) => {
+    // Forward only ACP messages. Provider diagnostics can include sign-in links.
+    if (line.trimStart().startsWith("{")) rpc.pushLine(line);
+  }, () => rpc.close(new Error("Antigravity exited before sign-in completed")));
+  try {
+    await child.spawnChild(id, path, ["acp", "--stdio"], cwd,
+      named ? { provider: "antigravity", id: accountId } : undefined,
+    );
+    await rpc.request("initialize", { protocolVersion: 1, clientCapabilities: {} }, 15_000);
+    await rpc.request("authenticate", { methodId: "oauth-personal" }, LOGIN_TIMEOUT_MS);
+    if (named && !await invoke<boolean>("antigravity_account_signed_in", { accountId })) {
+      throw new Error("Antigravity did not save a sign-in for this profile");
+    }
+  } catch (error) {
+    throw new Error(safeLoginDetail(error instanceof Error ? error.message : String(error)));
+  } finally {
+    rpc.close();
+    await child.killChild(id).catch(() => undefined);
+  }
 }
 
 async function runHarnessLogin(
@@ -133,7 +166,7 @@ async function runHarnessLogin(
     const account =
       accountId &&
       accountId !== "default" &&
-      (harness === "claude" || harness === "codex")
+      supportsProviderAccounts(harness)
         ? { provider: harness, id: accountId }
         : undefined;
     const spawn = account

@@ -127,7 +127,7 @@ export function UsagePanel({
           {canManageAccounts ? (
             <button
               type="button"
-              className="mt-1 -ml-1 inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] text-content/55 hover:bg-content/10 hover:text-content"
+              className="mt-1 -ml-1 inline-flex max-w-full cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-[10px] text-content/55 hover:bg-content/10 hover:text-content"
               aria-label={`Switch ${providerLabel} account`}
               onClick={() => onViewChange("accounts")}
             >
@@ -201,7 +201,7 @@ function AccountSwitchRow({
     <div className="px-2.5 pt-2.5">
       <button
         type="button"
-        className="flex h-8 w-full items-center gap-2 rounded-lg bg-content/[0.045] px-2.5 text-left text-[11px] ring-1 ring-inset ring-content/[0.06] hover:bg-content/[0.08]"
+        className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg bg-content/[0.045] px-2.5 text-left text-[11px] ring-1 ring-inset ring-content/[0.06] hover:bg-content/[0.08]"
         aria-label={`Switch account from ${account.label}`}
         onClick={onClick}
       >
@@ -239,7 +239,7 @@ function ProviderAccountPicker({
       <div className="flex h-7 items-center gap-1">
         <button
           type="button"
-          className="grid size-6 place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content"
+          className="grid size-6 cursor-pointer place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content"
           aria-label="Back to usage"
           onClick={onBack}
         >
@@ -259,7 +259,7 @@ function ProviderAccountPicker({
               type="button"
               role="option"
               aria-selected={selected}
-              className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[11px] ring-1 ring-inset transition-colors ${
+              className={`flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-[11px] ring-1 ring-inset transition-colors ${
                 selected
                   ? "bg-accent/10 text-content ring-accent/20"
                   : "bg-content/[0.035] text-content/70 ring-content/[0.06] hover:bg-content/[0.075] hover:text-content"
@@ -280,7 +280,7 @@ function ProviderAccountPicker({
       </div>
       <button
         type="button"
-        className="mt-2 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[11px] text-content/55 hover:bg-content/[0.07] hover:text-content"
+        className="mt-2 flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-[11px] text-content/55 hover:bg-content/[0.07] hover:text-content"
         onClick={onAdd}
       >
         <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -335,7 +335,7 @@ function AddProviderAccount({
       <div className="flex h-7 items-center gap-1">
         <button
           type="button"
-          className="grid size-6 place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content disabled:opacity-40"
+          className="grid size-6 cursor-pointer place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content disabled:cursor-default disabled:opacity-40"
           aria-label="Back to accounts"
           disabled={running}
           onClick={onBack}
@@ -362,7 +362,7 @@ function AddProviderAccount({
       </label>
       <button
         type="submit"
-        className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-content px-3 text-[11px] font-medium text-background-base hover:bg-content/85 disabled:cursor-default disabled:opacity-45"
+        className="mt-3 inline-flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-content px-3 text-[11px] font-medium text-background-base hover:bg-content/85 disabled:cursor-default disabled:opacity-45"
         disabled={running || !label.trim()}
       >
         {running ? (

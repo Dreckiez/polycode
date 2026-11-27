@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HarnessEvent, SendTurnInput } from "./types";
+import type { ProfileProvider } from "../providerAccounts";
 
 const transport = vi.hoisted(() => ({
   watchers: new Map<string, (line: string) => void>(),
@@ -10,6 +11,7 @@ const transport = vi.hoisted(() => ({
     path: string;
     args: string[];
     cwd: string;
+    account?: { provider: ProfileProvider; id: string };
   }>,
   spawnChild: vi.fn(),
   writeChild: vi.fn(),
@@ -23,8 +25,9 @@ vi.mock("./child", () => ({
     path: string,
     args: string[],
     cwd: string,
+    account?: { provider: ProfileProvider; id: string },
   ) => {
-    transport.spawns.push({ sessionId, path, args, cwd });
+    transport.spawns.push({ sessionId, path, args, cwd, account });
   },
   watchChild: (
     id: string,
@@ -83,6 +86,20 @@ afterEach(async () => {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 describe("Antigravity live turn", () => {
+  it("passes the selected profile to the child without resuming another profile's conversation", async () => {
+    const sessionId = "agy-test-1";
+    bindAntigravitySession(sessionId, "other-thread", "/workspace", "account-other");
+    const turn = sendAntigravityTurn({
+      ...makeInput(sessionId),
+      providerAccountId: "account-work",
+    });
+    await vi.waitFor(() => expect(transport.writes).toHaveLength(1));
+    expect(transport.spawns[0].account).toEqual({ provider: "antigravity", id: "account-work" });
+    expect(transport.spawns[0].args).not.toContain("--conversation");
+    emitLine(sessionId, { event: "result", result: { status: "SUCCESS" } });
+    await turn;
+  });
+
   it("spawns agy and streams turn events end-to-end", async () => {
     const input = makeInput("agy-test-1", "calculate 2 + 2");
     const turnPromise = sendAntigravityTurn(input);

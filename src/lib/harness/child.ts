@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { ProfileProvider } from "../providerAccounts";
 
 type LinePayload = { sessionId: string; line: string };
 type ExitPayload = { sessionId: string; code: number | null; pid?: number };
@@ -238,7 +239,7 @@ export async function spawnChild(
   command: string,
   args: string[],
   cwd: string,
-  account?: { provider: "claude" | "codex"; id: string },
+  account?: { provider: ProfileProvider; id: string },
 ): Promise<void> {
   livePid.delete(sessionId);
   pendingExit.delete(sessionId);

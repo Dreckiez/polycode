@@ -281,6 +281,7 @@ pub fn run() {
             harness::harness_sse_close,
             harness::harness_exec,
             harness::provider_account_remove,
+            harness::antigravity_account_signed_in,
             harness_updates::harness_latest_version,
             harness_updates::harness_update_check_claim,
             rate_limits::fetch_claude_usage,

@@ -523,7 +523,7 @@ fn provider_account_path(
     provider: &str,
     account_id: &str,
 ) -> Result<PathBuf, String> {
-    if provider != "claude" && provider != "codex" {
+    if !matches!(provider, "claude" | "codex" | "antigravity") {
         return Err("Provider account profiles are not supported for this provider".into());
     }
     if account_id == DEFAULT_PROVIDER_ACCOUNT_ID {
@@ -626,8 +626,74 @@ fn apply_provider_account(
                 .env_remove("CODEX_API_KEY")
                 .env_remove("CODEX_ACCESS_TOKEN");
         }
+        "antigravity" => apply_antigravity_account(cmd, &dir)?,
         _ => unreachable!("provider_account_dir validates the provider"),
     }
+    Ok(())
+}
+
+fn antigravity_profile_signed_in(dir: &Path) -> bool {
+    dir.join(".gemini/antigravity-cli/antigravity-oauth-token")
+        .symlink_metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
+}
+
+#[tauri::command]
+pub fn antigravity_account_signed_in(app: AppHandle, account_id: String) -> Result<bool, String> {
+    let dir = provider_account_path(&app, "antigravity", &account_id)?;
+    Ok(antigravity_profile_signed_in(&dir))
+}
+
+fn apply_antigravity_account(cmd: &mut Command, dir: &Path) -> Result<(), String> {
+    require_antigravity_profile_support(cmd.get_program())?;
+    let gemini_dir = dir.join(".gemini");
+    if cmd.get_args().next().is_some_and(|arg| arg == "acp") {
+        cmd.arg("--gemini-dir")
+            .arg(&gemini_dir)
+            .args(["--app-data-dir", "antigravity-cli"]);
+    } else if !antigravity_profile_signed_in(dir) {
+        return Err("Antigravity is not signed in to this profile".into());
+    }
+    // Print mode resolves ~/.gemini from the process home. ACP also needs its
+    // explicit directory flag. Both must use the same token store.
+    cmd.env("HOME", dir)
+        .env("USERPROFILE", dir)
+        .env("GEMINI_HOME", &gemini_dir)
+        .env("AGY_CLI_FORCE_FILE_TOKEN_STORAGE", "1")
+        .env_remove("AGY_ADC_AUTH")
+        .env_remove("GEMINI_API_KEY")
+        .env_remove("GOOGLE_API_KEY")
+        .env_remove("GOOGLE_APPLICATION_CREDENTIALS");
+    Ok(())
+}
+
+fn require_antigravity_profile_support(program: &std::ffi::OsStr) -> Result<(), String> {
+    // Older builds can silently use the shared OS keyring. Cache the check per
+    // binary revision so opening a named session does not start a version probe.
+    static CHECKED: Mutex<Option<(PathBuf, std::time::SystemTime)>> = Mutex::new(None);
+    let path = Path::new(program);
+    let modified = path.metadata().and_then(|file| file.modified()).ok();
+    let mut checked = CHECKED.lock().unwrap_or_else(|error| error.into_inner());
+    if checked
+        .as_ref()
+        .is_some_and(|(known_path, known_time)| known_path == path && Some(*known_time) == modified)
+    {
+        return Ok(());
+    }
+    let command = path.to_str().ok_or("Invalid Antigravity CLI path")?;
+    let version = exec_capture(command, &["--version".into()], None)?;
+    let version = version.trim().trim_start_matches('v');
+    let mut parts = version.split('.');
+    let parsed = (|| {
+        let major = parts.next()?.parse::<u32>().ok()?;
+        let minor = parts.next()?.parse::<u32>().ok()?;
+        let patch = parts.next()?.parse::<u32>().ok()?;
+        Some((major, minor, patch))
+    })();
+    if parsed.is_none_or(|version| version < (1, 5, 16)) {
+        return Err("Antigravity profiles require a stable Antigravity CLI 1.5.16 or later".into());
+    }
+    *checked = modified.map(|time| (path.to_path_buf(), time));
     Ok(())
 }
 

@@ -9,6 +9,7 @@ const auth = vi.hoisted(() => ({
 }));
 const rateLimitsFetch = vi.hoisted(() => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
+  fetchAntigravityRateLimits: vi.fn(),
   fetchClaudeRateLimits: vi.fn(),
   fetchCodexRateLimits: vi.fn(),
 }));
@@ -20,6 +21,7 @@ vi.mock("../lib/harness/auth", async (importOriginal) => ({
 vi.mock("../lib/rateLimitsFetch", () => rateLimitsFetch);
 
 import type { ProviderRateLimits, RateLimitProvider } from "../lib/rateLimits";
+import { saveProviderAccount } from "../lib/providerAccounts";
 import { UsageFooter } from "./UsageFooter";
 
 let container: HTMLDivElement;
@@ -41,6 +43,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -81,6 +84,22 @@ function connectedLimits(provider: RateLimitProvider): ProviderRateLimits {
 }
 
 describe("UsageFooter provider authentication", () => {
+  it("offers Antigravity switching without fetching default-account usage for a named profile", async () => {
+    saveProviderAccount({ id: "account-work", provider: "antigravity", label: "Work" });
+    const onSelectAccount = vi.fn();
+    await act(async () => root.render(createElement(UsageFooter, {
+      providers: ["antigravity"],
+      session: { harness: "antigravity", providerAccountId: "account-work" },
+      onSelectAccount,
+    })));
+    expect(container.querySelector('[aria-label="Refresh usage"]')).toBeNull();
+    expect(rateLimitsFetch.fetchAntigravityRateLimits).not.toHaveBeenCalled();
+    await act(async () => button("Antigravity usage details").click());
+    await act(async () => button("Switch Antigravity account").click());
+    await act(async () => button("Default account").click());
+    expect(onSelectAccount).toHaveBeenCalledWith("antigravity", "default");
+  });
+
   it("keeps a healthy Grok provider label non-interactive", () => {
     act(() =>
       root.render(
