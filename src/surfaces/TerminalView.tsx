@@ -1,6 +1,8 @@
 import { Terminal } from "@xterm/xterm";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { CanvasAddon } from "@xterm/addon-canvas";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef } from "react";
 import {
   getPtyStatus,
@@ -191,6 +193,11 @@ function oscColors() {
   return isLightScheme() ? OSC_LIGHT : OSC_DARK;
 }
 
+function openTerminalLink(uri: string) {
+  if (!/^https?:\/\//i.test(uri)) return;
+  void openUrl(uri).catch(() => undefined);
+}
+
 export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
   const outerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -218,7 +225,9 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       smoothScrollDuration: 0,
       theme: terminalTheme(isLightScheme()),
       macOptionIsMeta: IS_MAC,
+      linkHandler: { activate: (_event, uri) => openTerminalLink(uri) },
     });
+    term.loadAddon(new WebLinksAddon((_event, uri) => openTerminalLink(uri)));
     term.open(host);
     termRef.current = term;
 

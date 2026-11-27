@@ -1,6 +1,7 @@
 import {
   HighlightStyle,
   LanguageSupport,
+  StreamLanguage,
 } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { tagHighlighter, tags, type Highlighter } from "@lezer/highlight";
@@ -147,6 +148,20 @@ export async function languageForPath(path: string): Promise<Extension | null> {
   const name = basename(path).toLowerCase();
   const extension = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
 
+  if (name === ".env" || name.startsWith(".env.")) {
+    const { properties } =
+      await import("@codemirror/legacy-modes/mode/properties");
+    // Give dotenv keys a theme color while leaving their values plain.
+    return StreamLanguage.define({
+      ...properties,
+      token: (stream, state) => {
+        const style = properties.token(stream, state);
+        return style === "def" ? "envKey" : style;
+      },
+      tokenTable: { envKey: tags.labelName },
+    });
+  }
+
   if ([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"].includes(extension)) {
     const { javascript } = await import("@codemirror/lang-javascript");
     return javascript({
@@ -162,9 +177,25 @@ export async function languageForPath(path: string): Promise<Extension | null> {
     const { css } = await import("@codemirror/lang-css");
     return css();
   }
+  if (extension === ".scss" || extension === ".sass") {
+    const { sass } = await import("@codemirror/lang-sass");
+    return sass({ indented: extension === ".sass" });
+  }
+  if (extension === ".less") {
+    const { less } = await import("@codemirror/lang-less");
+    return less();
+  }
   if ([".html", ".htm"].includes(extension)) {
     const { html } = await import("@codemirror/lang-html");
     return html();
+  }
+  if (extension === ".vue") {
+    const { vue } = await import("@codemirror/lang-vue");
+    return vue();
+  }
+  if (extension === ".svelte") {
+    const { svelte } = await import("@replit/codemirror-lang-svelte");
+    return svelte();
   }
   if ([".md", ".mdx", ".markdown"].includes(extension)) {
     const { markdown } = await import("@codemirror/lang-markdown");

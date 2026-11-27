@@ -1,6 +1,7 @@
 import { javascript } from "@codemirror/lang-javascript";
 import { describe, expect, it } from "vitest";
 import { buildUnifiedFile } from "../lib/unifiedDiff";
+import { languageForPath } from "./editorLanguage";
 import {
   highlightDiffFile,
   highlightSource,
@@ -9,8 +10,53 @@ import {
 const KEYWORD_DARK = "#ff8ffd";
 const STRING_DARK = "#b4fa72";
 const COMMENT_DARK = "#fefdc2";
+const PROPERTY_DARK = "#d0d1fe";
 
 describe("highlightSource", () => {
+  it.each(["App.vue", "Counter.svelte"])(
+    "colors script blocks in %s",
+    async (path) => {
+      const language = await languageForPath(path);
+      const lines = highlightSource(
+        '<script>\nconst name = "agent";\n</script>',
+        language,
+        "dark",
+      );
+      expect(token(lines[1], "const")?.color).toBe(KEYWORD_DARK);
+      expect(token(lines[1], '"agent"')?.color).toBe(STRING_DARK);
+    },
+  );
+
+  it.each(["theme.scss", "theme.less"])(
+    "colors comments in %s",
+    async (path) => {
+      const language = await languageForPath(path);
+      const lines = highlightSource(
+        "// note\na { color: red; }",
+        language,
+        "dark",
+      );
+      expect(token(lines[0], "// note")?.color).toBe(COMMENT_DARK);
+    },
+  );
+
+  it("colors declarations in indented Sass stylesheets", async () => {
+    const language = await languageForPath("theme.sass");
+    const lines = highlightSource(".card\n  color: red", language, "dark");
+    expect(token(lines[1], "color")?.color).toBe(PROPERTY_DARK);
+  });
+
+  it.each([".env", ".env.local", "C:\\repo\\.env.production"])(
+    "colors dotenv keys and comments in %s",
+    async (path) => {
+      const language = await languageForPath(path);
+      const lines = highlightSource("# note\nMY_KEY=value", language, "dark");
+      expect(token(lines[0], "# note")?.color).toBe(COMMENT_DARK);
+      expect(token(lines[1], "MY_KEY")?.color).toBe("#a5d5fe");
+      expect(token(lines[1], "value")?.color).toBeUndefined();
+    },
+  );
+
   it("colors TypeScript keywords, strings, and comments", () => {
     const lines = highlightSource(
       'const name = "agent";\n// note',
